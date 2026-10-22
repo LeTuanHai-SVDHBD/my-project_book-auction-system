@@ -1,95 +1,59 @@
-<!-- Mục đích: Ghi kết quả kiểm tra thực tế và phân biệt phụ thuộc thật với giả lập. -->
+<!-- Mục đích: Lưu bằng chứng kiểm tra, phân biệt phụ thuộc thật và giả. -->
 
 # Kết quả kiểm tra
 
-Ngày: 22/10/2026. Nền mã: nhánh `feat/Hai`, commit `bb3ba13eaa818486f572dcdf105ab92359ac48f3`.
-Bản cập nhật bổ sung tài khoản, xác thực và phân quyền theo phương án A.
+Ngày 22/10/2026. Bản Mốc 4 được xây trên nhánh `feat/Hai`, nền commit
+`24447dba38445eac4221b980596f2ebf3fb08b02`.
 
-## 1. Kết quả trong môi trường chuẩn bị bản cập nhật
+## 1. Xác nhận của Hải trước Mốc 4
 
-| Hạng mục | Kết quả | Phạm vi và giới hạn |
+- SQL Server và Redis healthy, giao diện đủ năm trạng thái sẵn sàng, probe completed.
+- Đăng ký/đăng nhập người dùng và tạo/đăng nhập Admin thành công.
+- Hải xác nhận hai lệnh `npm.cmd run smoke` và `npm.cmd run smoke:auth` đều PASS.
+
+Theo bằng chứng đó Mốc 3 đã hoàn thành trên máy phát triển của nhóm.
+Không khẳng định đã nhận log/ảnh đầy đủ hoặc đã chạy trực tiếp SQL trên máy Hải.
+Sau khi cập nhật M4 cần chạy lại hai smoke để kiểm tra hồi quy.
+
+## 2. Kiểm tra bản Mốc 4 trong môi trường chuẩn bị
+
+| Hạng mục | Kết quả | Giới hạn |
 |---|---|---|
-| Cài thư viện | Đạt | `npm ci --no-audit --no-fund`, Node 24.19.0 |
-| Cú pháp | Đạt | `npm run check`: 34 file JS phía máy chủ và script |
-| Kiểm thử mặc định | Đạt | `npm test`: 31 đạt, 1 SKIP; model/store giả, Argon2 thật |
-| Kiểm thử có Redis thật | Đạt | 32/32 đạt; gồm TTL 2 giờ, gia hạn, hết hạn, thu hồi và bộ đếm đồng thời |
-| Phiên bản Redis thử riêng | 7.0.15 | Chưa xác minh lại trên Redis 8 trong Docker của nhóm |
-| Build React | Đạt | `npm run build`, Vite 8.3.5 |
-| Trình duyệt desktop | Đạt | Chromium: đăng ký, đăng nhập, F5 giữ phiên, đăng xuất, Admin và điều hướng |
-| Trình duyệt mobile | Đạt | Viewport 390 px; không tràn ngang; đã xem ảnh render |
-| Bảo vệ cookie | Đạt trong QA trình duyệt | HttpOnly, SameSite=Lax; auth không lưu trong Local Storage/Session Storage |
-| Dữ liệu trong QA trình duyệt | Model giả, Redis thật | Không phải bằng chứng SQL Server thật |
-| Script setup:auth | Đạt | Giữ cấu hình cũ, tự sinh secret, chạy lại không thay secret, nhận diện secret mẫu |
-| Không đổi schema | Đã đối chiếu file | DDL 19 bảng/142 trường giữ nguyên so với commit nền |
-| Smoke SQL/Redis/worker thật sau cập nhật | Chưa chạy | Môi trường chuẩn bị không có SQL Server/Docker |
-| Smoke auth với SQL Server thật | Chưa chạy | Chạy `npm.cmd run smoke:auth` trên máy Hải |
-| Admin INSERT SQL thật | Chưa xác minh | Script đã có; cần chạy `admin:create` trên máy Hải |
+| Node/dependency | Node 24.19.0, giữ nguyên dependency và package-lock | Dùng bộ dependency đã cài bằng npm ci ở bản nền; không thêm thư viện |
+| Cú pháp | Đạt, 51 file JavaScript qua `npm run check` | Không phải kiểm tra thực thi T-SQL |
+| Test mặc định | 45 đạt, 2 SKIP | SQL/Cloudinary giả; bài Redis thật bật opt-in |
+| Test có Redis thật | 47/47 đạt | Redis 7.0.15 riêng; SQL/provider vẫn giả |
+| Build React | Đạt, Vite 8.3.5 | Không chứng minh kết nối SQL/Cloudinary thật |
+| Browser desktop/mobile | Đạt luồng tạo → từ chối → bổ sung → duyệt → kích hoạt → danh mục | React/Express/Redis thật, SQL và Cloudinary giả; viewport 1440 và 390 px |
+| Cookie/session | Giữ cơ chế M3, HTTP test hồi quy đạt | Production HTTPS chưa kiểm tra |
+| SQL migration 002 | Đã kiểm tra mã: thêm hai cột nullable/index, 001 không đổi | Chưa chạy trên SQL Server thật trong môi trường này |
+| Upload/destroy Cloudinary | Test REST contract, kiểm tra URL/kind/public_id và lỗi redacted | Không có credentials; chưa upload/destroy thật |
+| Video thật | Chưa kiểm tra | Có test magic WebM và route dùng chung; nhóm cần thử MP4/WebM thật |
+| smoke, smoke:auth, smoke:m4 sau M4 | Chưa chạy thật | Không có SQL Server/Docker và credentials Cloudinary ở đây |
 
-Các bài test auth bao gồm: email trùng, đầu vào sai, từ chối tự truyền vai trò Admin,
-CSRF thiếu/sai, đăng nhập sai/email lạ, đổi session ID/CSRF, phân quyền 401/403/200,
-đổi quyền tại SQL model có hiệu lực ở request kế tiếp, xóa tài khoản làm phiên bị từ chối,
-đăng xuất/thu hồi, TTL, lỗi store, lỗi SQL, Redis unavailable và CORS.
+Các ca M4 gồm tiền chuỗi 18 chữ số, trường không được phép, UUID/version, lịch có múi giờ,
+quý hiếm/lý do duyệt, trạng thái đôi, điều kiện đăng lại latest/no-winner/winner/missing-result,
+public projection, auth/role/CSRF, MIME/magic và Cloudinary response validation.
+Service test phân biệt rollback chắc chắn, commit chưa rõ và acknowledgement Redis lỗi sau COMMIT.
 
-Các ca SQL model giả không kiểm chứng thực thi cú pháp truy vấn, UNIQUE hoặc kết nối
-trên SQL Server thật. Cần chạy smoke trên máy nhóm trước khi xác nhận hoàn tất Mốc 3.
+Redis thật kiểm tra ownership, claim đồng thời chỉ một request thắng, release/retry,
+cleanup không xóa file được SQL tham chiếu, giữ claim chưa rõ, SQL lỗi không destroy,
+xóa tệp bỏ dở và vé hết hạn. Prefix UUID riêng được dọn; không xóa khóa ứng dụng.
+Browser kiểm tra upload PNG nhị phân qua API, role riêng, giữ ID phiên khi kích hoạt,
+không hiển thị ngưỡng giá trên trang công khai, không tràn ngang và không có pageerror.
+Ảnh QA là đầu ra tạm của quá trình kiểm tra, không đưa vào repository.
 
-## 2. Bằng chứng Mốc 2 do Hải xác nhận
+## 3. Phần cần nghiệm thu trên Windows của nhóm
 
-Hải đã xác nhận:
-- SQL Server và Redis healthy.
-- Giao diện đủ năm trạng thái sẵn sàng.
-- Probe completed.
-- `npm.cmd run smoke` PASS.
+Làm theo README mục 11: `setup:media`, cấu hình Cloudinary local, `db:migrate`, khởi động API/worker/web,
+rồi chạy check/test/build/smoke/smoke:auth/smoke:m4. Không xóa dữ liệu hay volume M3.
 
-Đây là kết quả trên máy Hải trước bản cập nhật tài khoản.
-Sau khi cập nhật cần chạy lại `smoke` để xác nhận không ảnh hưởng luồng cũ.
+Smoke M4 dùng tài khoản/dữ liệu UUID riêng: kiểm tra rollback SQL khi gắn media lỗi,
+retry tạo bài, quyền/CSRF, cặp trạng thái pending/reject/approve, kiểm duyệt đồng thời,
+kích hoạt đúng phiên, ẩn giá và fixture kết quả không người thắng/có người thắng cho đăng lại.
+Chỉ PASS nếu dọn cả SQL và Cloudinary thành công. Fixture không tạo API kết thúc thủ công.
+Đây là script **chờ chạy**, không phải bằng chứng đã thực thi trong môi trường chuẩn bị.
 
-## 3. Kết quả trên máy Hải được xác nhận ngày 22/10/2026
-
-Hải xác nhận đã chạy chức năng tài khoản thành công:
-
-| Nội dung | Kết quả / nguồn |
-|---|---|
-| Tạo tài khoản | Thành công, theo xác nhận của Hải |
-| Đăng nhập người dùng | Thành công, theo xác nhận của Hải |
-| Tạo và đăng nhập tài khoản Admin | Thành công, theo xác nhận của Hải |
-
-Đây là xác nhận sử dụng trên máy phát triển của nhóm, không phải kết quả SQL được chạy
-trực tiếp trong môi trường chuẩn bị bản cập nhật ở mục 1. Chưa có log smoke hoặc ảnh
-nghiệm thu bổ sung trong lần xác nhận này.
-
-## 4. Rà soát mã nguồn và bản sửa tài liệu
-
-Đã đối chiếu nhánh `feat/Hai` tại commit `3ad972ee6cfda4d084aff3f68070ae83a815c62b`
-với bản cập nhật Mốc 3; các file chức năng tài khoản đã có đầy đủ.
-
-Kết quả chạy lại trên mã nguồn commit đó:
-
-- `npm ci --no-audit --no-fund`: thành công.
-- `npm run check`: đạt, 34 file JavaScript.
-- `npm test`: 31 đạt, 1 SKIP, không lỗi; bài Redis thật chưa bật biến opt-in.
-- `npm run build`: thành công.
-
-Bản sửa tiếp theo đồng bộ hướng dẫn tài khoản vào README, cập nhật xác nhận trên máy Hải
-và thêm tên volume chuẩn cho máy cài mới vào `.env.example`. Fallback volume hiện hành
-trong Compose được giữ nguyên; không sửa `.env` riêng hoặc dữ liệu.
-
-Kiểm tra riêng cho bản sửa cấu hình và tài liệu:
-
-- Đọc YAML thành công; hai fallback volume giống trước bản sửa.
-- Chạy setup trong thư mục tạm: máy cài mới nhận đủ hai tên volume chuẩn.
-- Chạy lại setup với `.env` đã có: nội dung file được giữ nguyên.
-- Chạy setup:auth với cấu hình cũ: chỉ bổ sung session, không thêm hoặc đổi biến volume.
-- Liên kết và anchor Markdown nội bộ hợp lệ; không còn tham chiếu hai file hướng dẫn riêng đã xóa.
-
-Các kiểm tra này không khởi động Docker, không xác nhận mount thực tế trên máy Hải
-và không thay thế `smoke` / `smoke:auth` với SQL Server thật.
-
-## 5. Điều kiện nghiệm thu còn lại
-
-Làm theo [README, mục 6–7](README.md#6-kiểm-tra-tài-khoản-trên-giao-diện),
-kiểm tra giữ phiên sau F5, đăng xuất, quyền Admin và chạy `smoke` / `smoke:auth`
-trên Windows với SQL Server/Redis thật. Chỉ đánh dấu PASS khi có kết quả tương ứng.
-
-Chưa triển khai các nghiệp vụ đăng sách, AI, đặt giá hoặc kết thúc phiên.
-Socket.IO hiện chỉ có lời chào kiểm tra hạ tầng công khai.
+Chưa có kiểm thử tải lớn, thời lượng video, distributed commit SQL–Cloudinary hoặc phục hồi hoàn toàn khi mất Redis.
+Claim chưa rõ commit được giữ để đối soát thủ công; không đánh đổi an toàn media bằng xóa phỏng đoán.
+Mốc 5 (đặt giá/kết thúc), Mốc 6 realtime nghiệp vụ và Mốc 7 AI chưa triển khai trong bản này.

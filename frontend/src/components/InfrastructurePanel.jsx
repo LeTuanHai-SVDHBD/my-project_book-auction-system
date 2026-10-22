@@ -52,7 +52,7 @@ export default function InfrastructurePanel() {
       {networkError && <p className="alert" role="alert">{networkError}</p>}
       <section className="services" aria-label="Trạng thái hạ tầng">
         <Status label="Express API" value={health ? true : networkError ? false : undefined} detail="Tiếp nhận yêu cầu · cổng 5000"/>
-        <Status label="SQL Server" value={db?.ok} detail={db?.connected ? `${db.databaseName} · ${db.tables}/19 bảng · ${db.columns}/142 trường` : 'Kho dữ liệu chính · cổng 14330'}/>
+        <Status label="SQL Server" value={db?.ok} detail={db?.connected ? `${db.databaseName} · ${db.tables}/${db.expectedTables ?? 19} bảng · ${db.columns}/${db.expectedColumns ?? 144} trường` : 'Kho dữ liệu chính · cổng 14330'}/>
         <Status label="Redis" value={redis?.ok} detail="Redis Streams · cổng 63790"/>
         <Status label="Event Worker" value={worker?.ok} detail={worker?.consumer || 'Tiến trình Node.js chạy riêng'}/>
         <Status label="Socket.IO" value={socketReady} detail="Kiểm tra kết nối thời gian thực"/>

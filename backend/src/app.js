@@ -10,7 +10,7 @@ function sameToken(received, expected) {
   const a = Buffer.from(received || ''); const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
 }
-export function createApp({ config, deps, probes, authRouter, log = () => {} }) {
+export function createApp({ config, deps, probes, authRouter, postRouter, mediaRouter, log = () => {} }) {
   const app = express();
   app.disable('x-powered-by'); app.use(helmet());
   app.use((req, res, next) => { req.requestId = randomUUID(); res.setHeader('X-Request-ID', req.requestId); next(); });
@@ -18,8 +18,8 @@ export function createApp({ config, deps, probes, authRouter, log = () => {} }) 
     if (!origin || config.origins.includes(origin)) done(null, true);
     else done(new HttpError(403, 'ORIGIN_NOT_ALLOWED', 'Origin không được phép.'));
   }, credentials: true }));
-  app.use(express.json({ limit: '8kb' }));
-  app.get('/api/health/live', (req, res) => res.json({ ok: true, service: 'book-auction-api', milestone: 2, uptimeSeconds: Math.floor(process.uptime()) }));
+  app.use(express.json({ limit: '64kb' }));
+  app.get('/api/health/live', (req, res) => res.json({ ok: true, service: 'book-auction-api', milestone: 4, uptimeSeconds: Math.floor(process.uptime()) }));
   app.get('/api/health/ready', async (req, res) => {
     const report = await readiness(deps); res.status(report.ok ? 200 : 503).json(report);
   });
@@ -39,6 +39,8 @@ export function createApp({ config, deps, probes, authRouter, log = () => {} }) 
   });
   app.use('/api/dev', diagnostic);
   if (authRouter) app.use('/api/auth', authRouter);
+  if (postRouter) app.use('/api/posts', postRouter);
+  if (mediaRouter) app.use('/api/media', mediaRouter);
   app.use((req, res, next) => next(new HttpError(404, 'NOT_FOUND', 'Không tìm thấy API.')));
   app.use(errorHandler(log));
   return app;

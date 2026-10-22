@@ -15,7 +15,8 @@ hướng tới xử lý tranh chấp đồng thời và đồng bộ thời gian
 - Xác thực: session Redis, cookie HttpOnly, CSRF và Argon2id.
 - Phân quyền: người dùng / Admin; script tạo Admin và kiểm thử API bảo vệ.
 
-Đăng sách, phân tích AI, kích hoạt phiên, đặt giá và kết thúc phiên chưa được triển khai.
+Mốc 4 đã thêm đăng sách, media Cloudinary, kiểm duyệt thủ công, bổ sung bài từ chối,
+đặt lịch/kích hoạt và đăng lại cùng bản sách. AI ở Mốc 7; đặt giá/kết thúc ở Mốc 5 chưa triển khai.
 Màn hình kiểm tra hệ thống vẫn có trong thanh điều hướng.
 
 ## 2. Môi trường
@@ -59,11 +60,12 @@ npm.cmd run admin:create
 ```
 
 `setup` tạo cấu hình riêng trên máy; không ghi đè `.env` đã có.
-`db:init` tạo database/schema khi chưa có và giữ nguyên database đã nhận diện đủ 19 bảng/142 trường.
+`db:init` tạo schema nền khi chưa có, rồi chạy migration 002 lên 19 bảng/144 cột.
+Database Mốc 3 có 142 cột được nâng cấp bằng cách thêm hai cột nullable; dữ liệu giữ nguyên.
 `admin:create` yêu cầu nhập tên, email và mật khẩu kín trong terminal.
 
 **Máy đã hoàn thành phần môi trường:** cập nhật file, chạy `npm.cmd ci`,
-`npm.cmd run setup:auth` và `npm.cmd run admin:create`.
+`npm.cmd run setup:auth`, `npm.cmd run setup:media` và `npm.cmd run db:migrate`.
 Nếu Admin đã tồn tại, script giữ nguyên tài khoản và mật khẩu. Không cần tạo lại database.
 
 Máy cài mới lấy hai tên volume chuẩn từ `.env.example` khi chạy `setup`:
@@ -120,7 +122,7 @@ Nếu email đã là Admin, script giữ nguyên mật khẩu. Nếu email thu�
 chọn email Admin khác; script không tự nâng quyền tài khoản đó.
 
 Đăng nhập Admin và kiểm tra quyền là hai bước riêng.
-Nút kiểm tra quyền gọi backend; đây chưa phải màn hình quản lý bài đăng hay kiểm duyệt sách.
+Nút kiểm tra quyền gọi backend. Màn hình duyệt bài nằm ở tab **Kiểm duyệt** sau khi đăng nhập Admin.
 
 ## 7. Kiểm tra bằng lệnh
 
@@ -132,13 +134,16 @@ npm.cmd test
 npm.cmd run build
 npm.cmd run smoke
 npm.cmd run smoke:auth
+npm.cmd run smoke:m4
 ```
 
-- `test` chạy HTTP test với phụ thuộc giả và Argon2 thật.
+- `test` chạy hợp đồng HTTP, quy tắc Mốc 4, media và Argon2 thật với SQL/Cloudinary giả.
   Bài Redis thật mặc định SKIP, bật bằng `AUTH_TEST_REDIS_URL`.
 - `smoke` kiểm tra hạ tầng thật, worker và probe.
 - `smoke:auth` kiểm tra đăng ký, đăng nhập, cookie, CSRF, phân quyền và thu hồi phiên;
   tạo rồi dọn tài khoản thử riêng.
+- `smoke:m4` cần Cloudinary thật; kiểm tra luồng Mốc 4, rollback SQL và kiểm duyệt đồng thời.
+  Script chỉ chạy trong development, tạo ba tài khoản thử (có một Admin) và dọn đúng dữ liệu/media của lần chạy.
 - Kiểm tra Admin thủ công theo mục 6.2.
 
 `smoke:auth` chỉ tạo và dọn tài khoản thử riêng của lần chạy. Nếu dọn thất bại,
@@ -220,3 +225,132 @@ Không xóa volume để xử lý lỗi cấu hình.
 - [Tiến độ](docs/tasks.md)
 - [Kết quả kiểm tra](VALIDATION.md)
 - [Chuyển Docker project và kiểm tra volume](docs/docker-migration.md)
+
+
+## 11. Bắt đầu Mốc 4 trên máy đã hoàn thành Mốc 3
+
+Giữ nguyên `.env`, database, tài khoản và Docker volume hiện tại. Dừng terminal API bằng Ctrl+C trước khi cập nhật.
+
+```powershell
+git switch feat/Hai
+git pull --ff-only origin feat/Hai
+npm.cmd ci
+npm.cmd run setup:media
+npm.cmd run db:migrate
+```
+
+Nếu Git báo có thay đổi cục bộ, giữ/lưu các thay đổi đó trước khi pull; không dùng `reset --hard`.
+`db:migrate` chạy `002_cloudinary_metadata.sql`, chỉ thêm `cloudinary_public_id` nullable vào `HinhAnh` và `Video`
+cùng index tra cứu. Có thể chạy lại. `001_schema.sql` giữ nguyên; không cần xóa database hay chạy lại DDL nền.
+Readiness SQL của Mốc 4 cần **19 bảng/144 cột** (Mốc 3 là 142 cột).
+
+Mở `.env` ở **gốc dự án**, điền từ tài khoản Cloudinary của bạn:
+
+```dotenv
+CLOUDINARY_CLOUD_NAME=ten_cloud_cua_ban
+CLOUDINARY_API_KEY=api_key_cua_ban
+CLOUDINARY_API_SECRET=api_secret_cua_ban
+```
+
+Chỉ sửa ba giá trị trên máy; không gửi secret qua chat, không thêm vào `frontend/.env` hay biến `VITE_*`.
+Lấy chúng trong phần API credentials của Cloudinary; không cần cấu hình unsigned upload preset.
+API upload xác thực với Cloudinary từ server bằng REST; không thêm dependency.
+
+Chạy lại API, worker và React theo mục 5. API vẫn khởi động được khi Cloudinary chưa cấu hình;
+chức năng upload sẽ bị khóa và biểu mẫu hiển thị lý do. Lưu URL/provider ID ở SQL, tệp gốc ở Cloudinary;
+không lưu tệp vào Redis, cột SQL nhị phân hay thư mục upload trong repository.
+
+### 11.1. Đi qua luồng trên giao diện
+
+1. Đăng nhập **người dùng** → **Bài của tôi → Đăng sách mới**.
+2. Nhập thông tin sách, tình trạng, bằng chứng quý hiếm; chọn ảnh/video và chờ tải xong.
+3. Nhập giá nguyên VND không dấu phân cách, bước giá, thời gian chờ 10–30 giây → **Gửi kiểm duyệt**.
+4. Bài và phiên cùng chờ duyệt, chưa có lịch. Chủ sách xem trạng thái trong **Bài của tôi**.
+5. Dùng trình duyệt khác hoặc cửa sổ riêng đăng nhập **Admin → Kiểm duyệt → Xem chi tiết**.
+6. Kiểm tra thông tin, ảnh/video và nguồn đối chiếu. Ghi lý do; khi duyệt phải xác nhận đã kiểm tra bằng chứng quý hiếm.
+   Có thể từ chối, chỉ rõ phần cần bổ sung. Chủ sách dùng **Bổ sung và gửi duyệt lại**; giữ bài/phiên và lịch sử,
+   bổ sung mô tả, giá, media. Media đã lưu được giữ lại; không sửa bản ghi sách đang dùng trong lịch sử.
+7. Sau khi được duyệt, chủ sách tải lại chi tiết, chọn giờ bắt đầu trong tương lai và giờ kết thúc sau đó → **Đặt lịch và kích hoạt**.
+   Giờ nhập theo máy người dùng, gửi UTC và kiểm tra bằng đồng hồ SQL Server. ID phiên giữ nguyên.
+8. Phiên đã kích hoạt xuất hiện trong **Danh mục**; người mua không nhận `gia_toi_thieu` từ API.
+   Chức năng đặt giá và tự chốt phiên sẽ có ở Mốc 5.
+
+AI chưa được gọi trong Mốc 4: hiển thị **Chưa có phân tích AI**, không tạo điểm 0 hoặc kết quả lỗi giả.
+Admin vẫn duyệt thủ công. Nếu database đã có phân tích, giao diện hiển thị dữ liệu đó để tham khảo.
+Thiếu bằng chứng phải được ghi rõ trong nhận xét; tình trạng đẹp không thay thế điều kiện quý hiếm.
+
+**Đăng lại:** chỉ khi phiên **mới nhất** của bản sách đã `da_ket_thuc` và có `KetQuaDauGia`
+`khong_co_nguoi_thang`. Tạo bài/phiên mới giữ `sach_id`, không ghi đè giá hoặc lịch sử cũ;
+có thể dùng lại media của bài trước. Không có nút kết thúc thủ công để tạo điều kiện đăng lại.
+Trước Mốc 5, kịch bản này được kiểm tra bằng fixture riêng trong `smoke:m4`.
+
+### 11.2. Media và xử lý lỗi
+
+| Cấu hình | Mặc định kỹ thuật |
+|---|---|
+| Ảnh | JPEG, PNG, WebP; `MEDIA_IMAGE_MAX_MB=10`, `MEDIA_MAX_IMAGES=12` |
+| Video | MP4, WebM; `MEDIA_VIDEO_MAX_MB=50`, `MEDIA_MAX_VIDEOS=3` |
+| Upload đang xử lý | Tối đa 2 request/API process; 60 lần/tài khoản/giờ |
+| Vé upload chưa dùng | Có hiệu lực 1 giờ; phải thuộc đúng chủ sách |
+
+Đây là giới hạn tài nguyên của bản triển khai, không phải bộ tiêu chí chấm điểm trong báo cáo.
+Có thể cấu hình trong `.env` theo giới hạn gói Cloudinary; khởi động lại API sau khi đổi.
+Backend kiểm tra MIME, kích thước và magic bytes; Cloudinary tiếp tục giải mã tệp. Chưa có kiểm tra thời lượng video.
+
+Ảnh/video tải xong được cấp vé Redis, chỉ vé được gửi cùng bài. Không nhận URL hay `public_id` do client khai báo.
+Claim vé nguyên tử trước khi vào SQL; không upload/gọi AI trong giao dịch SQL.
+Nếu SQL rollback chắc chắn, vé được trả lại để thử lại. Nếu không rõ COMMIT đã thành công hay chưa,
+hệ thống giữ vé claim để đối soát, không tự xóa file có thể đang được sử dụng.
+
+API chạy cleanup mỗi phút: vé hết hạn chỉ bị xóa Cloudinary sau khi kiểm tra không có tham chiếu SQL.
+SQL hoặc Cloudinary lỗi thì giữ lại để thử sau. File đã gắn bài (kể cả lịch sử cũ) được giữ lại.
+Nếu tiến trình chết trước acknowledgement, SQL reference giúp cleanup nhận diện file đã lưu.
+Claim chưa rõ và không có reference được giữ lại, ghi cảnh báo số lượng; cần đối soát thủ công sau khi dừng API,
+đây là giới hạn phục hồi hiện tại. Redis mất dữ liệu có thể để lại media mồ côi; dùng AOF và không xóa Redis/volume.
+
+Mất phản hồi khi tạo bài: dùng lại `ma_yeu_cau` để lấy kết quả cũ, không tạo thêm sách/phiên.
+Cùng mã yêu cầu luôn trả bài đã tạo trước đó; không dùng lại mã đó cho nội dung mới.
+HTTP 409 khi thao tác bằng `row_version` cũ: tải lại bài rồi thao tác lại.
+Vé hết hạn hoặc đã claim chưa rõ: kiểm tra **Bài của tôi** trước khi tải lại tệp và tạo yêu cầu mới.
+
+### 11.3. API Mốc 4
+
+| Phương thức | Endpoint | Quyền |
+|---|---|---|
+| GET | `/api/posts/catalog`, `/api/posts/catalog/:id` | Công khai; chỉ bài duyệt + phiên kích hoạt, projection không có ngưỡng giá |
+| GET | `/api/posts/mine` | Người dùng; bài của mình |
+| GET | `/api/posts/pending` | Admin; hàng chờ kiểm duyệt |
+| GET | `/api/posts/:id` | Chủ bài hoặc Admin; có giá riêng và lịch sử duyệt |
+| POST | `/api/posts` | Người dùng + CSRF; tạo mới |
+| POST | `/api/posts/:id/resubmit` | Chủ bài bị từ chối + CSRF |
+| POST | `/api/posts/:id/relist` | Chủ bài đủ điều kiện đăng lại + CSRF |
+| POST | `/api/posts/:id/review` | Admin + CSRF; lý do bắt buộc |
+| POST | `/api/posts/:id/activate` | Chủ bài đã duyệt + CSRF; không tạo phiên mới |
+| GET | `/api/media/config` | Cấu hình công khai, không bí mật |
+| POST | `/api/media/image`, `/api/media/video` | Người dùng + CSRF; body nhị phân, Content-Type đúng MIME |
+| DELETE | `/api/media/:upload_id` | Chủ vé + CSRF; chỉ bỏ tệp chưa gắn bài |
+
+Danh sách tối đa 30 bài/trang, dùng `?before=<bai_dang_id>` theo `nextBefore` để xem tiếp.
+Giá trong JSON là **chuỗi số nguyên**, giữ đủ chính xác DECIMAL(18,0).
+Tạo bài gửi `ma_yeu_cau` UUID v4, `sach`, `bai_dang`, `phien`, `media: [{upload_id,tieu_de}]`.
+Đăng lại bỏ `sach`, thêm `reuse_media`; gửi duyệt lại bỏ `sach`/`ma_yeu_cau`, gửi `row_version`.
+Duyệt nhận `quyet_dinh: phe_duyet|tu_choi`, `ly_do`, `xac_nhan_quy_hiem`, `row_version`.
+Kích hoạt nhận `thoi_gian_bat_dau`, `thoi_gian_ket_thuc` ISO có múi giờ và `row_version`.
+
+### 11.4. Nghiệm thu
+
+```powershell
+npm.cmd run check
+npm.cmd test
+npm.cmd run build
+npm.cmd run smoke
+npm.cmd run smoke:auth
+npm.cmd run smoke:m4
+```
+
+`smoke:m4` tạo dữ liệu UUID riêng và tải một PNG thật lên Cloudinary; có sử dụng tài nguyên gói của bạn.
+Kiểm tra tạo/retry, rollback SQL khi gắn media lỗi, quyền/CSRF, từ chối/bổ sung, duyệt đồng thời,
+lịch kích hoạt, ẩn ngưỡng giá và điều kiện đăng lại. Fixture kết thúc phiên chỉ thay đổi phiên của tài khoản smoke,
+không phải API kết thúc thủ công. Cuối cùng dọn dữ liệu SQL và media riêng; dọn lỗi trả FAIL và in ID để đối soát.
+Video thật và chất lượng bằng chứng cần thử thủ công bằng tệp của nhóm.
+Chỉ xác nhận Mốc 4 hoàn tất trên máy nhóm khi các lệnh và luồng giao diện này đạt.

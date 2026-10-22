@@ -19,13 +19,28 @@ import { enqueueProbe } from './events/eventPublisher.js';
 import { INFRA } from './constants/infrastructure.js';
 import { createApp } from './app.js';
 import { logger, logError } from './utils/logger.js';
+import { parseMediaConfig } from './config/media.js';
+import { createSessionMiddleware } from './middlewares/session.js';
+import { createCloudinary } from './services/cloudinary.service.js';
+import { createMediaLedger } from './services/mediaLedger.service.js';
+import { createPostModel } from './models/post.model.js';
+import { createPostService } from './services/post.service.js';
+import { createPostRouter } from './routes/post.routes.js';
+import { createMediaRouter } from './routes/media.routes.js';
 const authConfig = parseAuthConfig(process.env);
-const authRouter = createAuthRouter({ authConfig,
-  store: new RedisStore({ client: redis, prefix: 'bookauction:auth:session:' }),
-  users: createUserModel({ getPool, sql }), passwords,
+const users = createUserModel({ getPool, sql });
+const sessionMiddleware = createSessionMiddleware(authConfig, new RedisStore({ client: redis, prefix: 'bookauction:auth:session:' }));
+const mediaConfig = parseMediaConfig(process.env);
+const model = createPostModel({getPool,sql});
+const provider = createCloudinary({config:mediaConfig});
+const ledger = createMediaLedger({getRedis:requireRedis,provider,isReferenced:id=>model.isMediaReferenced(id),config:mediaConfig});
+const service = createPostService({model,ledger,limits:mediaConfig,log:logError});
+const postRouter = createPostRouter({sessionMiddleware,users,model,service,limits:mediaConfig});
+const mediaRouter = createMediaRouter({sessionMiddleware,users,config:mediaConfig,provider,ledger});
+const authRouter = createAuthRouter({ authConfig, sessionMiddleware, users, passwords,
   limiter: createAuthRateLimiter({ getRedis: requireRedis, secret: authConfig.secret }),
   ready: () => redis.isReady });
-const app = createApp({ config, authRouter, deps: { sqlserver: databaseStatus, redis: redisStatus, worker: workerStatus },
+const app = createApp({ config, authRouter, postRouter, mediaRouter, deps: { sqlserver: databaseStatus, redis: redisStatus, worker: workerStatus },
   probes: { enqueue: () => enqueueProbe(requireRedis()), get: async id => {
     const raw = await requireRedis().get(INFRA.resultPrefix + id); return raw ? JSON.parse(raw) : null;
   } }, log: logError });
@@ -38,9 +53,18 @@ server.on('error', error => { logError(error, { component: 'http-server' }); voi
 void Promise.allSettled([getPool(), connectRedis()]).then(results => {
   results.forEach((r, i) => { if (r.status === 'rejected') logError(r.reason, { component: i === 0 ? 'startup-sql' : 'startup-redis' }); });
 });
+let cleaning = false;
+const cleanupTimer = setInterval(async () => {
+  if (cleaning || !redis.isReady || !mediaConfig.configured) return;
+  cleaning = true;
+  try { const result = await ledger.cleanup(); if (result.retainedClaims) logger.warn({count:result.retainedClaims}, 'Có vé media chưa rõ kết quả SQL; giữ lại để đối soát'); }
+  catch(error) { logError(error,{component:'media-cleanup'}); }
+  finally { cleaning = false; }
+}, 60000);
+cleanupTimer.unref();
 let stopping = false;
 async function shutdown(code = 0) {
-  if (stopping) return; stopping = true;
+  if (stopping) return; stopping = true; clearInterval(cleanupTimer);
   const force = setTimeout(() => process.exit(1), 10000); force.unref();
   await new Promise(resolve => io.close(resolve));
   if (redis.isOpen) redis.destroy();

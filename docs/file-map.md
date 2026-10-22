@@ -29,7 +29,6 @@
 | `frontend/` | Giao diện React |
 | `scripts/` | Công cụ hỗ trợ toàn dự án |
 | `docs/` | Tài liệu kiến trúc và tiến độ |
-| `academic/` | Báo cáo, slide, mã UML và bằng chứng nghiệm thu |
 
 ## 3. Backend
 
@@ -57,15 +56,14 @@ Các đường dẫn bên dưới nằm trong `backend/`.
 | `src/middlewares/errorHandler.js` | Chuẩn hóa lỗi HTTP | Đã có |
 | `src/utils/logger.js` | Log có cấu trúc và che thông tin nhạy cảm | Đã có |
 | `test/infrastructure.test.js` | Kiểm thử hạ tầng và API bằng giả lập | Đã có |
-| `src/routes/` | Router nghiệp vụ | Chờ triển khai |
-| `src/models/` | Truy vấn dữ liệu nghiệp vụ; giữ chỗ bằng `.gitkeep` | Chờ triển khai |
+| `src/routes/` | Router nghiệp vụ | Đã có auth.routes.js |
+| `src/models/` | Truy vấn dữ liệu nghiệp vụ | Đã có user.model.js |
 | `src/concurrency/` | Khóa theo phiên và hỗ trợ xử lý đồng thời | Chờ triển khai |
 | `src/jobs/` | Tác vụ kiểm tra hết hạn phiên | Chờ triển khai |
 | `src/ai/` | Kết nối và kiểm tra kết quả phân tích AI | Chờ triển khai |
 
 Khi thêm chức năng, tạo controller, service và model tương ứng.
-Ví dụ tên file dự kiến: `auth.controller.js`, `auth.service.js`,
-`user.model.js`. Các file này chưa có trong bộ khung.
+Các file tài khoản đã có được liệt kê tại mục 9.
 
 ## 4. Frontend
 
@@ -79,11 +77,11 @@ Các đường dẫn bên dưới nằm trong `frontend/`.
 | `.env.example` | Mẫu địa chỉ API | Đã có |
 | `.env` | Cấu hình riêng; không commit | Tạo bằng setup |
 | `src/main.jsx` | Gắn React vào trang HTML | Đã có |
-| `src/App.jsx` | Màn hình kiểm tra hạ tầng | Đã có |
-| `src/style.css` | Giao diện màn hình kiểm tra | Đã có |
+| `src/App.jsx` | Điều hướng tài khoản và kiểm tra hệ thống | Đã có |
+| `src/style.css` | Giao diện tài khoản và kiểm tra hệ thống | Đã có |
 | `src/pages/` | Trang nghiệp vụ | Tạo khi cần |
-| `src/components/` | Component dùng lại | Tạo khi cần |
-| `src/services/` | Hàm gọi HTTP API | Tạo khi cần |
+| `src/components/` | Màn hình tài khoản và hạ tầng | Đã có |
+| `src/services/` | Hàm gọi HTTP API tài khoản | Đã có |
 | `src/hooks/` | React hook dùng lại | Tạo khi cần |
 
 Không đưa truy vấn SQL, mật khẩu database hoặc Redis client vào Frontend.
@@ -108,12 +106,6 @@ Script điều phối nhiều thành phần nằm trong `scripts/` ở gốc.
 | `docs/file-map.md` | Bản đồ mã nguồn |
 | `docs/decisions.md` | Quyết định kỹ thuật và nội dung chưa chốt |
 | `docs/tasks.md` | Công việc, tiến độ và điều kiện nghiệm thu |
-| `docs/docker-migration.md` | Chuyển tên Docker project và giữ liên kết dữ liệu cũ |
-| `academic/README.md` | Quy ước lưu báo cáo, slide, UML và bằng chứng |
-| `academic/reports/` | DOCX và PDF báo cáo |
-| `academic/slides/` | PPTX và PDF thuyết trình |
-| `academic/uml/` | PlantUML và hình sơ đồ |
-| `academic/evidence/` | Bằng chứng kiểm thử đã chọn |
 
 ## 7. File sinh tự động
 
@@ -131,3 +123,25 @@ Các hàm chỉ cần comment thêm khi có quy tắc hoặc lý do khó thấy 
 
 Không chèn comment vào `package.json`, `package-lock.json`
 hoặc `schema-manifest.json` vì các file này sử dụng JSON chuẩn.
+
+## 9. Các file bổ sung cho tài khoản
+
+| File | Trách nhiệm |
+|---|---|
+| `backend/src/config/auth.js` | Kiểm tra secret, cookie và thời hạn session |
+| `backend/src/models/user.model.js` | Đọc/ghi NguoiDung bằng tham số SQL |
+| `backend/src/services/password.service.js` | Băm và kiểm tra Argon2id |
+| `backend/src/services/auth.service.js` | Kiểm tra đầu vào, đăng ký và đăng nhập |
+| `backend/src/services/authRateLimit.service.js` | Bộ đếm giới hạn thử dùng Redis Lua |
+| `backend/src/middlewares/auth.js` | CSRF, xác thực và phân quyền HTTP |
+| `backend/src/controllers/auth.controller.js` | Phản hồi HTTP và vòng đời session |
+| `backend/src/routes/auth.routes.js` | Endpoint tài khoản và cấu hình middleware session |
+| `backend/scripts/createAdmin.js` | Tạo Admin qua terminal, nhập mật khẩu kín |
+| `frontend/src/components/AccountPanel.jsx` | Form và thông tin tài khoản |
+| `frontend/src/components/InfrastructurePanel.jsx` | Màn hình hạ tầng được tách từ App cũ |
+| `frontend/src/services/authApi.js` | Fetch kèm cookie và CSRF trong bộ nhớ |
+| `scripts/setupAuth.mjs` | Bổ sung cấu hình auth còn thiếu |
+| `scripts/smokeAuth.mjs` | Kiểm tra API/SQL/Redis thật và dọn tài khoản thử |
+| `backend/test/auth.test.js` | HTTP auth, model/store giả và Argon2 thật |
+| `backend/test/authRedis.test.js` | Kiểm tra Redis thật theo opt-in |
+| `backend/test/setupAuth.test.js` | Kiểm tra giữ nguyên cấu hình và chạy lại an toàn |

@@ -1,5 +1,5 @@
 {
-  "name": "my-project_book-auction-system-backend",
+  "name": "book-auction-backend",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,12 +9,16 @@
     "start:api": "node src/server.js",
     "start:worker": "node src/worker.js",
     "db:init": "node scripts/initDatabase.js",
+    "admin:create": "node scripts/createAdmin.js",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
+    "argon2": "0.45.1",
+    "connect-redis": "10.0.0",
     "cors": "2.8.6",
     "dotenv": "17.4.2",
     "express": "5.3.0",
+    "express-session": "1.19.0",
     "helmet": "8.3.0",
     "mssql": "12.7.10",
     "pino": "10.4.0",

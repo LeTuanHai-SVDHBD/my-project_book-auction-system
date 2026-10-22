@@ -4,11 +4,11 @@
 
 ## 1. Phạm vi
 
-Các luồng tài khoản và nghiệp vụ dưới đây là thiết kế cần triển khai.
-Mã nguồn hiện tại đã triển khai luồng kiểm tra hạ tầng.
+Luồng kiểm tra hạ tầng và luồng tài khoản đã có trong mã nguồn.
+Các luồng từ đăng sách đến khiếu nại bên dưới vẫn là thiết kế chưa triển khai.
 
-Cơ chế duy trì đăng nhập, thư viện băm mật khẩu và thời hạn phiên
-cần được thống nhất trước khi viết chức năng xác thực.
+Tài khoản dùng session Redis, cookie HttpOnly và Argon2id theo ADR-010.
+Chi tiết luồng HTTP hiện tại được ghi ở mục 10.
 
 ## 2. Đăng ký
 
@@ -16,7 +16,7 @@ cần được thống nhất trước khi viết chức năng xác thực.
 |---|---|
 | 1 | Người dùng nhập thông tin đăng ký |
 | 2 | Backend kiểm tra dữ liệu bắt buộc và định dạng |
-| 3 | Kiểm tra email đã tồn tại |
+| 3 | Kiểm tra CSRF và giới hạn thử bằng Redis |
 | 4 | Băm mật khẩu bằng thư viện chuyên dụng có salt |
 | 5 | Lưu tài khoản vào `NguoiDung` |
 | 6 | Trả kết quả đăng ký, không trả trường mật khẩu |
@@ -31,9 +31,9 @@ cần được thống nhất trước khi viết chức năng xác thực.
 | Bước | Xử lý |
 |---|---|
 | 1 | Người dùng gửi thông tin đăng nhập |
-| 2 | Backend kiểm tra tài khoản và trạng thái được phép sử dụng |
+| 2 | Backend kiểm tra dữ liệu, CSRF, giới hạn thử và tài khoản trong SQL |
 | 3 | So khớp mật khẩu với chuỗi băm |
-| 4 | Tạo phiên đăng nhập theo cơ chế được thống nhất |
+| 4 | Đổi session ID, tạo phiên Redis và token CSRF mới |
 | 5 | Các yêu cầu tiếp theo được kiểm tra xác thực và quyền |
 | 6 | Khi đăng xuất hoặc hết hạn, xử lý theo chính sách phiên |
 
@@ -41,7 +41,7 @@ cần được thống nhất trước khi viết chức năng xác thực.
 - Không trả mật khẩu hoặc chuỗi băm cho Frontend.
 - Không tin vai trò hoặc mã người dùng do client tự khai báo.
 - Kiểm tra quyền sở hữu tài nguyên tại Backend.
-- Token chẩn đoán hạ tầng không phải tài khoản đăng nhập.
+- Token chẩn đoán Mốc 2 không phải tài khoản đăng nhập.
 
 ## 4. Đăng sách và kích hoạt phiên
 
@@ -171,11 +171,28 @@ nếu chưa cập nhật thiết kế và được nhóm thống nhất.
 - Không tự động thay đổi người thắng hoặc trạng thái giao dịch
   chỉ vì có khiếu nại.
 
-## 9. Luồng kiểm tra hạ tầng đã có
+## 9. Luồng kiểm tra Mốc 2 đã có
 
 `React → API → Redis Streams → Worker → SELECT kiểm tra SQL → Redis → React`
 
 - API trả trạng thái `queued`.
 - Worker chỉ truy vấn kiểm tra, không ghi dữ liệu đấu giá.
 - Worker lưu `completed`; giao diện lấy kết quả qua API.
-- Socket.IO hiện kiểm tra kết nối bằng `system:hello`.
+- Socket.IO trong Mốc 2 mới kiểm tra kết nối bằng `system:hello`.
+
+## 10. Luồng tài khoản — đã triển khai trong bản cập nhật Mốc 3
+
+1. React gọi `GET /api/auth/csrf` với `credentials: include`.
+2. API tạo session ẩn danh trong Redis và trả token CSRF; cookie mang mã session.
+3. React đăng ký với họ tên, email, mật khẩu và header CSRF.
+4. Backend kiểm tra dữ liệu và giới hạn thử, băm Argon2id, INSERT tham số hóa vào NguoiDung.
+5. UNIQUE email bảo vệ đăng ký trùng; API công khai chỉ ghi vai trò `nguoi_dung`.
+6. Khi đăng nhập, backend đọc SQL và so hash, rồi đổi session ID và token CSRF.
+7. Trước khi trả thành công, session mới được lưu vào Redis.
+8. API `/me` và `/admin-check` đọc lại SQL để xác minh tài khoản và vai trò hiện tại.
+9. Đăng xuất hủy session trong Redis và xóa cookie; phát lại cookie cũ nhận 401.
+
+Luồng này không qua worker. HTTP 201 là đã tạo tài khoản; HTTP 200 đăng nhập chỉ trả
+sau khi session được lưu. Lỗi sau INSERT nhưng trước phản hồi có thể khiến client cần
+đăng nhập hoặc kiểm tra email thay vì gửi lại đăng ký nhiều lần.
+

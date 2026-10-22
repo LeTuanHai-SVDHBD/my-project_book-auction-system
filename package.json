@@ -1,5 +1,5 @@
 {
-  "name": "my-project_book-auction-system",
+  "name": "my-project-book-auction-system",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,6 +12,9 @@
   ],
   "scripts": {
     "setup": "node scripts/setup.mjs",
+    "setup:auth": "node scripts/setupAuth.mjs",
+    "admin:create": "npm run admin:create --workspace backend",
+    "smoke:auth": "node scripts/smokeAuth.mjs",
     "db:init": "npm run db:init --workspace backend",
     "dev:api": "npm run dev:api --workspace backend",
     "dev:worker": "npm run dev:worker --workspace backend",

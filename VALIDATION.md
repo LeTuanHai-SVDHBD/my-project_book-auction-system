@@ -1,37 +1,53 @@
-<!-- Mục đích: Ghi kết quả kiểm tra theo nguồn xác nhận và giới hạn của lần rà soát. -->
+<!-- Mục đích: Ghi kết quả kiểm tra thực tế và phân biệt phụ thuộc thật với giả lập. -->
 
-# Kết quả kiểm tra hệ thống
+# Kết quả kiểm tra
 
-## 1. Xác nhận môi trường của nhóm
+Ngày: 22/10/2026. Nền mã: nhánh `feat/Hai`, commit `bb3ba13eaa818486f572dcdf105ab92359ac48f3`.
+Bản cập nhật bổ sung tài khoản, xác thực và phân quyền theo phương án A.
 
-Ngày 22/10/2026, chủ dự án xác nhận đã thiết lập thành công toàn bộ môi trường hạ tầng trên máy phát triển. Đây là xác nhận từ người vận hành; repository chưa chứa ảnh hoặc log nghiệm thu tương ứng.
+## 1. Kết quả trong môi trường chuẩn bị bản cập nhật
 
-Bằng chứng được nhóm bổ sung vào `academic/evidence/`. Sau khi áp dụng đổi tên Docker, chạy lại smoke để kiểm tra cấu hình mới.
-
-## 2. Kiểm tra bản chuẩn hóa ngày 22/10/2026
-
-| Hạng mục | Kết quả | Phạm vi |
+| Hạng mục | Kết quả | Phạm vi và giới hạn |
 |---|---|---|
-| Cài dependency | Đạt | `npm ci --ignore-scripts`; bộ dependency giữ nguyên |
-| Khóa phiên bản | Đạt | Chỉ đổi tên package/workspace trong lockfile; không đổi phiên bản hoặc integrity của dependency |
-| Cú pháp JavaScript | Đạt | `npm run check`: 20 file máy chủ/script |
-| Kiểm thử tự động | Đạt | `npm test`: 14 bài kiểm thử với dịch vụ giả lập |
-| Build React | Đạt | `npm run build` |
-| Setup | Đạt | Cấu hình mới có tên volume chuẩn; chạy lại không ghi đè `.env` |
-| API và Socket.IO thật | Đạt | Liveness đúng tên mới; thiếu SQL/Redis trả readiness 503; client nhận `system:hello` |
-| Docker Compose | Kiểm tra tĩnh đạt | YAML hợp lệ, tên project và volume fallback khớp tài liệu |
-| Phạm vi Git ignore | Đạt | Bỏ qua cấu hình riêng, build, dữ liệu sinh và file khóa Office; giữ models, CSV fixture, DOCX/PPTX và UML |
-| Comment đầu file | Đạt | Mã JS/MJS/JSX/CSS, HTML, SQL, cấu hình hỗ trợ comment và tài liệu có mô tả; JSON giữ đúng chuẩn |
+| Cài thư viện | Đạt | `npm ci --no-audit --no-fund`, Node 24.19.0 |
+| Cú pháp | Đạt | `npm run check`: 34 file JS phía máy chủ và script |
+| Kiểm thử mặc định | Đạt | `npm test`: 31 đạt, 1 SKIP; model/store giả, Argon2 thật |
+| Kiểm thử có Redis thật | Đạt | 32/32 đạt; gồm TTL 2 giờ, gia hạn, hết hạn, thu hồi và bộ đếm đồng thời |
+| Phiên bản Redis thử riêng | 7.0.15 | Chưa xác minh lại trên Redis 8 trong Docker của nhóm |
+| Build React | Đạt | `npm run build`, Vite 8.3.5 |
+| Trình duyệt desktop | Đạt | Chromium: đăng ký, đăng nhập, F5 giữ phiên, đăng xuất, Admin và điều hướng |
+| Trình duyệt mobile | Đạt | Viewport 390 px; không tràn ngang; đã xem ảnh render |
+| Bảo vệ cookie | Đạt trong QA trình duyệt | HttpOnly, SameSite=Lax; auth không lưu trong Local Storage/Session Storage |
+| Dữ liệu trong QA trình duyệt | Model giả, Redis thật | Không phải bằng chứng SQL Server thật |
+| Script setup:auth | Đạt | Giữ cấu hình cũ, tự sinh secret, chạy lại không thay secret, nhận diện secret mẫu |
+| Không đổi schema | Đã đối chiếu file | DDL 19 bảng/142 trường giữ nguyên so với commit nền |
+| Smoke SQL/Redis/worker thật sau cập nhật | Chưa chạy | Môi trường chuẩn bị không có SQL Server/Docker |
+| Smoke auth với SQL Server thật | Chưa chạy | Chạy `npm.cmd run smoke:auth` trên máy Hải |
+| Admin INSERT SQL thật | Chưa xác minh | Script đã có; cần chạy `admin:create` trên máy Hải |
 
-## 3. Giới hạn xác minh
+Các bài test auth bao gồm: email trùng, đầu vào sai, từ chối tự truyền vai trò Admin,
+CSRF thiếu/sai, đăng nhập sai/email lạ, đổi session ID/CSRF, phân quyền 401/403/200,
+đổi quyền tại SQL model có hiệu lực ở request kế tiếp, xóa tài khoản làm phiên bị từ chối,
+đăng xuất/thu hồi, TTL, lỗi store, lỗi SQL, Redis unavailable và CORS.
 
-- Môi trường rà soát hiện không có Docker hoặc SQL Server, nên chưa chạy lại smoke và chuyển volume thật sau thay đổi.
-- Việc giữ volume được kiểm tra ở cấu hình; mount và dữ liệu phải được nhóm kiểm tra khi áp dụng theo `docs/docker-migration.md`.
-- Build Frontend thành công chưa thay thế kiểm tra trực quan trên trình duyệt.
-- Các bài kiểm thử hiện tại tập trung hạ tầng; chưa chứng minh các chức năng tài khoản hoặc đấu giá đã được triển khai.
+Các ca SQL model giả không kiểm chứng thực thi cú pháp truy vấn, UNIQUE hoặc kết nối
+trên SQL Server thật. Cần chạy smoke trên máy nhóm trước khi xác nhận hoàn tất Mốc 3.
 
-## 4. Cơ sở dữ liệu
+## 2. Bằng chứng Mốc 2 do Hải xác nhận
 
-DDL 19 bảng/142 trường đã được đối chiếu với thiết kế vật lý ở lần chuẩn bị ban đầu. Lần chuẩn hóa này không sửa DDL, tên database, bảng/cột, ràng buộc hoặc dữ liệu nghiệp vụ.
+Hải đã xác nhận:
+- SQL Server và Redis healthy.
+- Giao diện đủ năm trạng thái sẵn sàng.
+- Probe completed.
+- `npm.cmd run smoke` PASS.
 
-Script khởi tạo nhận diện schema đang có bằng tên 19 bảng và tổng 142 cột. Đây chưa phải phép so sánh đầy đủ kiểu, chỉ mục và ràng buộc của một database có sẵn.
+Đây là kết quả trên máy Hải trước bản cập nhật tài khoản.
+Sau khi cập nhật cần chạy lại `smoke` để xác nhận không ảnh hưởng luồng cũ.
+
+## 3. Điều kiện nghiệm thu tiếp theo
+
+Làm theo `README.md`, kiểm tra Admin bằng giao diện,
+chạy `check`, `test`, `build`, `smoke` và `smoke:auth` trên Windows với SQL Server/Redis thật.
+
+Chưa triển khai các nghiệp vụ đăng sách, AI, đặt giá hoặc kết thúc phiên.
+Socket.IO hiện chỉ có lời chào kiểm tra hạ tầng công khai.

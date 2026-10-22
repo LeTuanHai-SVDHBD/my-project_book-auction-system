@@ -1,7 +1,7 @@
 /** Đăng ký, đăng nhập và thông tin tài khoản; không lưu xác thực vào storage. */
 import { useEffect, useState } from 'react';
 import { authApi } from '../services/authApi.js';
-export default function AccountPanel() {
+export default function AccountPanel({ onUserChange }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState('login');
@@ -12,6 +12,7 @@ export default function AccountPanel() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [reload, setReload] = useState(0);
+  useEffect(() => { onUserChange?.(user); }, [user, onUserChange]);
   useEffect(() => {
     let canceled = false;
     setLoading(true); setError('');

@@ -26,7 +26,8 @@ Redis hỗ trợ truyền sự kiện, phối hợp xử lý và lưu session đ
 | Redis lock | Phối hợp xử lý các yêu cầu của cùng một phiên |
 | SQL Server | Lưu tài khoản, bài đăng, phiên, lượt giá, kết quả và giao dịch |
 | Socket.IO | Gửi cập nhật sau khi thay đổi đã được xác nhận |
-| Gemini API | Hỗ trợ phân tích sách; Admin quyết định kiểm duyệt |
+| Gemini API | Dự kiến Mốc 7: hỗ trợ phân tích sách; Admin quyết định kiểm duyệt |
+| Cloudinary | Mốc 4: lưu/phân phối ảnh và video; SQL giữ URL và public_id |
 
 ## 3. Mô hình kết nối
 
@@ -37,6 +38,8 @@ Redis hỗ trợ truyền sự kiện, phối hợp xử lý và lưu session đ
 | API | SQL Server | Thư viện `mssql` | Đọc/ghi dữ liệu theo nghiệp vụ |
 | API | Redis Streams | Redis client | Đưa yêu cầu bất đồng bộ vào hàng đợi |
 | API | Redis | express-session / connect-redis | Lưu, gia hạn và hủy session đăng nhập |
+| API | Cloudinary | HTTPS REST, native fetch/FormData | Upload/destroy tệp, bí mật chỉ ở server |
+| API | Redis | Ledger vé media + Lua claim | Gắn media đúng chủ và cleanup sau lỗi |
 | Worker | Redis Streams | Consumer group | Nhận và xác nhận sự kiện |
 | Worker | SQL Server | Giao dịch SQL | Ghi nhận kết quả xử lý |
 | Worker | Redis | Khóa theo phiên | Phối hợp xử lý đồng thời |
@@ -110,7 +113,7 @@ Chi tiết khởi động được trình bày tại `../README.md`.
 - Script khởi tạo schema 19 bảng.
 
 Chưa triển khai:
-- Nghiệp vụ đăng sách, đặt giá và kết thúc phiên.
+- Đặt giá và kết thúc phiên (Mốc 5).
 - Giao dịch, trò chuyện, đánh giá và khiếu nại.
 - Phân tích sách bằng Gemini API.
 
@@ -123,3 +126,16 @@ Trong bản cập nhật Mốc 3 đã bổ sung:
 Luồng tài khoản chạy trực tiếp qua HTTP và SQL Server; không đưa đăng nhập vào Redis Streams.
 Socket.IO hiện chỉ phát lời chào hạ tầng công khai, chưa có room hoặc sự kiện nghiệp vụ riêng tư.
 Khi thêm các sự kiện nghiệp vụ, phải gắn xác thực session và kiểm tra quyền tại ranh giới Socket.IO.
+
+
+Mốc 4 đã bổ sung:
+- React: danh mục, bài của tôi, đăng sách, bổ sung media, kiểm duyệt và đặt lịch.
+- API: model SQL giao dịch, policy trạng thái, service claim media, router phân quyền.
+- Migration 002: hai cột metadata Cloudinary nullable, tổng 144 cột; 001 không đổi.
+- Native Cloudinary REST, vé Redis và cleanup sau lỗi. Không thêm dependency.
+- Public projection ẩn giá kết thúc sớm; optimistic version được kiểm tra sau khóa SQL.
+- Manual review hoạt động độc lập AI. AI chưa gọi, không ghi phân tích giả.
+
+Upload ngoài transaction SQL; ledger và kiểm tra SQL reference giảm orphan, nhưng không là distributed transaction.
+Claim chưa rõ kết quả commit cần đối soát thủ công; mất Redis có thể để lại orphan.
+Chi tiết phục hồi và giới hạn: ADR-012 và README mục 11.

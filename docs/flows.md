@@ -4,8 +4,8 @@
 
 ## 1. Phạm vi
 
-Luồng kiểm tra hạ tầng và luồng tài khoản đã có trong mã nguồn.
-Các luồng từ đăng sách đến khiếu nại bên dưới vẫn là thiết kế chưa triển khai.
+Hạ tầng, tài khoản, đăng sách, kiểm duyệt và kích hoạt phiên đã có trong mã nguồn.
+Đặt giá/kết thúc, realtime nghiệp vụ, AI và chức năng sau phiên vẫn theo các mốc tiếp theo.
 
 Tài khoản dùng session Redis, cookie HttpOnly và Argon2id theo ADR-010.
 Chi tiết luồng HTTP hiện tại được ghi ở mục 10.
@@ -49,7 +49,7 @@ Chi tiết luồng HTTP hiện tại được ghi ở mục 10.
 |---|---|
 | 1 | Người bán nhập thông tin sách, media và thông số giá |
 | 2 | Backend kiểm tra và lưu sách, bài đăng, phiên chờ kiểm duyệt |
-| 3 | Gọi AI hỗ trợ phân tích; lưu kết quả hoặc trạng thái lỗi |
+| 3 | Mốc 4: chưa gọi AI, hiển thị chưa có phân tích; Mốc 7 mới tích hợp |
 | 4 | Admin xem thông tin, bằng chứng và yếu tố quý hiếm |
 | 5 | Admin phê duyệt hoặc từ chối kèm lý do |
 | 6 | Sau khi được duyệt, người bán thiết lập lịch và kích hoạt |
@@ -196,3 +196,22 @@ Luồng này không qua worker. HTTP 201 là đã tạo tài khoản; HTTP 200 �
 sau khi session được lưu. Lỗi sau INSERT nhưng trước phản hồi có thể khiến client cần
 đăng nhập hoặc kiểm tra email thay vì gửi lại đăng ký nhiều lần.
 
+
+
+## 11. Chi tiết giao dịch Mốc 4 đã triển khai
+
+1. API xác thực chủ sách/CSRF, kiểm tra MIME/magic/kích thước, tạo vé Redis rồi upload Cloudinary.
+2. Client gửi nội dung và vé UUID; service claim toàn bộ vé nguyên tử, không tin URL/public_id từ client.
+3. Model mở transaction SQL, kiểm tra mã yêu cầu đã có; tạo sách, bài, phiên pending, media và lịch sử rồi COMMIT.
+4. Sau COMMIT, xóa ledger của vé đã gắn; acknowledgement lỗi được cleanup đối soát bằng reference SQL.
+5. Rollback chắc chắn trả vé về ready; kết quả commit không rõ giữ claim để tránh xóa nhầm file.
+6. Admin duyệt/từ chối trong transaction có khóa và đối chiếu row_version, ghi KiemDuyet và cập nhật cặp trạng thái.
+7. Chủ sách bị từ chối có thể bổ sung/gửi lại; giữ bài/phiên, media và lịch sử duyệt.
+8. Chủ sách đã duyệt đặt lịch/kích hoạt đúng phiên, SQL kiểm tra thời điểm UTC và trạng thái mới nhất.
+9. Đăng lại sau kết thúc không người thắng: khóa Sach, kiểm tra phiên cuối và kết quả,
+   tạo bài/phiên mới cùng Sach; giữ dữ liệu cũ. Thiếu KetQuaDauGia không đủ điều kiện đăng lại.
+10. Cleanup tệp hết hạn thực hiện ngoài transaction và chỉ destroy khi SQL xác nhận không được dùng.
+    Claim chưa rõ được giữ để đối soát, không tự chuyển thành orphan rồi xóa.
+
+Các thao tác Mốc 4 đi trực tiếp HTTP → SQL, không lẫn vào probe hoặc queue đặt giá dự kiến.
+AI lỗi/không có dữ liệu không khóa luồng duyệt thủ công.

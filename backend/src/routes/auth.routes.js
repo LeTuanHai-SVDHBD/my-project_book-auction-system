@@ -1,11 +1,11 @@
 /** Khai báo API tài khoản, session Redis và ranh giới xác thực/phân quyền. */
 import { Router } from 'express';
-import session from 'express-session';
+import { createSessionMiddleware } from '../middlewares/session.js';
 import { HttpError } from '../middlewares/errorHandler.js';
 import { requireCsrf, requireUser, requireRole, rateLimit } from '../middlewares/auth.js';
 import { createAuthService, validateCredentials } from '../services/auth.service.js';
 import { createAuthController } from '../controllers/auth.controller.js';
-export function createAuthRouter({ authConfig, store, users, passwords, limiter, ready = () => true }) {
+export function createAuthRouter({ authConfig, store, users, passwords, limiter, sessionMiddleware, ready = () => true }) {
   const router = Router();
   const controller = createAuthController({ service: createAuthService({ users, passwords }), authConfig });
   router.use((req, res, next) => {
@@ -13,9 +13,7 @@ export function createAuthRouter({ authConfig, store, users, passwords, limiter,
     if (!ready()) return next(new HttpError(503, 'AUTH_UNAVAILABLE', 'Dịch vụ đăng nhập chưa sẵn sàng.'));
     next();
   });
-  router.use(session({ name: authConfig.cookieName, secret: authConfig.secret, store,
-    resave: false, saveUninitialized: false, rolling: true,
-    cookie: { ...authConfig.cookie, maxAge: authConfig.idleSeconds * 1000 } }));
+  router.use(sessionMiddleware || createSessionMiddleware(authConfig, store));
   const validate = registering => (req, res, next) => {
     req.authInput = validateCredentials(req.body, registering); next();
   };

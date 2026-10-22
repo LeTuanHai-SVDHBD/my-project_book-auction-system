@@ -10,7 +10,8 @@
     "start:worker": "node src/worker.js",
     "db:init": "node scripts/initDatabase.js",
     "admin:create": "node scripts/createAdmin.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "db:migrate": "node scripts/migrateDatabase.js"
   },
   "dependencies": {
     "argon2": "0.45.1",

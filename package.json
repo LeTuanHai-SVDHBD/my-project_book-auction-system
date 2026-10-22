@@ -22,6 +22,9 @@
     "check": "node scripts/check.mjs",
     "test": "npm test --workspace backend",
     "build": "npm run build --workspace frontend",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "db:migrate": "npm run db:migrate --workspace backend",
+    "setup:media": "node scripts/setupMedia.mjs",
+    "smoke:m4": "node scripts/smokeM4.mjs"
   }
 }

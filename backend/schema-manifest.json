@@ -20,7 +20,7 @@
     "PhanTichAI",
     "ChiTietPhanTichAI"
   ],
-  "columns": 142,
+  "columns": 144,
   "checks": 91,
   "uniqueConstraints": 14
 }

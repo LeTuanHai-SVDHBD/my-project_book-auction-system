@@ -34,7 +34,7 @@ try {
     if (result.status === 'completed' && result.sqlOk) { completed = true; break; }
   }
   if (!completed) throw new Error('Worker chưa hoàn tất yêu cầu thử nghiệm.');
-  console.log('PASS: API, SQL Server (19 bảng/142 trường), Redis, worker, Socket.IO và luồng Streams → worker → SQL đều hoạt động.');
+  console.log(`PASS: API, SQL Server (19 bảng/144 trường), Redis, worker, Socket.IO và luồng Streams → worker → SQL đều hoạt động.`);
 } catch (error) {
   console.error('FAIL:', String(error.message).replaceAll(env.DEV_PROBE_TOKEN || '___', '[REDACTED]').replaceAll(env.DB_PASSWORD || '___', '[REDACTED]'));
   process.exitCode = 1;

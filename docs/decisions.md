@@ -176,3 +176,45 @@ Trạng thái: Đã đồng bộ cấu hình mẫu và tài liệu; giữ nguyê
 - Không tự đổi tên, sao chép hoặc xóa volume đã có dữ liệu.
 
 Các bước chuyển đổi: [docker-migration.md](docker-migration.md).
+
+
+## ADR-012 — Cloudinary và ranh giới giao dịch media
+
+Trạng thái: Hải chọn Cloudinary; triển khai cho Mốc 4.
+
+- React gửi tệp nhị phân qua API đã kiểm tra session, vai trò và CSRF. API dùng native fetch/FormData/Blob của Node 24,
+  gọi Cloudinary REST với credentials ở backend; không thêm dependency hoặc unsigned upload preset.
+- Cloudinary lưu tệp; SQL lưu URL và `cloudinary_public_id` để quản lý tài nguyên. Migration 002 thêm đúng hai cột nullable
+  cùng index, schema nền 001 không đổi. Tổng 19 bảng/144 cột sau migration; URL cũ vẫn sử dụng được, ID cũ có thể NULL.
+- Giới hạn tài nguyên cấu hình trong `.env`: mặc định 12 ảnh, 3 video, 10 MB/ảnh, 50 MB/video;
+  2 upload đồng thời/API process, 60 lần thử/tài khoản/giờ. Đây không phải tiêu chí nghiệp vụ của báo cáo.
+- Redis lưu vé upload và lịch cleanup, không lưu bytes. Tạo vé trước khi gọi provider để theo dõi cả upload bị ngắt.
+  Vé có thời hạn sử dụng 1 giờ, không TTL-xóa ledger; Lua claim kiểm tra chủ sở hữu và trạng thái nguyên tử.
+- Chỉ metadata từ vé đã claim được ghi vào SQL. COMMIT thành công mới trả kết quả nghiệp vụ.
+  Redis acknowledgement lỗi sau COMMIT không biến kết quả SQL thành rollback giả.
+- Cleanup mỗi phút kiểm tra SQL reference trước khi gọi destroy; không xóa file đã gắn bài hoặc đang claim chưa rõ.
+  Claim không rõ commit và không có reference được giữ lại/cảnh báo để đối soát thủ công; mất dữ liệu Redis có thể để lại orphan.
+  Không có distributed transaction SQL–Cloudinary; không khẳng định cleanup bảo đảm tuyệt đối sau mọi sự cố.
+
+Tài liệu REST chính thức: [Cloudinary Upload API](https://cloudinary.com/documentation/image_upload_api_reference).
+
+## ADR-013 — Vòng đời bài đăng Mốc 4 và AI ở Mốc 7
+
+Trạng thái: triển khai theo lộ trình đã gửi.
+
+- Tạo `Sach`, `BaiDang`, `PhienDauGia`, media và lịch sử trong cùng transaction SQL SERIALIZABLE.
+  Bài/phiên chờ duyệt, chưa có lịch. Không gọi provider/AI khi đang giữ transaction.
+- Mã yêu cầu UUID ánh xạ thành `BaiDang.ma_san_pham` (`BK` + 32 ký tự hex); UNIQUE hiện có bảo vệ retry.
+  Cùng mã trả bài đã tạo của đúng chủ, không cập nhật bằng nội dung mới. Không thêm cột idempotency khác.
+- Kiểm duyệt khóa cặp bài/phiên, đối chiếu `row_version`, lưu lý do và cập nhật hai trạng thái nguyên tử.
+  Duyệt yêu cầu xác nhận kiểm tra bằng chứng quý hiếm; dữ liệu/điểm AI không tự quyết định duyệt.
+- Bài bị từ chối được bổ sung mô tả bài, thông số giá và media rồi gửi lại, giữ ID bài/phiên và mọi quyết định cũ.
+  Bản ghi sách và media đã lưu không bị sửa/xóa; khác với đăng lại sau phiên không có người thắng.
+- Kích hoạt chỉ cập nhật phiên đã qua kiểm duyệt của chủ sách. SQL kiểm tra giờ bắt đầu tương lai,
+  giờ kết thúc sau bắt đầu; lưu datetime UTC. Không có kết thúc thủ công hoặc sửa giá/lịch sau kích hoạt.
+- Đăng lại lấy sách làm điểm khóa ổn định, kiểm tra bài/phiên mới nhất đã kết thúc và kết quả rõ không người thắng.
+  Tạo bài/phiên mới giữ `sach_id`; thông số giá và lịch sử trước giữ nguyên. Không suy ra không người thắng từ việc thiếu kết quả.
+- Public API dùng projection cho phép riêng, không trả `gia_toi_thieu`, owner/email, row_version hay nhận xét nội bộ.
+  Tiền 18 chữ số dùng chuỗi JSON và VARCHAR→DECIMAL trong SQL để tránh làm tròn bằng JavaScript Number.
+- Mốc 4 chưa gọi Gemini. Không có phân tích thì trả `ai: null`, hiển thị chưa tích hợp; không ghi điểm/kết quả lỗi giả.
+  Đọc được kết quả AI đã có để Admin tham khảo, nhưng tích hợp và chấm điểm thực hiện ở Mốc 7.

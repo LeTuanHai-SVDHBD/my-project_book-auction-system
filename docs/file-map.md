@@ -56,8 +56,8 @@ Các đường dẫn bên dưới nằm trong `backend/`.
 | `src/middlewares/errorHandler.js` | Chuẩn hóa lỗi HTTP | Đã có |
 | `src/utils/logger.js` | Log có cấu trúc và che thông tin nhạy cảm | Đã có |
 | `test/infrastructure.test.js` | Kiểm thử hạ tầng và API bằng giả lập | Đã có |
-| `src/routes/` | Router nghiệp vụ | Đã có auth.routes.js |
-| `src/models/` | Truy vấn dữ liệu nghiệp vụ | Đã có user.model.js |
+| `src/routes/` | Router nghiệp vụ | Đã có auth.routes.js, post.routes.js và media.routes.js |
+| `src/models/` | Truy vấn dữ liệu nghiệp vụ | Đã có user.model.js và post.model.js |
 | `src/concurrency/` | Khóa theo phiên và hỗ trợ xử lý đồng thời | Chờ triển khai |
 | `src/jobs/` | Tác vụ kiểm tra hết hạn phiên | Chờ triển khai |
 | `src/ai/` | Kết nối và kiểm tra kết quả phân tích AI | Chờ triển khai |
@@ -77,7 +77,7 @@ Các đường dẫn bên dưới nằm trong `frontend/`.
 | `.env.example` | Mẫu địa chỉ API | Đã có |
 | `.env` | Cấu hình riêng; không commit | Tạo bằng setup |
 | `src/main.jsx` | Gắn React vào trang HTML | Đã có |
-| `src/App.jsx` | Điều hướng tài khoản và kiểm tra hệ thống | Đã có |
+| `src/App.jsx` | Điều hướng tài khoản, bài đăng, kiểm duyệt, danh mục và hạ tầng | Đã có |
 | `src/style.css` | Giao diện tài khoản và kiểm tra hệ thống | Đã có |
 | `src/pages/` | Trang nghiệp vụ | Tạo khi cần |
 | `src/components/` | Màn hình tài khoản và hạ tầng | Đã có |
@@ -145,3 +145,30 @@ hoặc `schema-manifest.json` vì các file này sử dụng JSON chuẩn.
 | `backend/test/auth.test.js` | HTTP auth, model/store giả và Argon2 thật |
 | `backend/test/authRedis.test.js` | Kiểm tra Redis thật theo opt-in |
 | `backend/test/setupAuth.test.js` | Kiểm tra giữ nguyên cấu hình và chạy lại an toàn |
+
+
+## 10. Các file Mốc 4
+
+| File | Trách nhiệm |
+|---|---|
+| `backend/migrations/002_cloudinary_metadata.sql` | Thêm hai cột public_id nullable và index, không xóa dữ liệu |
+| `backend/scripts/migrateDatabase.js` | Chạy migration hiện có, có thể chạy lại |
+| `backend/src/config/media.js` | Cấu hình bí mật Cloudinary và projection giới hạn công khai |
+| `backend/src/middlewares/session.js` | Factory session dùng chung auth/posts/media |
+| `backend/src/services/cloudinary.service.js` | Native REST upload/destroy, kiểm tra magic và phản hồi provider |
+| `backend/src/services/mediaLedger.service.js` | Vé Redis, claim/release nguyên tử, cleanup kiểm tra SQL reference |
+| `backend/src/services/postValidation.js` | Kiểm tra payload, tiền dạng chuỗi, version và lịch ISO |
+| `backend/src/services/postPolicy.js` | Quy tắc trạng thái, version và điều kiện đăng lại |
+| `backend/src/services/post.service.js` | Điều phối claim, SQL commit/rollback và acknowledgement |
+| `backend/src/models/post.model.js` | SQL tham số hóa; tạo/duyệt/bổ sung/kích hoạt/đăng lại trong transaction |
+| `backend/src/controllers/post.controller.js` | HTTP, phân trang và projection công khai không chứa giá ẩn |
+| `backend/src/routes/post.routes.js` | Quyền công khai/chủ sách/Admin và CSRF |
+| `backend/src/controllers/media.controller.js` | HTTP upload/discard, kiểm tra bytes và trả vé |
+| `backend/src/routes/media.routes.js` | Raw upload giới hạn bộ nhớ sau xác thực và CSRF |
+| `frontend/src/components/PostForm.jsx` | Form sách/bài, upload trước, vé đính kèm, bỏ tệp chưa dùng |
+| `frontend/src/components/PostsPanel.jsx` | Danh sách/chi tiết, kiểm duyệt, bổ sung và lịch kích hoạt |
+| `frontend/src/services/postApi.js` | HTTP M4 dùng chung session/CSRF trong bộ nhớ |
+| `scripts/setupMedia.mjs` | Chỉ bổ sung cấu hình mẫu còn thiếu, không đổi giá trị đã có |
+| `scripts/smokeM4.mjs` | Smoke thật với dữ liệu UUID, cleanup SQL/Cloudinary riêng |
+| `backend/test/posts.test.js` | Hợp đồng, policy, privacy, HTTP và provider giả |
+| `backend/test/mediaRedis.test.js` | Redis thật theo opt-in: claim đồng thời, ownership, cleanup và commit chưa rõ |

@@ -30,8 +30,9 @@ services:
       timeout: 3s
       retries: 12
 volumes:
-  # Giữ volume của bản cấu hình cũ khi .env chưa có tên volume riêng.
+  # Giữ fallback hiện hành khi .env chưa chỉ định tên volume; không tự đổi liên kết dữ liệu.
   # Máy cài mới nhận tên chuẩn từ .env.example qua npm run setup.
+  # Nếu dữ liệu nằm trong volume book-auction-moc2_*, đặt đúng tên đã inspect vào .env.
   sqlserver_data:
     name: ${SQLSERVER_VOLUME_NAME:-book-auction_sqlserver_data}
   redis_data:

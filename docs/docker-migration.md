@@ -13,6 +13,9 @@
 
 Đổi project không tự di chuyển dữ liệu sang volume mới. Tên volume chứa dữ liệu cũ có thể được giữ; container và network mang tên project mới.
 
+Máy đang chạy healthy và truy cập đúng dữ liệu không cần thực hiện lại việc chuyển đổi.
+Giữ nguyên `.env` và các volume đang gắn. Chỉ làm các bước bên dưới khi thực sự chuyển project.
+
 ## 2. Máy đã chạy cấu hình cũ
 
 Thực hiện một lần khi chuyển đổi. Dừng API, worker và React bằng Ctrl+C trước khi chuyển.
@@ -40,7 +43,20 @@ SQLSERVER_VOLUME_NAME=book-auction-moc2_sqlserver_data
 REDIS_VOLUME_NAME=book-auction-moc2_redis_data
 ```
 
-Đây là tên dữ liệu đã có, không phải tên project mới. Nếu `.env` cũ chưa có hai biến, Compose dùng hai tên cũ trên làm fallback để giữ liên kết mặc định.
+Ví dụ trên chỉ đúng nếu `docker inspect` xác nhận dữ liệu nằm trong hai volume `book-auction-moc2_*` đó.
+Nếu tên quan sát khác, dùng đúng tên quan sát; không sao chép ví dụ một cách mặc định.
+
+Fallback hiện hành trong `compose.yaml` khi biến tương ứng bị thiếu hoặc rỗng là:
+
+```dotenv
+SQLSERVER_VOLUME_NAME=book-auction_sqlserver_data
+REDIS_VOLUME_NAME=book-auction_redis_data
+```
+
+Đây là giá trị dự phòng của Compose, không phải các dòng được setup tự thêm vào `.env` đã có.
+Fallback không tự dò volume mang tên `book-auction-moc2_*`. Nếu dữ liệu ở volume đó,
+phải chỉ định tên đã kiểm tra trước khi khởi động project mới. Bản sửa tài liệu giữ nguyên
+fallback hiện hành để không tự đổi liên kết trên máy đã chạy được.
 
 Không chép tên volume mới từ `.env.example` vào môi trường có dữ liệu cũ. Chọn tên chưa tồn tại sẽ tạo volume rỗng, không tự chuyển dữ liệu.
 
@@ -74,7 +90,7 @@ Không cần khởi tạo lại schema chỉ vì đổi project.
 
 ## 3. Máy cài mới
 
-Setup tạo `.env` mới với tên chuẩn:
+Chạy `npm.cmd run setup` khi chưa có `.env`. Script đọc `.env.example` và tạo cấu hình với tên chuẩn:
 
 ```dotenv
 SQLSERVER_VOLUME_NAME=my-project_book-auction-system_sqlserver_data
@@ -82,6 +98,9 @@ REDIS_VOLUME_NAME=my-project_book-auction-system_redis_data
 ```
 
 Hai volume mới được tạo khi chạy `docker compose up -d`.
+
+Nếu `.env` đã tồn tại, `setup` giữ nguyên file và không tự thêm hay đổi hai biến volume.
+`setup:auth` chỉ bổ sung cấu hình session còn thiếu, không đổi cấu hình volume.
 
 ## 4. Consumer group
 

@@ -148,5 +148,31 @@ Hải xác nhận chọn session Redis, cookie HttpOnly và Argon2.
 - Redis giới hạn tổng lần thử đăng nhập, đăng ký và cấp CSRF; không bỏ qua khi Redis lỗi.
 - Không thêm bảng/cột session hoặc refresh token vào SQL Server.
 
-Chi tiết lệnh và giới hạn được ghi trong `README.md`.
-Kết quả xác minh và phần chưa chạy thật: `../VALIDATION.md`.
+Các giới hạn mặc định đã triển khai:
+
+| Hoạt động | Giới hạn | Cửa sổ |
+|---|---|---|
+| Đăng nhập theo email | 10 lần thử | 15 phút |
+| Đăng nhập theo IP | 50 lần thử | 15 phút |
+| Đăng ký theo IP | 10 lần thử | 15 phút |
+| Cấp CSRF theo IP | 60 lần | 1 phút |
+
+Bộ đếm tính tổng lần thử, kể cả lần thành công. Quá giới hạn trả HTTP 429 và `Retry-After`.
+Tên khóa dùng HMAC để không chứa email hoặc IP nguyên văn.
+
+Hướng dẫn chạy, API và kiểm tra Admin: [README, mục 6–8](../README.md#6-kiểm-tra-tài-khoản-trên-giao-diện).
+Kết quả kiểm thử và xác nhận của nhóm: [VALIDATION.md](../VALIDATION.md).
+
+## ADR-011 — Tên volume Docker và bảo toàn liên kết dữ liệu
+
+Trạng thái: Đã đồng bộ cấu hình mẫu và tài liệu; giữ nguyên fallback hiện hành.
+
+- Project dùng tên `my-project_book-auction-system`.
+- Máy cài mới lấy `SQLSERVER_VOLUME_NAME` và `REDIS_VOLUME_NAME` từ `.env.example` qua `npm run setup`.
+- Tên volume mới lần lượt là `my-project_book-auction-system_sqlserver_data` và `my-project_book-auction-system_redis_data`.
+- `setup` không ghi đè hoặc bổ sung biến volume vào `.env` đã tồn tại.
+- Khi biến volume thiếu hoặc rỗng, Compose vẫn dùng `book-auction_sqlserver_data` / `book-auction_redis_data` như trước bản sửa này.
+- Khi chuyển từ volume mang tên khác, gán đúng tên đã quan sát bằng `docker inspect`; không suy đoán từ tên project.
+- Không tự đổi tên, sao chép hoặc xóa volume đã có dữ liệu.
+
+Các bước chuyển đổi: [docker-migration.md](docker-migration.md).

@@ -1,4 +1,7 @@
-export const INFRA = Object.freeze({ stream: 'bookauction:infra:requests', group: 'moc2-workers',
+/**
+ * Định nghĩa stream, consumer group, TTL và định dạng mã yêu cầu của luồng chẩn đoán.
+ */
+export const INFRA = Object.freeze({ stream: 'bookauction:infra:requests', group: 'infrastructure-workers',
   deadLetter: 'bookauction:infra:dead-letter', heartbeat: 'bookauction:infra:worker',
   resultPrefix: 'bookauction:infra:probe:', resultTtl: 600, heartbeatTtl: 10,
   eventType: 'system.connection_probe', minIdleMs: 30000 });

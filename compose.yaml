@@ -1,4 +1,5 @@
-name: book-auction-moc2
+# Mục đích: Chạy SQL Server và Redis cho môi trường phát triển.
+name: my-project_book-auction-system
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -29,5 +30,9 @@ services:
       timeout: 3s
       retries: 12
 volumes:
+  # Giữ volume của bản cấu hình cũ khi .env chưa có tên volume riêng.
+  # Máy cài mới nhận tên chuẩn từ .env.example qua npm run setup.
   sqlserver_data:
+    name: ${SQLSERVER_VOLUME_NAME:-book-auction-moc2_sqlserver_data}
   redis_data:
+    name: ${REDIS_VOLUME_NAME:-book-auction-moc2_redis_data}

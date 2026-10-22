@@ -1,3 +1,6 @@
+/**
+ * Kiểm thử API, cấu hình và processor bằng dịch vụ giả lập; không yêu cầu Docker.
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';

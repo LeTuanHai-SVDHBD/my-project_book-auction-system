@@ -1,61 +1,32 @@
-# Dependency và kết quả sinh tự động
+# Mục đích: Loại cấu hình riêng, thư viện và dữ liệu sinh tự động khỏi Git.
+
+# Dependency và kết quả kiểm tra/build của Node.js
 node_modules/
 dist/
 coverage/
 *.log
+logs/
+.cache/
 
-# Cấu hình riêng; giữ cấu hình mẫu
+# Cấu hình riêng; cho phép commit file mẫu ở mọi thư mục
 .env
 .env.*
 !.env.example
 
-# File hệ điều hành
-.DS_Store
-Thumbs.db
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-venv/
-env/
-.pytest_cache/
-
-# Môi trường
-.env
-.env.local
-
-# IDE
+# Cấu hình IDE cá nhân và file tạm hệ điều hành
 .vscode/
 .idea/
 *.swp
-
-# Dữ liệu lớn (KHÔNG push lên Git)
-data/outputs/
-*.csv
-*.log
-db/data/
-*.sql.gz
-
-# Cache / model
-.cache/
-models/
-
-# OS
+*.tmp
 .DS_Store
 Thumbs.db
 
-# Docker
-mysql-data/
+# Dữ liệu chạy thử và database cục bộ; không bỏ qua CSV hoặc models toàn dự án
+/data/generated/
+/data/outputs/
+/data/models/
+/db/data/
+*.sql.gz
 
-# Report tạm
-~$*.docx
-~$*.pptx
-
-# --- thêm bởi init_structure.py ---
-*.pyc
-data/generated/
-data/outputs/*.csv
-security/logs/*.log
-logs/
-structure.txt
+# File khóa tạm của Microsoft Office; giữ báo cáo và slide chính thức
+~$*

@@ -1,6 +1,4 @@
-/**
- * Tạo Express app, middleware, API trạng thái và API chẩn đoán dành cho development.
- */
+/** HTTP API chung: kiểm tra hạ tầng, mô-đun tài khoản và xử lý lỗi tập trung. */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -12,16 +10,16 @@ function sameToken(received, expected) {
   const a = Buffer.from(received || ''); const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
 }
-export function createApp({ config, deps, probes, log = () => {} }) {
+export function createApp({ config, deps, probes, authRouter, log = () => {} }) {
   const app = express();
   app.disable('x-powered-by'); app.use(helmet());
   app.use((req, res, next) => { req.requestId = randomUUID(); res.setHeader('X-Request-ID', req.requestId); next(); });
   app.use(cors({ origin(origin, done) {
     if (!origin || config.origins.includes(origin)) done(null, true);
     else done(new HttpError(403, 'ORIGIN_NOT_ALLOWED', 'Origin không được phép.'));
-  } }));
+  }, credentials: true }));
   app.use(express.json({ limit: '8kb' }));
-  app.get('/api/health/live', (req, res) => res.json({ ok: true, service: 'my-project_book-auction-system-api', uptimeSeconds: Math.floor(process.uptime()) }));
+  app.get('/api/health/live', (req, res) => res.json({ ok: true, service: 'book-auction-api', milestone: 2, uptimeSeconds: Math.floor(process.uptime()) }));
   app.get('/api/health/ready', async (req, res) => {
     const report = await readiness(deps); res.status(report.ok ? 200 : 503).json(report);
   });
@@ -40,6 +38,7 @@ export function createApp({ config, deps, probes, log = () => {} }) {
     res.json(result);
   });
   app.use('/api/dev', diagnostic);
+  if (authRouter) app.use('/api/auth', authRouter);
   app.use((req, res, next) => next(new HttpError(404, 'NOT_FOUND', 'Không tìm thấy API.')));
   app.use(errorHandler(log));
   return app;

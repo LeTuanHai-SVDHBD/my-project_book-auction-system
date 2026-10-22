@@ -1,54 +1,64 @@
-<!-- Mục đích: Theo dõi tiến độ triển khai, nguồn xác nhận và công việc tiếp theo. -->
+<!-- Mục đích: Theo dõi phạm vi triển khai và bằng chứng nghiệm thu từng mốc. -->
 
-# Tiến độ triển khai hệ thống
+# Tiến độ dự án
 
-## 1. Hiện trạng
+## 1. Quy ước
 
-Ngày 22/10/2026, chủ dự án xác nhận đã thiết lập thành công toàn bộ môi trường hạ tầng.
-Repository đã được đưa lên GitHub tại nhánh `feat/Hai`.
+- **Đã triển khai:** đã có mã nguồn/cấu hình.
+- **Đã kiểm tra:** đã chạy và có kết quả cụ thể, nêu rõ phụ thuộc thật hay giả.
+- **Chờ nghiệm thu:** cần xác minh trên môi trường thật của nhóm.
+- **Chưa triển khai:** thuộc phần việc tiếp theo.
 
-Xác nhận trên máy của nhóm và kiểm tra trong môi trường rà soát là hai nguồn riêng.
-Các kết quả chạy cục bộ được ghi tại [VALIDATION](../VALIDATION.md).
+## 2. Mốc 2 — Hạ tầng
 
-## 2. Tiến độ
+Hải xác nhận ngày 22/10/2026:
 
-| Nhóm việc | Trạng thái | Căn cứ |
+- SQL Server và Redis đều healthy.
+- Giao diện có đủ năm trạng thái sẵn sàng.
+- Probe đã completed.
+- `npm.cmd run smoke` PASS.
+
+Theo xác nhận trên, mốc 2 đã đạt điều kiện chạy thành công trên máy phát triển.
+Ảnh chụp và log báo cáo do nhóm lưu trên máy của mình; không khẳng định đã có trong repository.
+
+## 3. Mốc 3 — Tài khoản, xác thực và phân quyền
+
+Phương án A đã được Hải chọn: session Redis, cookie HttpOnly và Argon2.
+
+| Mã | Công việc | Trạng thái |
 |---|---|---|
-| npm workspaces, cấu hình và cấu trúc Backend/Frontend | Đã có | Mã nguồn trong repository |
-| SQL Server và Redis trên Docker | Đã thiết lập | Chủ dự án xác nhận |
-| Khởi tạo database và schema | Đã thiết lập | Chủ dự án xác nhận; DDL gồm 19 bảng/142 trường |
-| API, worker, React và kết nối hạ tầng | Đã thiết lập | Chủ dự án xác nhận |
-| Kiểm thử tự động và build | Đã có công cụ | `check`, `test`, `build`; xem VALIDATION |
-| Tài liệu AGENTS và docs | Đã có | Các file đã được đưa vào repository |
-| Chuẩn hóa tên dự án, Docker và README | Đã chuẩn bị | Bản thay đổi cần được nhóm áp dụng |
-| Chú thích đầu file và phạm vi `.gitignore` | Đã chuẩn bị | Bản thay đổi cần được nhóm áp dụng |
-| Cấu trúc lưu báo cáo, slide và UML | Đã tạo thư mục | Chưa thêm tài liệu học thuật của nhóm |
-| Chạy lại sau khi chuyển tên Docker | Cần thực hiện | Làm theo `docker-migration.md`, sau đó chạy smoke |
-| Bằng chứng nghiệm thu | Cần bổ sung | Chưa có ảnh hoặc log nghiệm thu trong repository |
+| M3-01 | Đọc/ghi NguoiDung bằng SQL tham số hóa | Đã triển khai; chờ SQL thật |
+| M3-02 | Đăng ký, đăng nhập, đăng xuất, thông tin tài khoản | Đã triển khai và kiểm tra HTTP với model giả |
+| M3-03 | Băm Argon2id, không trả hash về client | Đã kiểm tra với Argon2 thật |
+| M3-04 | Session Redis, TTL 2 giờ, gia hạn, hết hạn và thu hồi | Đã kiểm tra với Redis thật riêng |
+| M3-05 | CSRF, chống tự nâng quyền và kiểm tra Admin | Đã triển khai và kiểm tra tự động |
+| M3-06 | Giới hạn thử nguyên tử qua Redis | Đã kiểm tra đồng thời trên Redis thật |
+| M3-07 | Tạo Admin qua terminal, mật khẩu không hiển thị | Đã triển khai; chờ chạy với SQL thật |
+| M3-08 | Form React và điều hướng kiểm tra hạ tầng | Đã triển khai, build; xem VALIDATION.md cho QA |
+| M3-09 | Script setup:auth bổ sung cấu hình còn thiếu | Đã triển khai; không ghi đè giá trị đang có |
+| M3-10 | Smoke tài khoản qua API/SQL/Redis thật | Đã có script; chờ chạy trên máy Hải |
+| M3-11 | Nghiệm thu đầy đủ Windows + SQL Server + Redis 8 | Chờ nghiệm thu trên máy Hải |
 
-## 3. Checklist sau khi áp dụng bản chuẩn hóa
+## 4. Checklist nghiệm thu Mốc 3
 
-- [ ] Giữ nguyên `.env` và xác nhận đúng volume dữ liệu đang sử dụng.
-- [ ] Dừng Docker project cũ trước khi chạy project tên mới.
-- [ ] `npm.cmd ci` thành công với lockfile hiện tại.
-- [ ] SQL Server và Redis healthy.
-- [ ] API, worker và React chạy lại thành công.
-- [ ] Giao diện đủ năm trạng thái sẵn sàng.
-- [ ] Probe chuyển từ `queued` sang `completed`.
-- [ ] `npm.cmd run smoke` PASS sau chuyển đổi.
-- [ ] Đưa báo cáo DOCX, slide PPTX và mã UML vào `academic/`.
-- [ ] Lưu bằng chứng đã loại thông tin nhạy cảm trong `academic/evidence/`.
+- [ ] Cài thư viện và cấu hình auth thành công.
+- [ ] Tạo Admin bằng terminal với SQL Server thật.
+- [ ] Đăng ký và đăng nhập người dùng trên giao diện.
+- [ ] Refresh vẫn giữ đăng nhập khi session còn hạn.
+- [ ] Đăng xuất và không dùng lại được cookie cũ.
+- [ ] Người dùng thường bị chặn quyền Admin.
+- [ ] Admin kiểm tra quyền thành công.
+- [ ] `check`, `test`, `build` đạt.
+- [ ] `smoke` mốc 2 vẫn PASS sau cập nhật.
+- [ ] `smoke:auth` PASS trên máy nhóm.
 
-## 4. Công việc nghiệp vụ tiếp theo
+## 5. Phần chưa triển khai
 
-- [ ] Thống nhất cơ chế đăng nhập và quản lý phiên.
-- [ ] Thống nhất kênh thông báo từ worker sang API và cách phục hồi sau COMMIT.
-- [ ] Đăng ký, đăng nhập và phân quyền.
-- [ ] Đăng sách, kiểm duyệt và phân tích AI.
-- [ ] Kích hoạt phiên.
-- [ ] Đặt giá, khóa theo phiên, cooldown và chống ghi trùng.
-- [ ] Kết thúc phiên và xác định người thắng.
-- [ ] Giao dịch, trò chuyện, đánh giá và khiếu nại.
+- Đăng sách, kiểm duyệt và phân tích AI.
+- Kích hoạt phiên.
+- Đặt giá, khóa theo phiên và chống ghi trùng.
+- Kết thúc phiên và xác định người thắng.
+- Các nghiệp vụ giao dịch, trò chuyện, đánh giá và khiếu nại theo phạm vi đã chốt.
 
-Chỉ cập nhật hoàn thành khi có mã và kết quả kiểm tra phù hợp.
-Không suy ra các chức năng nghiệp vụ đã có từ việc môi trường chạy thành công.
+Cơ chế chuyển thông báo từ worker sang API và phục hồi sau COMMIT còn cần thống nhất
+trước khi triển khai luồng đấu giá hoàn chỉnh; xem ADR-009.

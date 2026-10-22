@@ -33,6 +33,6 @@ volumes:
   # Giữ volume của bản cấu hình cũ khi .env chưa có tên volume riêng.
   # Máy cài mới nhận tên chuẩn từ .env.example qua npm run setup.
   sqlserver_data:
-    name: ${SQLSERVER_VOLUME_NAME:-book-auction-moc2_sqlserver_data}
+    name: ${SQLSERVER_VOLUME_NAME:-book-auction_sqlserver_data}
   redis_data:
-    name: ${REDIS_VOLUME_NAME:-book-auction-moc2_redis_data}
+    name: ${REDIS_VOLUME_NAME:-book-auction_redis_data}

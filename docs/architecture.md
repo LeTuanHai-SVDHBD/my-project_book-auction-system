@@ -4,18 +4,14 @@
 
 ## 1. Tổng quan
 
-Repository `my-project_book-auction-system` chứa Frontend, Backend, tài liệu kỹ thuật và tài liệu học thuật.
-
-- Tên hiển thị: BookAuction — Hệ thống đấu giá sách trực tuyến.
-- npm package gốc và Docker Compose project: `my-project_book-auction-system`.
-- Database: `BookAuctionDB`; tên bảng/cột giữ theo thiết kế đã thống nhất.
+Hệ thống sử dụng một repository chứa Frontend và Backend.
 
 Backend được tổ chức theo các mô-đun, có hai tiến trình:
 - API: tiếp nhận HTTP request và quản lý kết nối Socket.IO.
 - Worker: đọc sự kiện từ Redis Streams và xử lý công việc nền.
 
 SQL Server lưu dữ liệu nghiệp vụ có thẩm quyền.
-Redis hỗ trợ truyền sự kiện và phối hợp xử lý.
+Redis hỗ trợ truyền sự kiện, phối hợp xử lý và lưu session đăng nhập.
 
 Đây chưa phải kiến trúc microservices; API và worker dùng chung mã nguồn Backend.
 
@@ -40,6 +36,7 @@ Redis hỗ trợ truyền sự kiện và phối hợp xử lý.
 | Frontend | Socket.IO trên API | Kết nối thời gian thực | Nhận cập nhật |
 | API | SQL Server | Thư viện `mssql` | Đọc/ghi dữ liệu theo nghiệp vụ |
 | API | Redis Streams | Redis client | Đưa yêu cầu bất đồng bộ vào hàng đợi |
+| API | Redis | express-session / connect-redis | Lưu, gia hạn và hủy session đăng nhập |
 | Worker | Redis Streams | Consumer group | Nhận và xác nhận sự kiện |
 | Worker | SQL Server | Giao dịch SQL | Ghi nhận kết quả xử lý |
 | Worker | Redis | Khóa theo phiên | Phối hợp xử lý đồng thời |
@@ -77,7 +74,7 @@ cần được quyết định trước khi triển khai luồng đấu giá ho�
 
 ## 6. Cập nhật thời gian thực
 
-Trong triển khai hiện tại:
+Trong Mốc 2:
 - Socket.IO chạy cùng tiến trình API.
 - Client nhận `system:hello`.
 - Kết quả probe được giao diện lấy qua HTTP API.
@@ -101,9 +98,7 @@ SQL Server và Redis chạy trong Docker.
 API, worker và React chạy bằng các terminal riêng.
 
 Cấu hình riêng nằm trong `.env` ở gốc và `frontend/.env`.
-Chi tiết khởi động: [README](../README.md).
-Máy đang dùng Docker project cũ: [hướng dẫn chuyển đổi](docker-migration.md).
-Báo cáo, slide và UML: [academic](../academic/README.md).
+Chi tiết khởi động được trình bày tại `../README.md`.
 
 ## 8. Phạm vi hiện tại
 
@@ -115,7 +110,16 @@ Báo cáo, slide và UML: [academic](../academic/README.md).
 - Script khởi tạo schema 19 bảng.
 
 Chưa triển khai:
-- Xác thực và phân quyền người dùng.
 - Nghiệp vụ đăng sách, đặt giá và kết thúc phiên.
 - Giao dịch, trò chuyện, đánh giá và khiếu nại.
 - Phân tích sách bằng Gemini API.
+
+Trong bản cập nhật Mốc 3 đã bổ sung:
+- Đăng ký, đăng nhập, đăng xuất và thông tin tài khoản.
+- Session Redis, cookie HttpOnly và CSRF.
+- Middleware xác thực và kiểm tra quyền Admin ở backend.
+- Script tạo Admin, kiểm thử auth và smoke tài khoản.
+
+Luồng tài khoản chạy trực tiếp qua HTTP và SQL Server; không đưa đăng nhập vào Redis Streams.
+Socket.IO hiện chỉ phát lời chào hạ tầng công khai, chưa có room hoặc sự kiện nghiệp vụ riêng tư.
+Khi thêm các sự kiện nghiệp vụ, phải gắn xác thực session và kiểm tra quyền tại ranh giới Socket.IO.

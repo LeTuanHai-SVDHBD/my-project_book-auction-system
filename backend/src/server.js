@@ -6,14 +6,26 @@
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { config } from './config/env.js';
-import { getPool, closeDatabase } from './config/database.js';
+import { getPool, closeDatabase, sql } from './config/database.js';
+import { RedisStore } from 'connect-redis';
+import { parseAuthConfig } from './config/auth.js';
+import { createUserModel } from './models/user.model.js';
+import { passwords } from './services/password.service.js';
+import { createAuthRateLimiter } from './services/authRateLimit.service.js';
+import { createAuthRouter } from './routes/auth.routes.js';
 import { redis, connectRedis, requireRedis } from './config/redis.js';
 import { databaseStatus, redisStatus, workerStatus } from './services/infrastructure.service.js';
 import { enqueueProbe } from './events/eventPublisher.js';
 import { INFRA } from './constants/infrastructure.js';
 import { createApp } from './app.js';
 import { logger, logError } from './utils/logger.js';
-const app = createApp({ config, deps: { sqlserver: databaseStatus, redis: redisStatus, worker: workerStatus },
+const authConfig = parseAuthConfig(process.env);
+const authRouter = createAuthRouter({ authConfig,
+  store: new RedisStore({ client: redis, prefix: 'bookauction:auth:session:' }),
+  users: createUserModel({ getPool, sql }), passwords,
+  limiter: createAuthRateLimiter({ getRedis: requireRedis, secret: authConfig.secret }),
+  ready: () => redis.isReady });
+const app = createApp({ config, authRouter, deps: { sqlserver: databaseStatus, redis: redisStatus, worker: workerStatus },
   probes: { enqueue: () => enqueueProbe(requireRedis()), get: async id => {
     const raw = await requireRedis().get(INFRA.resultPrefix + id); return raw ? JSON.parse(raw) : null;
   } }, log: logError });

@@ -1,3 +1,6 @@
+/**
+ * Kiểm tra API, SQL, Redis, worker, Socket.IO và probe bằng các dịch vụ đang chạy thật.
+ */
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 const { io } = createRequire(new URL('../frontend/package.json', import.meta.url))('socket.io-client');

@@ -32,7 +32,7 @@ Hệ quả:
 
 ## ADR-003 — Dùng FK và UNIQUE cho quan hệ tối đa một bản ghi
 
-Trạng thái: Đã có trong DDL; chờ xác nhận thực thi trên SQL Server.
+Trạng thái: Đã có trong DDL. Chủ dự án xác nhận môi trường đã chạy thành công; bằng chứng thực thi được lưu khi nghiệm thu.
 
 Ví dụ:
 `KetQuaDauGia.phien_dau_gia_id` có FK, UNIQUE và NOT NULL.
@@ -71,7 +71,7 @@ Tính tùy chọn `0..1` ở mỗi bản ghi con không làm quan hệ thành 1�
 ## ADR-005 — Tiếp nhận bất đồng bộ và chống ghi trùng
 
 Trạng thái:
-- Đã áp dụng cho probe Mốc 2.
+- Đã áp dụng cho probe hạ tầng.
 - Luồng đặt giá chưa triển khai.
 
 Quyết định:
@@ -142,3 +142,43 @@ Cần thống nhất trước khi triển khai:
 - Chính sách giới hạn thử đăng nhập.
 
 Không tự bổ sung cột refresh token hoặc đổi schema khi chưa thống nhất.
+
+
+## ADR-011 — Chuẩn hóa tên dự án và tài nguyên Docker
+
+Trạng thái: Áp dụng trong lần chuẩn hóa repository.
+
+| Thành phần | Tên |
+|---|---|
+| Repository, thư mục gốc, npm package gốc | `my-project_book-auction-system` |
+| npm Backend | `my-project_book-auction-system-backend` |
+| npm Frontend | `my-project_book-auction-system-frontend` |
+| Docker Compose project | `my-project_book-auction-system` |
+| Database | `BookAuctionDB` |
+| Consumer group chẩn đoán | `infrastructure-workers` |
+
+Tên stream/key Redis giữ namespace `bookauction:infra:*`.
+Giữ nguyên database, bảng/cột và phiên bản thư viện.
+
+Volume được đặt tên qua `SQLSERVER_VOLUME_NAME` và `REDIS_VOLUME_NAME`.
+Máy cài mới dùng tên theo dự án trong `.env.example`.
+Máy đã có `.env` chưa khai báo hai biến này được giữ tên volume cũ bằng fallback.
+Tên cũ chỉ là định danh dữ liệu đã tồn tại, không còn là tên Docker project.
+Đọc [hướng dẫn chuyển đổi](docker-migration.md) trước khi đổi môi trường đang chạy.
+
+Consumer group mới có thể đọc lại probe hạ tầng cũ từ đầu stream.
+Probe chỉ truy vấn SQL đọc và không tạo dữ liệu đấu giá.
+Không chạy đồng thời worker bản cũ và bản mới trong quá trình chuyển đổi.
+
+## ADR-012 — Tách tài liệu kỹ thuật và tài liệu học thuật
+
+Trạng thái: Đã tạo cấu trúc lưu trữ.
+
+- `docs/`: kiến trúc, luồng nghiệp vụ, quyết định kỹ thuật và tiến độ.
+- `academic/reports/`: báo cáo DOCX và bản PDF đã xuất.
+- `academic/slides/`: slide PPTX và bản PDF đã xuất.
+- `academic/uml/`: mã PlantUML và hình sơ đồ đã xuất.
+- `academic/evidence/`: bằng chứng kiểm thử được chọn để đưa vào báo cáo.
+
+Commit tài liệu nguồn và bản được nhóm thống nhất.
+File khóa Office, log thô và dữ liệu sinh tự động không đưa vào Git.

@@ -29,6 +29,7 @@
 | `frontend/` | Giao diện React |
 | `scripts/` | Công cụ hỗ trợ toàn dự án |
 | `docs/` | Tài liệu kiến trúc và tiến độ |
+| `academic/` | Báo cáo, slide, mã UML và bằng chứng nghiệm thu |
 
 ## 3. Backend
 
@@ -57,7 +58,7 @@ Các đường dẫn bên dưới nằm trong `backend/`.
 | `src/utils/logger.js` | Log có cấu trúc và che thông tin nhạy cảm | Đã có |
 | `test/infrastructure.test.js` | Kiểm thử hạ tầng và API bằng giả lập | Đã có |
 | `src/routes/` | Router nghiệp vụ | Chờ triển khai |
-| `src/models/` | Truy vấn dữ liệu nghiệp vụ | Chờ triển khai |
+| `src/models/` | Truy vấn dữ liệu nghiệp vụ; giữ chỗ bằng `.gitkeep` | Chờ triển khai |
 | `src/concurrency/` | Khóa theo phiên và hỗ trợ xử lý đồng thời | Chờ triển khai |
 | `src/jobs/` | Tác vụ kiểm tra hết hạn phiên | Chờ triển khai |
 | `src/ai/` | Kết nối và kiểm tra kết quả phân tích AI | Chờ triển khai |
@@ -78,7 +79,7 @@ Các đường dẫn bên dưới nằm trong `frontend/`.
 | `.env.example` | Mẫu địa chỉ API | Đã có |
 | `.env` | Cấu hình riêng; không commit | Tạo bằng setup |
 | `src/main.jsx` | Gắn React vào trang HTML | Đã có |
-| `src/App.jsx` | Màn hình kiểm tra Mốc 2 | Đã có |
+| `src/App.jsx` | Màn hình kiểm tra hạ tầng | Đã có |
 | `src/style.css` | Giao diện màn hình kiểm tra | Đã có |
 | `src/pages/` | Trang nghiệp vụ | Tạo khi cần |
 | `src/components/` | Component dùng lại | Tạo khi cần |
@@ -107,6 +108,12 @@ Script điều phối nhiều thành phần nằm trong `scripts/` ở gốc.
 | `docs/file-map.md` | Bản đồ mã nguồn |
 | `docs/decisions.md` | Quyết định kỹ thuật và nội dung chưa chốt |
 | `docs/tasks.md` | Công việc, tiến độ và điều kiện nghiệm thu |
+| `docs/docker-migration.md` | Chuyển tên Docker project và giữ liên kết dữ liệu cũ |
+| `academic/README.md` | Quy ước lưu báo cáo, slide, UML và bằng chứng |
+| `academic/reports/` | DOCX và PDF báo cáo |
+| `academic/slides/` | PPTX và PDF thuyết trình |
+| `academic/uml/` | PlantUML và hình sơ đồ |
+| `academic/evidence/` | Bằng chứng kiểm thử đã chọn |
 
 ## 7. File sinh tự động
 

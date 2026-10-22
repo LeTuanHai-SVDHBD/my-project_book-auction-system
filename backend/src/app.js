@@ -1,3 +1,6 @@
+/**
+ * Tạo Express app, middleware, API trạng thái và API chẩn đoán dành cho development.
+ */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -18,7 +21,7 @@ export function createApp({ config, deps, probes, log = () => {} }) {
     else done(new HttpError(403, 'ORIGIN_NOT_ALLOWED', 'Origin không được phép.'));
   } }));
   app.use(express.json({ limit: '8kb' }));
-  app.get('/api/health/live', (req, res) => res.json({ ok: true, service: 'book-auction-api', milestone: 2, uptimeSeconds: Math.floor(process.uptime()) }));
+  app.get('/api/health/live', (req, res) => res.json({ ok: true, service: 'my-project_book-auction-system-api', uptimeSeconds: Math.floor(process.uptime()) }));
   app.get('/api/health/ready', async (req, res) => {
     const report = await readiness(deps); res.status(report.ok ? 200 : 503).json(report);
   });

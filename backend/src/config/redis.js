@@ -1,3 +1,6 @@
+/**
+ * Tạo Redis client cho lệnh thường và kết nối đọc BLOCK riêng của worker.
+ */
 import { createClient } from 'redis';
 import { config } from './env.js';
 import { logError } from '../utils/logger.js';

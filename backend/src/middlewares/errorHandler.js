@@ -1,3 +1,6 @@
+/**
+ * Chuẩn hóa phản hồi lỗi HTTP và giới hạn thông tin lỗi nội bộ trả cho client.
+ */
 export class HttpError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
 }

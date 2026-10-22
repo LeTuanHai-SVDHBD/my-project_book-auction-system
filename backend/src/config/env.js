@@ -1,3 +1,6 @@
+/**
+ * Nạp .env ở thư mục gốc và xuất cấu hình đã được kiểm tra.
+ */
 import dotenv from 'dotenv';
 import { parseConfig } from './parseConfig.js';
 dotenv.config({ path: new URL('../../../.env', import.meta.url), quiet: true });

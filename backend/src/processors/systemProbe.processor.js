@@ -1,3 +1,6 @@
+/**
+ * Xử lý probe bằng truy vấn SQL chỉ đọc; dùng lại kết quả completed khi nhận lại sự kiện.
+ */
 import { INFRA, isProbeId } from '../constants/infrastructure.js';
 // Infrastructure probe only. No auction table is INSERTed or UPDATEd here.
 export function validateProbe(event) {

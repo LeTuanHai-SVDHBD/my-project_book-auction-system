@@ -4,7 +4,11 @@
 
 ## 1. Tổng quan
 
-Hệ thống sử dụng một repository chứa Frontend và Backend.
+Repository `my-project_book-auction-system` chứa Frontend, Backend, tài liệu kỹ thuật và tài liệu học thuật.
+
+- Tên hiển thị: BookAuction — Hệ thống đấu giá sách trực tuyến.
+- npm package gốc và Docker Compose project: `my-project_book-auction-system`.
+- Database: `BookAuctionDB`; tên bảng/cột giữ theo thiết kế đã thống nhất.
 
 Backend được tổ chức theo các mô-đun, có hai tiến trình:
 - API: tiếp nhận HTTP request và quản lý kết nối Socket.IO.
@@ -73,7 +77,7 @@ cần được quyết định trước khi triển khai luồng đấu giá ho�
 
 ## 6. Cập nhật thời gian thực
 
-Trong Mốc 2:
+Trong triển khai hiện tại:
 - Socket.IO chạy cùng tiến trình API.
 - Client nhận `system:hello`.
 - Kết quả probe được giao diện lấy qua HTTP API.
@@ -97,7 +101,9 @@ SQL Server và Redis chạy trong Docker.
 API, worker và React chạy bằng các terminal riêng.
 
 Cấu hình riêng nằm trong `.env` ở gốc và `frontend/.env`.
-Chi tiết khởi động được trình bày tại `../README.md`.
+Chi tiết khởi động: [README](../README.md).
+Máy đang dùng Docker project cũ: [hướng dẫn chuyển đổi](docker-migration.md).
+Báo cáo, slide và UML: [academic](../academic/README.md).
 
 ## 8. Phạm vi hiện tại
 

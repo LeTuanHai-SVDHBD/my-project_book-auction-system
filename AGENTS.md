@@ -4,7 +4,9 @@
 
 ## 1. Phạm vi áp dụng
 
-Áp dụng cho toàn bộ repository hệ thống đấu giá sách trực tuyến của Nhóm 15.
+Áp dụng cho repository `my-project_book-auction-system` — hệ thống đấu giá sách trực tuyến của Nhóm 15.
+
+Tài liệu kỹ thuật nằm trong `docs/`; báo cáo, slide và mã UML nằm trong `academic/`.
 
 Công nghệ:
 - Frontend: React và Vite.
@@ -33,6 +35,8 @@ Không tự quyết định thay đổi nghiệp vụ, cấu trúc dữ liệu h
 - Không tự thêm thư viện, đổi phiên bản hoặc thay đổi kiến trúc.
 - Khi cần dependency mới, giải thích mục đích và hỏi trước.
 - Không ghi đè cấu hình cá nhân hoặc file `.env`.
+- Khi đổi tên Docker, kiểm tra liên kết volume và hướng dẫn chuyển đổi; không tự xóa dữ liệu.
+- Không sửa DOCX/PPTX hoặc mã UML ngoài phạm vi được yêu cầu.
 - Không xóa dữ liệu, volume hoặc chạy lệnh Git phá hủy thay đổi.
 - Không tự commit, push, merge hoặc triển khai nếu chưa được yêu cầu.
 
@@ -49,6 +53,7 @@ Không tự quyết định thay đổi nghiệp vụ, cấu trúc dữ liệu h
 - Dùng `async`/`await`; xử lý lỗi tại ranh giới phù hợp.
 - Comment giải thích trách nhiệm, lý do hoặc điều kiện đặc biệt.
 - Không thêm comment chỉ diễn đạt lại từng dòng lệnh.
+- Không chèn comment vào JSON chuẩn hoặc file sinh tự động; tra trách nhiệm trong `docs/file-map.md`.
 
 ## 5. Phân chia trách nhiệm
 

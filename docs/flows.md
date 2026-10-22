@@ -5,7 +5,7 @@
 ## 1. Phạm vi
 
 Các luồng tài khoản và nghiệp vụ dưới đây là thiết kế cần triển khai.
-Bộ khung Mốc 2 hiện chỉ có luồng kiểm tra hạ tầng.
+Mã nguồn hiện tại đã triển khai luồng kiểm tra hạ tầng.
 
 Cơ chế duy trì đăng nhập, thư viện băm mật khẩu và thời hạn phiên
 cần được thống nhất trước khi viết chức năng xác thực.
@@ -41,7 +41,7 @@ cần được thống nhất trước khi viết chức năng xác thực.
 - Không trả mật khẩu hoặc chuỗi băm cho Frontend.
 - Không tin vai trò hoặc mã người dùng do client tự khai báo.
 - Kiểm tra quyền sở hữu tài nguyên tại Backend.
-- Token chẩn đoán Mốc 2 không phải tài khoản đăng nhập.
+- Token chẩn đoán hạ tầng không phải tài khoản đăng nhập.
 
 ## 4. Đăng sách và kích hoạt phiên
 
@@ -171,11 +171,11 @@ nếu chưa cập nhật thiết kế và được nhóm thống nhất.
 - Không tự động thay đổi người thắng hoặc trạng thái giao dịch
   chỉ vì có khiếu nại.
 
-## 9. Luồng kiểm tra Mốc 2 đã có
+## 9. Luồng kiểm tra hạ tầng đã có
 
 `React → API → Redis Streams → Worker → SELECT kiểm tra SQL → Redis → React`
 
 - API trả trạng thái `queued`.
 - Worker chỉ truy vấn kiểm tra, không ghi dữ liệu đấu giá.
 - Worker lưu `completed`; giao diện lấy kết quả qua API.
-- Socket.IO trong Mốc 2 mới kiểm tra kết nối bằng `system:hello`.
+- Socket.IO hiện kiểm tra kết nối bằng `system:hello`.

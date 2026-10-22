@@ -1,3 +1,6 @@
+/**
+ * Tạo cấu hình riêng nếu chưa tồn tại; sinh mật khẩu/token và giữ nguyên cấu hình đang có.
+ */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';

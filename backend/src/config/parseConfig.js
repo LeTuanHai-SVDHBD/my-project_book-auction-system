@@ -1,3 +1,6 @@
+/**
+ * Kiểm tra và chuyển kiểu cấu hình đầu vào trước khi kết nối dịch vụ.
+ */
 function integer(value, fallback, min, max, name) {
   const n = value === undefined || value === '' ? fallback : Number(value);
   if (!Number.isInteger(n) || n < min || n > max) throw new Error(`${name} không hợp lệ.`);

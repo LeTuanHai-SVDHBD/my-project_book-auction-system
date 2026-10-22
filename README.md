@@ -44,7 +44,7 @@ docker info
 Giải nén `DauGiaSach_Moc2.zip`. Ví dụ thư mục sau khi giải nén là:
 
 ```text
-D:\Projects\dau-gia-sach-moc2
+"C:\Users\haiq4\Downloads\Nhom15\my-project_book-auction-system"
 ```
 
 Trong VS Code chọn **File → Open Folder**, mở thư mục có cùng lúc các tệp `package.json`, `package-lock.json`, `compose.yaml` và hai thư mục `backend`, `frontend`.

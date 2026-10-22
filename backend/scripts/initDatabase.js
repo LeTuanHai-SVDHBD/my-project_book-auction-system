@@ -1,3 +1,6 @@
+/**
+ * Khởi tạo database và schema khi chưa có bảng đích; dừng nếu cấu trúc đang có chỉ khớp một phần.
+ */
 import sql from 'mssql';
 import { readFile } from 'node:fs/promises';
 import { config } from '../src/config/env.js';
@@ -19,7 +22,7 @@ try {
     const contents = await readFile(new URL('../migrations/001_schema.sql', import.meta.url), 'utf8');
     const batches = contents.replace(/^\uFEFF/, '').split(/^\s*GO\s*(?:--[^\n]*)?$/gim).filter(x => x.trim());
     for (const batch of batches) await app.request().batch(batch);
-    console.log('Đã tạo schema 19 bảng theo bản Word (3).');
+    console.log('Đã khởi tạo schema 19 bảng của hệ thống đấu giá sách.');
   }
 } catch (error) {
   console.error('Khởi tạo thất bại:', String(error.message).replaceAll(config.sql.password, '[REDACTED]'));

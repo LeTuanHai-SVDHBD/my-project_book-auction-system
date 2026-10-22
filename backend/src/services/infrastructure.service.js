@@ -1,3 +1,6 @@
+/**
+ * Kiểm tra kết nối SQL, số bảng/cột dự kiến, Redis PING và heartbeat của worker.
+ */
 import manifest from '../../schema-manifest.json' with { type: 'json' };
 import { getPool } from '../config/database.js';
 import { requireRedis } from '../config/redis.js';

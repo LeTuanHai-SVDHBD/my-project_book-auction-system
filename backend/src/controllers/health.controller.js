@@ -1,3 +1,6 @@
+/**
+ * Tổng hợp readiness của SQL Server, Redis và worker; thiếu thành phần thì báo chưa sẵn sàng.
+ */
 export async function readiness(deps) {
   const names = ['sqlserver', 'redis', 'worker'];
   const results = await Promise.allSettled(names.map(name => Promise.resolve().then(() => deps[name]())));

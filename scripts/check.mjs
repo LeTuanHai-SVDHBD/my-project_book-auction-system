@@ -1,3 +1,6 @@
+/**
+ * Kiểm tra cú pháp các file JavaScript máy chủ và script, bỏ qua dependency và kết quả build.
+ */
 import { readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';

@@ -1,3 +1,6 @@
+/**
+ * Quản lý connection pool SQL Server dùng chung trong từng tiến trình và đóng kết nối khi dừng.
+ */
 import sql from 'mssql';
 import { config } from './env.js';
 import { logError } from '../utils/logger.js';

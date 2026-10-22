@@ -44,10 +44,52 @@ Hải đã xác nhận:
 Đây là kết quả trên máy Hải trước bản cập nhật tài khoản.
 Sau khi cập nhật cần chạy lại `smoke` để xác nhận không ảnh hưởng luồng cũ.
 
-## 3. Điều kiện nghiệm thu tiếp theo
+## 3. Kết quả trên máy Hải được xác nhận ngày 22/10/2026
 
-Làm theo `README.md`, kiểm tra Admin bằng giao diện,
-chạy `check`, `test`, `build`, `smoke` và `smoke:auth` trên Windows với SQL Server/Redis thật.
+Hải xác nhận đã chạy chức năng tài khoản thành công:
+
+| Nội dung | Kết quả / nguồn |
+|---|---|
+| Tạo tài khoản | Thành công, theo xác nhận của Hải |
+| Đăng nhập người dùng | Thành công, theo xác nhận của Hải |
+| Tạo và đăng nhập tài khoản Admin | Thành công, theo xác nhận của Hải |
+
+Đây là xác nhận sử dụng trên máy phát triển của nhóm, không phải kết quả SQL được chạy
+trực tiếp trong môi trường chuẩn bị bản cập nhật ở mục 1. Chưa có log smoke hoặc ảnh
+nghiệm thu bổ sung trong lần xác nhận này.
+
+## 4. Rà soát mã nguồn và bản sửa tài liệu
+
+Đã đối chiếu nhánh `feat/Hai` tại commit `3ad972ee6cfda4d084aff3f68070ae83a815c62b`
+với bản cập nhật Mốc 3; các file chức năng tài khoản đã có đầy đủ.
+
+Kết quả chạy lại trên mã nguồn commit đó:
+
+- `npm ci --no-audit --no-fund`: thành công.
+- `npm run check`: đạt, 34 file JavaScript.
+- `npm test`: 31 đạt, 1 SKIP, không lỗi; bài Redis thật chưa bật biến opt-in.
+- `npm run build`: thành công.
+
+Bản sửa tiếp theo đồng bộ hướng dẫn tài khoản vào README, cập nhật xác nhận trên máy Hải
+và thêm tên volume chuẩn cho máy cài mới vào `.env.example`. Fallback volume hiện hành
+trong Compose được giữ nguyên; không sửa `.env` riêng hoặc dữ liệu.
+
+Kiểm tra riêng cho bản sửa cấu hình và tài liệu:
+
+- Đọc YAML thành công; hai fallback volume giống trước bản sửa.
+- Chạy setup trong thư mục tạm: máy cài mới nhận đủ hai tên volume chuẩn.
+- Chạy lại setup với `.env` đã có: nội dung file được giữ nguyên.
+- Chạy setup:auth với cấu hình cũ: chỉ bổ sung session, không thêm hoặc đổi biến volume.
+- Liên kết và anchor Markdown nội bộ hợp lệ; không còn tham chiếu hai file hướng dẫn riêng đã xóa.
+
+Các kiểm tra này không khởi động Docker, không xác nhận mount thực tế trên máy Hải
+và không thay thế `smoke` / `smoke:auth` với SQL Server thật.
+
+## 5. Điều kiện nghiệm thu còn lại
+
+Làm theo [README, mục 6–7](README.md#6-kiểm-tra-tài-khoản-trên-giao-diện),
+kiểm tra giữ phiên sau F5, đăng xuất, quyền Admin và chạy `smoke` / `smoke:auth`
+trên Windows với SQL Server/Redis thật. Chỉ đánh dấu PASS khi có kết quả tương ứng.
 
 Chưa triển khai các nghiệp vụ đăng sách, AI, đặt giá hoặc kết thúc phiên.
 Socket.IO hiện chỉ có lời chào kiểm tra hạ tầng công khai.

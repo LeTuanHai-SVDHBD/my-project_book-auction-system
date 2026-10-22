@@ -1,0 +1,24 @@
+{
+  "name": "dau-gia-sach-moc2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "db:init": "npm run db:init --workspace backend",
+    "dev:api": "npm run dev:api --workspace backend",
+    "dev:worker": "npm run dev:worker --workspace backend",
+    "dev:web": "npm run dev --workspace frontend",
+    "check": "node scripts/check.mjs",
+    "test": "npm test --workspace backend",
+    "build": "npm run build --workspace frontend",
+    "smoke": "node scripts/smoke.mjs"
+  }
+}

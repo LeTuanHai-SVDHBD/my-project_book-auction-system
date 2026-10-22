@@ -1,0 +1,26 @@
+{
+  "tables": [
+    "NguoiDung",
+    "Sach",
+    "BaiDang",
+    "HinhAnh",
+    "Video",
+    "KiemDuyet",
+    "PhienDauGia",
+    "BinhLuan",
+    "LuotDatGia",
+    "LichSuDauGia",
+    "KetQuaDauGia",
+    "GiaoDich",
+    "CuocTroChuyen",
+    "TinNhan",
+    "KhieuNai",
+    "BangChungKhieuNai",
+    "DanhGia",
+    "PhanTichAI",
+    "ChiTietPhanTichAI"
+  ],
+  "columns": 142,
+  "checks": 91,
+  "uniqueConstraints": 14
+}

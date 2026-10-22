@@ -1,0 +1,24 @@
+{
+  "name": "book-auction-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:api": "node --watch src/server.js",
+    "dev:worker": "node --watch src/worker.js",
+    "start:api": "node src/server.js",
+    "start:worker": "node src/worker.js",
+    "db:init": "node scripts/initDatabase.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "cors": "2.8.6",
+    "dotenv": "17.4.2",
+    "express": "5.3.0",
+    "helmet": "8.3.0",
+    "mssql": "12.7.10",
+    "pino": "10.4.0",
+    "redis": "5.12.1",
+    "socket.io": "4.8.4"
+  }
+}

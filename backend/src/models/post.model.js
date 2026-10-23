@@ -1,5 +1,6 @@
 /** SQL bài đăng/phiên: khóa cặp trạng thái và sách vật lý, tiền được truyền/đọc bằng chuỗi. */
 import { HttpError } from '../middlewares/errorHandler.js';
+import {withRowVersion} from '../utils/rowVersion.js';
 import {assertVersion,assertStatePair,assertRelistable} from '../services/postPolicy.js';
 const conflict = message => { throw new HttpError(409,'POST_CONFLICT',message); };
 const notFound = () => { throw new HttpError(404,'POST_NOT_FOUND','Không tìm thấy bài đăng.'); };
@@ -7,7 +8,7 @@ const projection = `b.bai_dang_id,b.sach_id,b.nguoi_dung_id,b.ma_san_pham,b.tieu
  s.ten_sach,s.tac_gia,s.the_loai,s.nha_xuat_ban,s.nam_xuat_ban,s.isbn,s.tinh_trang_sach,s.mo_ta,
  p.phien_dau_gia_id,p.trang_thai AS trang_thai_phien,p.thoi_gian_bat_dau,p.thoi_gian_ket_thuc,
  CONVERT(VARCHAR(18),p.gia_khoi_diem) AS gia_khoi_diem,CONVERT(VARCHAR(18),p.gia_hien_tai) AS gia_hien_tai,
- CONVERT(VARCHAR(18),p.buoc_gia) AS buoc_gia,p.thoi_gian_cho_dat_lai,CONVERT(VARCHAR(16),p.row_version,2) AS row_version`;
+ CONVERT(VARCHAR(18),p.buoc_gia) AS buoc_gia,p.thoi_gian_cho_dat_lai,CONVERT(BINARY(8),p.row_version) AS row_version`;
 const joins = 'FROM dbo.BaiDang b JOIN dbo.Sach s ON s.sach_id=b.sach_id JOIN dbo.PhienDauGia p ON p.bai_dang_id=b.bai_dang_id';
 export function createPostModel({ getPool, sql }) {
   const request = target => target.request ? target.request() : new sql.Request(target);
@@ -31,9 +32,9 @@ export function createPostModel({ getPool, sql }) {
   }
   async function locked(tx, postId, user, role='owner') {
     const result=await request(tx).input('id',sql.Int,postId).query(`SELECT b.*,p.phien_dau_gia_id,p.trang_thai AS trang_thai_phien,
-      CONVERT(VARCHAR(16),p.row_version,2) AS row_version FROM dbo.BaiDang b WITH (UPDLOCK,HOLDLOCK)
+      CONVERT(BINARY(8),p.row_version) AS row_version FROM dbo.BaiDang b WITH (UPDLOCK,HOLDLOCK)
       JOIN dbo.PhienDauGia p WITH (UPDLOCK,HOLDLOCK) ON p.bai_dang_id=b.bai_dang_id WHERE b.bai_dang_id=@id`);
-    const row=result.recordset[0]; if (!row || role==='owner' && row.nguoi_dung_id!==user) notFound(); return row;
+    const row=result.recordset[0]; if (!row || role==='owner' && row.nguoi_dung_id!==user) notFound(); return withRowVersion(row);
   }
   async function history(tx,auctionId,owner,action) {
     await request(tx).input('auction',sql.Int,auctionId).input('owner',sql.Int,owner).input('action',sql.NVarChar(2000),action)
@@ -70,12 +71,12 @@ export function createPostModel({ getPool, sql }) {
         .query(`SELECT TOP(30) ${projection} ${joins} WHERE b.bai_dang_id<@after AND (@owner IS NULL OR b.nguoi_dung_id=@owner)
           AND (@pending=0 OR (b.trang_thai='cho_kiem_duyet' AND p.trang_thai='cho_kiem_duyet'))
           AND (@public=0 OR (b.trang_thai='da_duyet' AND p.trang_thai='da_kich_hoat')) ORDER BY b.bai_dang_id DESC`);
-      return result.recordset;
+      return result.recordset.map(withRowVersion);
     },
     async detail(postId,{owner=null,admin=false,publicOnly=false}={}) {
       const pool=await getPool();
       const result=await request(pool).input('id',sql.Int,postId).query(`SELECT ${projection}${publicOnly?'':',CONVERT(VARCHAR(18),p.gia_toi_thieu) AS gia_toi_thieu'} ${joins} WHERE b.bai_dang_id=@id`);
-      const row=result.recordset[0];
+      const row=withRowVersion(result.recordset[0]);
       if (!row || publicOnly && (row.trang_thai_bai!=='da_duyet'||row.trang_thai_phien!=='da_kich_hoat') || !publicOnly && !admin && row.nguoi_dung_id!==owner) notFound();
       row.media=(await media(pool,postId)).map(({publicId,...item})=>item);
       if (publicOnly) return row;

@@ -172,3 +172,13 @@ hoặc `schema-manifest.json` vì các file này sử dụng JSON chuẩn.
 | `scripts/smokeM4.mjs` | Smoke thật với dữ liệu UUID, cleanup SQL/Cloudinary riêng |
 | `backend/test/posts.test.js` | Hợp đồng, policy, privacy, HTTP và provider giả |
 | `backend/test/mediaRedis.test.js` | Redis thật theo opt-in: claim đồng thời, ownership, cleanup và commit chưa rõ |
+
+
+Bản sửa 23/10/2026:
+
+| File | Trách nhiệm |
+|---|---|
+| `backend/src/utils/rowVersion.js` | Mã hóa bytes SQL thành hex 16 ký tự, giữ byte 0 đầu, dùng chung cho model |
+| `backend/test/rowVersion.test.js` | Hồi quy model/HTTP dùng driver giả trả binary, giữ kiểm tra xung đột |
+
+`smokeM4.mjs` kiểm tra token phiên bản ngay sau khi đọc chi tiết và in thêm thông báo lỗi API khi sai HTTP status.

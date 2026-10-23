@@ -313,6 +313,19 @@ Cùng mã yêu cầu luôn trả bài đã tạo trước đó; không dùng l�
 HTTP 409 khi thao tác bằng `row_version` cũ: tải lại bài rồi thao tác lại.
 Vé hết hạn hoặc đã claim chưa rõ: kiểm tra **Bài của tôi** trước khi tải lại tệp và tạo yêu cầu mới.
 
+### Lưu ý khi xóa bài hoặc media
+
+Hiện tại chưa có API/nút xóa bài đăng. Xóa bản ghi thủ công trong SQL không gọi Cloudinary;
+media đã gắn bài không tự bị xóa theo. Cleanup định kỳ chỉ xử lý vé upload bỏ dở/hết hạn còn trong ledger,
+không quét xóa mọi file Cloudinary không có bản ghi SQL.
+
+- **Bỏ tệp trước khi gửi bài:** API xóa tệp chưa dùng trên Cloudinary sau khi kiểm tra không có tham chiếu SQL.
+- **Media của bài đã gửi, bị từ chối hoặc lịch sử phiên cũ:** giữ lại; đăng lại có thể dùng chung tệp.
+- **Media của smoke M4:** script có bước dọn SQL rồi gọi Cloudinary destroy riêng cho đúng tệp thử của lần chạy.
+
+Khi bổ sung chức năng xóa bài trong tương lai, cần xử lý quyền/trạng thái phiên, giữ lịch sử cần thiết
+và chỉ xóa file khi không còn bài nào tham chiếu. Đây chưa phải chức năng đã triển khai.
+
 ### 11.3. API Mốc 4
 
 | Phương thức | Endpoint | Quyền |
@@ -354,3 +367,22 @@ lịch kích hoạt, ẩn ngưỡng giá và điều kiện đăng lại. Fixtur
 không phải API kết thúc thủ công. Cuối cùng dọn dữ liệu SQL và media riêng; dọn lỗi trả FAIL và in ID để đối soát.
 Video thật và chất lượng bằng chứng cần thử thủ công bằng tệp của nhóm.
 Chỉ xác nhận Mốc 4 hoàn tất trên máy nhóm khi các lệnh và luồng giao diện này đạt.
+
+
+### 11.5. Cập nhật sửa lỗi phiên bản dữ liệu ngày 23/10/2026
+
+Nếu smoke dừng ở bước kích hoạt trước duyệt với HTTP 400 `INVALID_POST_INPUT`, hoặc Admin nhận
+“Thiếu phiên bản dữ liệu”, cập nhật mã sửa `row_version`:
+
+```powershell
+git pull --ff-only origin feat/Hai
+```
+
+Dừng rồi chạy lại terminal API (`npm.cmd run dev:api`), F5 trang React, mở lại chi tiết bài và thử kiểm duyệt.
+Chạy lại `npm.cmd run smoke:m4` trong terminal khác khi API/worker đang chạy.
+Bản sửa dùng database và cấu hình hiện tại, không có migration mới.
+
+Backend đọc phiên bản SQL dưới dạng BINARY(8), mã hóa bytes thành hex 16 ký tự tại model,
+dùng cùng encoder cho danh sách, chi tiết và dòng đang khóa. Client tiếp tục gửi `row_version` nhận từ API;
+không tự tạo mã mặc định hay bỏ kiểm tra version. Smoke kiểm tra hình dạng token ngay sau khi đọc bài,
+để phân biệt lỗi dữ liệu phiên bản với lỗi trạng thái nghiệp vụ.

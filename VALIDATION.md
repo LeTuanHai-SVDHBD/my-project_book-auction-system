@@ -57,3 +57,23 @@ Chỉ PASS nếu dọn cả SQL và Cloudinary thành công. Fixture không tạ
 Chưa có kiểm thử tải lớn, thời lượng video, distributed commit SQL–Cloudinary hoặc phục hồi hoàn toàn khi mất Redis.
 Claim chưa rõ commit được giữ để đối soát thủ công; không đánh đổi an toàn media bằng xóa phỏng đoán.
 Mốc 5 (đặt giá/kết thúc), Mốc 6 realtime nghiệp vụ và Mốc 7 AI chưa triển khai trong bản này.
+
+
+## 4. Sửa lỗi phiên bản dữ liệu — 23/10/2026
+
+Hải đã chạy smoke M4 trên máy Windows với dịch vụ thật. Log cho thấy lệnh đến bước
+“quyền sở hữu, CSRF, không kích hoạt trước duyệt”, nhận HTTP 400 `INVALID_POST_INPUT` thay vì 409.
+Script báo đã dọn dữ liệu/media thử. Hải đồng thời báo Admin không phê duyệt được vì “Thiếu phiên bản dữ liệu”.
+Đây là kết quả **FAIL**, chưa phải bằng chứng hoàn tất smoke M4.
+
+Bản sửa:
+- Đọc BINARY(8), mã hóa bytes thành hex 16 ký tự ở model cho cả list/detail/locked.
+- Giữ validator HTTP chặt chẽ, vẫn chặn dữ liệu cũ 409; không giả lập token khi thiếu.
+- Thêm test model thật và HTTP, driver trả bytes thay cho model giả đã trả sẵn chuỗi hợp lệ.
+- Smoke kiểm tra hình dạng row_version ngay sau GET detail và in thêm thông báo lỗi API.
+- README giải thích rõ chưa có xóa bài và không tự xóa Cloudinary khi xóa SQL thủ công.
+
+Kiểm tra bản sửa đã chạy: `npm run check` đạt 53 file; `npm test` mặc định 49 đạt/2 SKIP;
+bật Redis thật đạt 51/51; `npm run build` thành công. Các test mới dùng model thật với driver SQL giả trả bytes,
+không phải bằng chứng đã chạy T-SQL trên SQL Server thật.
+SQL/Cloudinary thật không có sẵn trong môi trường sửa; cần chạy lại smoke trên máy Hải sau cập nhật và restart API.

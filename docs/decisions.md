@@ -218,3 +218,17 @@ Trạng thái: triển khai theo lộ trình đã gửi.
   Tiền 18 chữ số dùng chuỗi JSON và VARCHAR→DECIMAL trong SQL để tránh làm tròn bằng JavaScript Number.
 - Mốc 4 chưa gọi Gemini. Không có phân tích thì trả `ai: null`, hiển thị chưa tích hợp; không ghi điểm/kết quả lỗi giả.
   Đọc được kết quả AI đã có để Admin tham khảo, nhưng tích hợp và chấm điểm thực hiện ở Mốc 7.
+
+
+### Bổ sung ADR-013 ngày 23/10/2026 — row_version qua ranh giới SQL/JSON
+
+Hải báo smoke M4 trả 400 thay vì 409 khi thử kích hoạt trước duyệt và Admin không duyệt được do token phiên bản không hợp lệ.
+Sửa model đọc `CONVERT(BINARY(8), p.row_version)`, mã hóa bằng Buffer thành chuỗi hex 16 ký tự viết hoa trong Node.
+Dùng chung encoder cho list/detail và truy vấn khóa; không phụ thuộc CONVERT sang VARCHAR để định dạng token HTTP.
+Giữ đủ byte 0 đầu, không qua Number; dữ liệu SQL không đúng 8 byte phải báo lỗi thay vì sinh token giả.
+HTTP vẫn yêu cầu đúng chuỗi hex 16 ký tự, bản cũ tiếp tục bị chặn 409 sau khi lấy khóa.
+Không thay đổi schema hoặc quy tắc duyệt/kích hoạt.
+
+Thêm hồi quy qua model thật và HTTP với driver giả trả bytes, gồm gửi lại token chi tiết,
+duyệt, kích hoạt trước duyệt, bản cũ và bản mới. SQL Server thật vẫn cần smoke trên máy nhóm.
+Tài liệu kiểu dữ liệu: [Microsoft rowversion](https://learn.microsoft.com/en-us/sql/t-sql/data-types/rowversion-transact-sql).

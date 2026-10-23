@@ -1,141 +1,79 @@
-<!-- Mục đích: Mô tả kiến trúc, kết nối và ranh giới trách nhiệm của hệ thống. -->
+<!-- Mục đích: Mô tả thành phần, kết nối, ranh giới trách nhiệm và phạm vi triển khai. -->
 
 # Kiến trúc hệ thống
 
-## 1. Tổng quan
+## Tổng quan
 
-Hệ thống sử dụng một repository chứa Frontend và Backend.
+Một repository chứa React Frontend và Express Backend, quản lý dependency bằng npm workspaces.
+Backend có hai tiến trình dùng chung mã nguồn: HTTP API và worker Redis Streams.
+SQL Server giữ trạng thái nghiệp vụ có thẩm quyền; Redis hỗ trợ session, hàng đợi và phối hợp xử lý.
 
-Backend được tổ chức theo các mô-đun, có hai tiến trình:
-- API: tiếp nhận HTTP request và quản lý kết nối Socket.IO.
-- Worker: đọc sự kiện từ Redis Streams và xử lý công việc nền.
+## Thành phần và kết nối
 
-SQL Server lưu dữ liệu nghiệp vụ có thẩm quyền.
-Redis hỗ trợ truyền sự kiện, phối hợp xử lý và lưu session đăng nhập.
+| Thành phần | Trách nhiệm | Kết nối |
+|---|---|---|
+| React | Tài khoản, bài đăng, kiểm duyệt, đặt lịch và danh mục | HTTP/JSON và upload nhị phân qua API |
+| Express API | Xác thực, phân quyền, đầu vào, nghiệp vụ HTTP và Socket.IO | SQL Server, Redis, Cloudinary |
+| SQL Server | Tài khoản, sách, bài, phiên, media và lịch sử | Thư viện `mssql`, truy vấn tham số hóa |
+| Redis | Session, vé media, giới hạn thử, kết quả probe và heartbeat | Redis client; Lua khi cần thao tác nguyên tử |
+| Redis Streams | Phân phối probe; nền tảng cho sự kiện đặt giá dự kiến | Consumer group tại worker |
+| Worker | Đọc, nhận lại và xác nhận probe | Kết nối Redis BLOCK riêng, SQL đọc kiểm tra |
+| Cloudinary | Lưu và phân phối ảnh/video | HTTPS REST từ Backend; SQL lưu URL/public_id |
+| Socket.IO | Kiểm tra kết nối bằng `system:hello` | Cùng HTTP server; chưa có sự kiện nghiệp vụ riêng tư |
+| Gemini API | Phân tích sách dự kiến | Chưa tích hợp; Admin hiện kiểm duyệt thủ công |
 
-Đây chưa phải kiến trúc microservices; API và worker dùng chung mã nguồn Backend.
+Frontend không truy cập SQL hoặc Redis trực tiếp. Bí mật Cloudinary chỉ có ở Backend.
+API, worker và React chạy riêng; SQL Server và Redis chạy trong Docker theo [README](../README.md).
 
-## 2. Thành phần
+## Phân lớp Backend
 
-| Thành phần | Trách nhiệm |
-|---|---|
-| React | Hiển thị dữ liệu, gửi yêu cầu, nhận cập nhật |
-| Express API | Xác thực, phân quyền, kiểm tra đầu vào và tiếp nhận yêu cầu |
-| Redis Streams | Lưu và phân phối yêu cầu cho worker |
-| Event Worker | Xử lý sự kiện và điều phối nghiệp vụ |
-| Redis lock | Phối hợp xử lý các yêu cầu của cùng một phiên |
-| SQL Server | Lưu tài khoản, bài đăng, phiên, lượt giá, kết quả và giao dịch |
-| Socket.IO | Gửi cập nhật sau khi thay đổi đã được xác nhận |
-| Gemini API | Dự kiến Mốc 7: hỗ trợ phân tích sách; Admin quyết định kiểm duyệt |
-| Cloudinary | Mốc 4: lưu/phân phối ảnh và video; SQL giữ URL và public_id |
+Luồng HTTP: `Route → Middleware → Controller → Service → Model → SQL Server`.
 
-## 3. Mô hình kết nối
+- Route khai báo endpoint và middleware xác thực/CSRF/phân quyền.
+- Controller chuyển đầu vào/đầu ra HTTP, áp dụng projection công khai.
+- Service điều phối claim media, nghiệp vụ và kết quả commit/rollback.
+- Model thực hiện truy vấn tham số hóa, lấy khóa và giao dịch SQL.
+- Policy/utility chứa quy tắc trạng thái, chuẩn hóa phiên bản và các hàm dùng chung.
 
-| Nguồn | Đích | Cách kết nối | Mục đích |
-|---|---|---|---|
-| Frontend | API | HTTP/JSON | Truy vấn dữ liệu và gửi thao tác |
-| Frontend | Socket.IO trên API | Kết nối thời gian thực | Nhận cập nhật |
-| API | SQL Server | Thư viện `mssql` | Đọc/ghi dữ liệu theo nghiệp vụ |
-| API | Redis Streams | Redis client | Đưa yêu cầu bất đồng bộ vào hàng đợi |
-| API | Redis | express-session / connect-redis | Lưu, gia hạn và hủy session đăng nhập |
-| API | Cloudinary | HTTPS REST, native fetch/FormData | Upload/destroy tệp, bí mật chỉ ở server |
-| API | Redis | Ledger vé media + Lua claim | Gắn media đúng chủ và cleanup sau lỗi |
-| Worker | Redis Streams | Consumer group | Nhận và xác nhận sự kiện |
-| Worker | SQL Server | Giao dịch SQL | Ghi nhận kết quả xử lý |
-| Worker | Redis | Khóa theo phiên | Phối hợp xử lý đồng thời |
+Luồng probe: `Redis Streams → Consumer → Processor → SQL SELECT → Redis result`.
+Probe không ghi lượt giá, kết quả đấu giá hoặc giao dịch.
 
-Frontend không truy cập trực tiếp SQL Server hoặc Redis.
+## Xác thực theo tab
 
-## 4. Phân lớp Backend
+Backend dùng một `express-session` middleware và RedisStore chung cho tiến trình.
+Frontend gửi mã tab ngẫu nhiên qua `X-Tab-ID`; Backend chỉ chọn cookie HttpOnly tương ứng,
+không lấy session từ cookie của tab khác hoặc cookie chung.
+Mã tab nằm trong sessionStorage và không chứa thông tin xác thực. Cookie chứa mã session được ký,
+CSRF token giữ trong bộ nhớ, vai trò và tài khoản luôn đọc lại từ SQL.
 
-Luồng HTTP nghiệp vụ dự kiến:
+F5 giữ mã tab; một tài liệu mới xoay mã kể cả khi trình duyệt sao chép storage từ tab mở nó.
+Vì vậy tab mới cần đăng nhập, đăng xuất chỉ thu hồi phiên được chọn.
+Client terminal không gửi mã tab tiếp tục dùng hợp đồng cookie chung cho smoke và tích hợp HTTP.
+Đây là cách phân tách thao tác theo tab, không phải ranh giới an toàn giữa các trang cùng origin.
 
-`Route → Middleware → Controller → Service → Model → SQL Server`
+## Nhất quán dữ liệu
 
-Luồng xử lý sự kiện:
+- SQL Server là nguồn trạng thái quyết định quyền kích hoạt, lịch, giá và kết quả.
+- Tạo sách/bài/phiên/media/lịch sử trong cùng transaction SERIALIZABLE.
+- Duyệt và gửi lại cập nhật cặp trạng thái bài/phiên nguyên tử.
+- Kiểm tra `row_version` sau khi lấy khóa; chuẩn hóa BINARY(8) thành hex 16 ký tự ở model.
+- UUID yêu cầu và UNIQUE bảo vệ retry; chỉ trả thành công sau COMMIT.
+- Giá DECIMAL(18,0) đi qua JSON dạng chuỗi, không chuyển thành JavaScript Number.
+- Giờ lưu UTC, SQL kiểm tra lịch kích hoạt theo `SYSUTCDATETIME()`.
 
-`Redis Streams → Consumer → Processor → Service/Model → SQL Server`
+Tệp được upload ngoài transaction SQL. Vé Redis claim nguyên tử xác nhận chủ sở hữu trước khi gắn media.
+Sau COMMIT, acknowledgement Redis lỗi không làm kết quả SQL biến thành rollback giả.
+Cleanup chỉ destroy file bỏ dở sau khi SQL xác nhận không còn tham chiếu;
+claim chưa rõ commit được giữ để đối soát thủ công. Không có distributed transaction SQL–Cloudinary.
 
-- Controller không chứa toàn bộ nghiệp vụ.
-- Model không phụ thuộc đối tượng HTTP request/response.
-- Processor không tự quyết định quy tắc khác với service.
-- API và worker dùng chung quy tắc nghiệp vụ khi cần.
+## Cập nhật thời gian thực và phục hồi
 
-## 5. Nhất quán dữ liệu
+Socket.IO mới cung cấp lời chào hạ tầng; giao diện đọc trạng thái bài/phiên qua HTTP.
+Khi triển khai đặt giá, worker và tác vụ hết hạn phải dùng cùng cơ chế bảo vệ phiên;
+chỉ phát thông báo sau COMMIT và kiểm tra quyền trước khi vào room riêng tư.
+Kênh worker → API cùng cơ chế phát lại sau sự cố chưa được triển khai; xem ADR-009.
 
-- Redis lock hỗ trợ phối hợp, không thay thế giao dịch SQL.
-- Worker đọc lại dữ liệu phiên sau khi lấy quyền xử lý.
-- Các thay đổi liên quan được ghi trong cùng giao dịch SQL.
-- Cập nhật phiên đối chiếu `row_version` để phát hiện xung đột.
-- Ràng buộc UNIQUE bảo vệ mã yêu cầu và các quan hệ cần duy nhất.
-- Chỉ xác nhận xử lý sự kiện sau khi kết quả đã được ghi nhận.
-- Yêu cầu được xử lý lại phải an toàn và không tạo dữ liệu trùng.
+## Phạm vi phát triển tiếp theo
 
-Ghi SQL và phát thông báo là hai thao tác khác nhau.
-Cơ chế bảo đảm phát lại thông báo khi tiến trình dừng sau COMMIT
-cần được quyết định trước khi triển khai luồng đấu giá hoàn chỉnh.
-
-## 6. Cập nhật thời gian thực
-
-Trong Mốc 2:
-- Socket.IO chạy cùng tiến trình API.
-- Client nhận `system:hello`.
-- Kết quả probe được giao diện lấy qua HTTP API.
-
-Trong các mốc nghiệp vụ:
-- Chỉ phát thay đổi sau khi SQL COMMIT.
-- Khi kết nối lại, client lấy trạng thái mới nhất từ API.
-- Room theo phiên/giao dịch phải được kiểm tra quyền.
-- Cơ chế chuyển thông báo từ worker sang API chưa được triển khai.
-
-## 7. Cấu hình phát triển mặc định
-
-| Dịch vụ | Địa chỉ/cổng |
-|---|---|
-| React | `127.0.0.1:5173` |
-| API và Socket.IO | `127.0.0.1:5000` |
-| SQL Server trên máy chủ | `127.0.0.1:14330` |
-| Redis trên máy chủ | `127.0.0.1:63790` |
-
-SQL Server và Redis chạy trong Docker.
-API, worker và React chạy bằng các terminal riêng.
-
-Cấu hình riêng nằm trong `.env` ở gốc và `frontend/.env`.
-Chi tiết khởi động được trình bày tại `../README.md`.
-
-## 8. Phạm vi hiện tại
-
-Đã có bộ khung:
-- Kiểm tra liveness và readiness.
-- Kết nối SQL Server và Redis.
-- Worker nhận sự kiện kiểm tra.
-- Socket.IO kiểm tra kết nối.
-- Script khởi tạo schema 19 bảng.
-
-Chưa triển khai:
-- Đặt giá và kết thúc phiên (Mốc 5).
-- Giao dịch, trò chuyện, đánh giá và khiếu nại.
-- Phân tích sách bằng Gemini API.
-
-Trong bản cập nhật Mốc 3 đã bổ sung:
-- Đăng ký, đăng nhập, đăng xuất và thông tin tài khoản.
-- Session Redis, cookie HttpOnly và CSRF.
-- Middleware xác thực và kiểm tra quyền Admin ở backend.
-- Script tạo Admin, kiểm thử auth và smoke tài khoản.
-
-Luồng tài khoản chạy trực tiếp qua HTTP và SQL Server; không đưa đăng nhập vào Redis Streams.
-Socket.IO hiện chỉ phát lời chào hạ tầng công khai, chưa có room hoặc sự kiện nghiệp vụ riêng tư.
-Khi thêm các sự kiện nghiệp vụ, phải gắn xác thực session và kiểm tra quyền tại ranh giới Socket.IO.
-
-
-Mốc 4 đã bổ sung:
-- React: danh mục, bài của tôi, đăng sách, bổ sung media, kiểm duyệt và đặt lịch.
-- API: model SQL giao dịch, policy trạng thái, service claim media, router phân quyền.
-- Migration 002: hai cột metadata Cloudinary nullable, tổng 144 cột; 001 không đổi.
-- Native Cloudinary REST, vé Redis và cleanup sau lỗi. Không thêm dependency.
-- Public projection ẩn giá kết thúc sớm; optimistic version được kiểm tra sau khóa SQL.
-- Manual review hoạt động độc lập AI. AI chưa gọi, không ghi phân tích giả.
-
-Upload ngoài transaction SQL; ledger và kiểm tra SQL reference giảm orphan, nhưng không là distributed transaction.
-Claim chưa rõ kết quả commit cần đối soát thủ công; mất Redis có thể để lại orphan.
-Chi tiết phục hồi và giới hạn: ADR-012 và README mục 11.
+Lõi đặt giá/kết thúc, realtime nghiệp vụ, AI, giao dịch, trò chuyện, bình luận, đánh giá và khiếu nại
+được theo dõi theo chức năng trong [tasks.md](tasks.md). Thiết kế tương lai được phân biệt với mã đã có tại [flows.md](flows.md).

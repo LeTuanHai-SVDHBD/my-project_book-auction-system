@@ -1,59 +1,53 @@
-<!-- Mục đích: Theo dõi lộ trình đã chốt và bằng chứng nghiệm thu từng mốc. -->
+<!-- Mục đích: Theo dõi chức năng, trạng thái kiểm chứng và công việc còn lại theo lĩnh vực nghiệp vụ. -->
 
-# Tiến độ dự án
+# Trạng thái phát triển
 
-## 1. Lộ trình theo file Hải đã gửi
+## Quy ước
 
-| Mốc | Nội dung | Trạng thái |
+- **Đã triển khai:** có mã nguồn và tài liệu sử dụng.
+- **Đã kiểm tra tự động:** nêu rõ phụ thuộc thật/giả tại [VALIDATION.md](../VALIDATION.md).
+- **Chờ nghiệm thu:** cần chạy với dữ liệu và dịch vụ thật của nhóm.
+- **Chưa triển khai:** thiết kế hoặc công việc phát triển tiếp theo.
+
+## Chức năng hiện tại
+
+| Nhóm | Phạm vi | Trạng thái |
 |---|---|---|
-| 1 | Chốt schema và hợp đồng dữ liệu | Schema nền đã có; M4 thêm metadata media tại migration riêng |
-| 2 | Dựng môi trường chạy | Hải xác nhận đủ 5 trạng thái, probe completed và smoke PASS |
-| 3 | Tài khoản và phân quyền | Hải xác nhận tạo/đăng nhập Admin và người dùng; smoke và smoke:auth đều PASS |
-| 4 | Đăng sách, kiểm duyệt và kích hoạt phiên | Đã triển khai bản này; chờ nghiệm thu SQL/Cloudinary thật trên máy Hải |
-| 5 | Hoàn thành lõi đặt giá và kết thúc phiên | Chưa triển khai |
-| 6 | Đồng bộ thời gian thực | Chỉ có lời chào hạ tầng; realtime nghiệp vụ chưa triển khai |
-| 7 | Tích hợp AI và bộ chấm điểm | Chưa triển khai; không chuyển vào M4 |
-| 8 | Giao dịch và các chức năng hỗ trợ | Chưa triển khai |
-| 9 | Kiểm thử, thực nghiệm và hoàn thiện báo cáo | Có kiểm thử từng mốc, thực nghiệm tổng thể chưa triển khai |
+| Hạ tầng | SQL, Redis, API, worker, Socket.IO và probe | Đã triển khai; nhóm xác nhận healthy/completed và smoke đạt |
+| Tài khoản | Đăng ký/đăng nhập/đăng xuất, Argon2id, CSRF, phân quyền | Đã triển khai; smoke tài khoản được nhóm xác nhận đạt |
+| Phiên tab | Hai tài khoản trong cùng trình duyệt; reload giữ phiên, tab mới đăng nhập lại | Đã kiểm tra HTTP/Redis và trình duyệt; chờ nghiệm thu máy nhóm |
+| Nhập tiền | Chỉ chữ số, dấu chấm hàng nghìn, chuỗi nguyên tối đa 18 chữ số | Đã kiểm tra HTTP/Redis và trình duyệt; chờ nghiệm thu máy nhóm |
+| Đăng sách | Tạo sách/bài/phiên pending và media trong transaction | Đã triển khai; có smoke tích hợp |
+| Media | Cloudinary, vé Redis, ownership, cleanup | Đã triển khai; kiểm thử hợp đồng và Redis; media thật cần nghiệm thu |
+| Kiểm duyệt | Phê duyệt/từ chối có lý do, bổ sung và gửi lại | Đã triển khai; Admin phê duyệt đã được nhóm xác nhận hoạt động |
+| Kích hoạt | Chủ sách đặt lịch và cập nhật đúng phiên đã duyệt | Đã triển khai; chờ nghiệm thu SQL thật đầy đủ |
+| Đăng lại | Phiên cuối kết thúc không người thắng, giữ sách và lịch sử | Đã triển khai; có test policy và fixture trong smoke |
+| Danh mục | Chỉ bài đã duyệt/phiên kích hoạt, ẩn ngưỡng giá | Đã triển khai; có kiểm thử HTTP |
 
-Không khẳng định log/ảnh nghiệm thu của nhóm đã được lưu trong repository.
+## Công việc tiếp theo
 
-## 2. Mốc 3 đã được Hải xác nhận
+| Lĩnh vực | Công việc |
+|---|---|
+| Đặt giá | Tiếp nhận qua Streams, khóa theo phiên, giá hợp lệ, cooldown và idempotency |
+| Kết thúc | Hết hạn/ngưỡng giá, kết quả duy nhất, giao dịch chỉ khi có người thắng |
+| Realtime | Xác thực socket, room, worker → API, phục hồi sau COMMIT |
+| AI | Tích hợp Gemini, trích xuất bằng chứng, bộ chấm điểm và trạng thái thiếu dữ liệu |
+| Hồ sơ | Cập nhật thông tin cá nhân theo phạm vi được thống nhất |
+| Sau phiên | Giao dịch, trò chuyện, bình luận, đánh giá uy tín, khiếu nại theo thiết kế |
+| Thực nghiệm | Kiểm thử đồng thời, tải lớn, phục hồi tiến trình và tổng hợp báo cáo |
 
-Phương án A: session Redis, cookie HttpOnly, CSRF và Argon2id.
-Ngày 22/10/2026 Hải xác nhận tài khoản Admin/người dùng chạy thành công,
-sau đó xác nhận **cả `npm.cmd run smoke` và `npm.cmd run smoke:auth` PASS**.
-Đây là bằng chứng trên máy nhóm; khác với kết quả test giả SQL trong môi trường chuẩn bị.
-Mốc 3 đủ điều kiện đi tiếp Mốc 4 theo xác nhận này.
+Chưa có chức năng xóa bài đăng hoặc kết thúc phiên thủ công.
+Không triển khai thêm trạng thái nghiệp vụ, cổng thanh toán hay cơ chế xác thực khác khi chưa thống nhất.
 
-## 3. Mốc 4 đã triển khai
+## Checklist nghiệm thu môi trường nhóm
 
-| Mã | Chức năng | Trạng thái xác minh |
-|---|---|---|
-| M4-01 | Tạo Sach, BaiDang, PhienDauGia pending và media trong một transaction | Có model SQL; smoke thật kiểm tra rollback, chờ chạy trên máy Hải |
-| M4-02 | Cloudinary ảnh/video, URL/public_id SQL, metadata migration | Provider REST và contract test; chưa có credentials để upload thật |
-| M4-03 | Session/ownership/CSRF và vé Redis claim nguyên tử | HTTP test + Redis thật đạt |
-| M4-04 | Admin duyệt/từ chối có lý do; cặp trạng thái nguyên tử | Policy/HTTP/browser đạt với SQL giả; smoke thật có kiểm duyệt đồng thời |
-| M4-05 | Bổ sung bài từ chối, giữ ID và lịch sử kiểm duyệt | Browser đạt với SQL giả |
-| M4-06 | Chủ sách đặt lịch/kích hoạt phiên cũ đã duyệt | Browser đạt; SQL kiểm tra tương lai, chờ smoke thật |
-| M4-07 | Đăng lại phiên cuối không người thắng, giữ sach_id/lịch sử | Policy đạt; smoke thật có fixture no-winner/winner |
-| M4-08 | Public projection không có gia_toi_thieu, tiền chuỗi 18 chữ số | HTTP/contract/browser đạt |
-| M4-09 | Admin duyệt thủ công khi chưa có AI | Browser đạt, không tạo phân tích giả |
-| M4-10 | Cleanup media hết hạn, bảo vệ reference SQL và claim chưa rõ | Redis thật đạt với SQL/provider giả; còn giới hạn đối soát thủ công sau crash |
-| M4-11 | Giao diện desktop/mobile | Luồng chính đạt với SQL/Cloudinary giả, Redis thật |
+- [ ] Cập nhật mã, giữ cấu hình và volume hiện tại; khởi động lại API/worker/web.
+- [ ] SQL readiness 19 bảng/144 cột; cấu hình Cloudinary đầy đủ.
+- [ ] Hai tab cùng trình duyệt giữ Admin/người dùng riêng; F5, logout và mở tab mới đúng chính sách.
+- [ ] Ba ô tiền lọc chữ, định dạng khi nhập/dán/xóa; API nhận chuỗi nguyên chính xác.
+- [ ] Đăng sách với ảnh và video thật; Admin từ chối, bổ sung, duyệt và chủ sách kích hoạt đúng phiên.
+- [ ] API danh mục không có `gia_toi_thieu`.
+- [ ] `check`, `test`, `build`, `smoke`, `smoke:auth`, `smoke:m4` đạt sau cập nhật.
+- [ ] Lưu log/ảnh nghiệm thu phù hợp, đã loại thông tin nhạy cảm.
 
-## 4. Checklist nghiệm thu Mốc 4 trên máy nhóm
-
-- [ ] Pull nhánh feat/Hai, giữ .env và volume cũ.
-- [ ] setup:media, điền Cloudinary local, db:migrate thành công; SQL readiness 19 bảng/144 cột.
-- [ ] check, test, build đạt.
-- [ ] smoke và smoke:auth vẫn PASS sau cập nhật.
-- [ ] Đăng sách với ảnh thật và video thật, xem được media.
-- [ ] Bài/phiên cùng pending, chưa có lịch; người khác không sửa/kích hoạt được.
-- [ ] Admin từ chối có lý do, chủ sách bổ sung và gửi lại.
-- [ ] Admin duyệt khi chưa có AI; chủ sách kích hoạt đúng phiên đã duyệt.
-- [ ] Danh mục không trả gia_toi_thieu trong Network response.
-- [ ] smoke:m4 PASS và dọn xong dữ liệu/media UUID thử.
-
-Hướng dẫn và API gộp tại README mục 11; không cần file hướng dẫn Mốc 3/Mốc 4 riêng.
-Chỉ đánh dấu hoàn tất M4 sau khi nhóm chạy các kiểm tra thật còn lại.
+Các xác nhận cũ không tự thay thế kiểm tra hồi quy cho bản cập nhật mới.

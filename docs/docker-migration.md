@@ -55,8 +55,7 @@ REDIS_VOLUME_NAME=book-auction_redis_data
 
 Đây là giá trị dự phòng của Compose, không phải các dòng được setup tự thêm vào `.env` đã có.
 Fallback không tự dò volume mang tên `book-auction-moc2_*`. Nếu dữ liệu ở volume đó,
-phải chỉ định tên đã kiểm tra trước khi khởi động project mới. Bản sửa tài liệu giữ nguyên
-fallback hiện hành để không tự đổi liên kết trên máy đã chạy được.
+phải chỉ định tên đã kiểm tra trước khi khởi động project mới. Fallback hiện hành được giữ để bảo toàn liên kết trên máy đã có dữ liệu.
 
 Không chép tên volume mới từ `.env.example` vào môi trường có dữ liệu cũ. Chọn tên chưa tồn tại sẽ tạo volume rỗng, không tự chuyển dữ liệu.
 
@@ -113,6 +112,6 @@ Nhóm probe đổi từ `moc2-workers` sang `infrastructure-workers`. Worker m�
 - Database và dữ liệu cũ truy cập được bằng cấu hình hiện có.
 - Giao diện sẵn sàng; probe completed và smoke PASS.
 
-Lần chuẩn hóa này không tự đổi tên vật lý hoặc sao chép dữ liệu volume. Nếu cần đổi cả tên volume đang có dữ liệu, chuẩn bị đợt sao lưu và chuyển dữ liệu riêng.
+Chuyển Compose project không tự đổi tên vật lý hoặc sao chép dữ liệu volume. Nếu cần đổi cả tên volume đang có dữ liệu, chuẩn bị đợt sao lưu và chuyển dữ liệu riêng.
 
 Tham khảo: [project name](https://docs.docker.com/reference/compose-file/version-and-name/), [volume name](https://docs.docker.com/reference/compose-file/volumes/), [compose down](https://docs.docker.com/reference/cli/docker/compose/down/).

@@ -1,79 +1,81 @@
-<!-- Mục đích: Lưu bằng chứng kiểm tra, phân biệt phụ thuộc thật và giả. -->
+<!-- Mục đích: Ghi bằng chứng kiểm tra theo chức năng, môi trường và giới hạn xác minh. -->
 
 # Kết quả kiểm tra
 
-Ngày 22/10/2026. Bản Mốc 4 được xây trên nhánh `feat/Hai`, nền commit
-`24447dba38445eac4221b980596f2ebf3fb08b02`.
+Cập nhật ngày 23/10/2026. Các kết quả dưới đây phân biệt rõ kiểm thử trong môi trường chuẩn bị
+và xác nhận sử dụng trên Windows của nhóm.
 
-## 1. Xác nhận của Hải trước Mốc 4
+## Môi trường kiểm thử tự động
 
-- SQL Server và Redis healthy, giao diện đủ năm trạng thái sẵn sàng, probe completed.
-- Đăng ký/đăng nhập người dùng và tạo/đăng nhập Admin thành công.
-- Hải xác nhận hai lệnh `npm.cmd run smoke` và `npm.cmd run smoke:auth` đều PASS.
+| Thành phần | Môi trường |
+|---|---|
+| Node.js | 24.19.0; dependency giữ theo package-lock.json |
+| HTTP | Express thật; cookie jar/CSRF qua HTTP |
+| SQL | Driver/model giả trong test; chưa có SQL Server/Docker trong môi trường chuẩn bị |
+| Redis opt-in | Redis 7.0.15 riêng, prefix UUID và cleanup đúng khóa test |
+| Cloudinary | REST/provider giả; upload/destroy thật cần credentials của nhóm |
+| Frontend | React, Vite 8.3.5; Chromium desktop/mobile khi chạy QA |
 
-Theo bằng chứng đó Mốc 3 đã hoàn thành trên máy phát triển của nhóm.
-Không khẳng định đã nhận log/ảnh đầy đủ hoặc đã chạy trực tiếp SQL trên máy Hải.
-Sau khi cập nhật M4 cần chạy lại hai smoke để kiểm tra hồi quy.
+Redis trong Compose của nhóm là Redis 8. Kết quả Redis 7 riêng không thay xác minh trên môi trường đó.
 
-## 2. Kiểm tra bản Mốc 4 trong môi trường chuẩn bị
+## Kết quả bản cập nhật hiện tại
 
-| Hạng mục | Kết quả | Giới hạn |
-|---|---|---|
-| Node/dependency | Node 24.19.0, giữ nguyên dependency và package-lock | Dùng bộ dependency đã cài bằng npm ci ở bản nền; không thêm thư viện |
-| Cú pháp | Đạt, 51 file JavaScript qua `npm run check` | Không phải kiểm tra thực thi T-SQL |
-| Test mặc định | 45 đạt, 2 SKIP | SQL/Cloudinary giả; bài Redis thật bật opt-in |
-| Test có Redis thật | 47/47 đạt | Redis 7.0.15 riêng; SQL/provider vẫn giả |
-| Build React | Đạt, Vite 8.3.5 | Không chứng minh kết nối SQL/Cloudinary thật |
-| Browser desktop/mobile | Đạt luồng tạo → từ chối → bổ sung → duyệt → kích hoạt → danh mục | React/Express/Redis thật, SQL và Cloudinary giả; viewport 1440 và 390 px |
-| Cookie/session | Giữ cơ chế M3, HTTP test hồi quy đạt | Production HTTPS chưa kiểm tra |
-| SQL migration 002 | Đã kiểm tra mã: thêm hai cột nullable/index, 001 không đổi | Chưa chạy trên SQL Server thật trong môi trường này |
-| Upload/destroy Cloudinary | Test REST contract, kiểm tra URL/kind/public_id và lỗi redacted | Không có credentials; chưa upload/destroy thật |
-| Video thật | Chưa kiểm tra | Có test magic WebM và route dùng chung; nhóm cần thử MP4/WebM thật |
-| smoke, smoke:auth, smoke:m4 sau M4 | Chưa chạy thật | Không có SQL Server/Docker và credentials Cloudinary ở đây |
+| Hạng mục | Trạng thái |
+|---|---|
+| Cú pháp Backend/script | Đạt: 55 file qua `npm run check` |
+| Test mặc định | Đạt: 56 ca, 3 SKIP theo opt-in |
+| Test bật Redis thật | Đạt: 59/59 ca với Redis riêng |
+| Build Frontend | Đạt: Vite 8.3.5, không thêm dependency |
+| Hai tab cùng một browser context | Đạt: Admin/người dùng, F5, opener sao chép storage, tab mới và logout riêng |
+| Nhập tiền và payload | Đạt cả ba ô: gõ/dán/lọc chữ, caret, giới hạn 18 chữ số và POST nguyên chính xác |
+| Liên kết Markdown và bố cục README | Đạt kiểm tra đường dẫn, fence, thuật ngữ và mục Tài liệu cuối README |
 
-Các ca M4 gồm tiền chuỗi 18 chữ số, trường không được phép, UUID/version, lịch có múi giờ,
-quý hiếm/lý do duyệt, trạng thái đôi, điều kiện đăng lại latest/no-winner/winner/missing-result,
-public projection, auth/role/CSRF, MIME/magic và Cloudinary response validation.
-Service test phân biệt rollback chắc chắn, commit chưa rõ và acknowledgement Redis lỗi sau COMMIT.
+## Phạm vi hồi quy
 
-Redis thật kiểm tra ownership, claim đồng thời chỉ một request thắng, release/retry,
-cleanup không xóa file được SQL tham chiếu, giữ claim chưa rõ, SQL lỗi không destroy,
-xóa tệp bỏ dở và vé hết hạn. Prefix UUID riêng được dọn; không xóa khóa ứng dụng.
-Browser kiểm tra upload PNG nhị phân qua API, role riêng, giữ ID phiên khi kích hoạt,
-không hiển thị ngưỡng giá trên trang công khai, không tràn ngang và không có pageerror.
-Ảnh QA là đầu ra tạm của quá trình kiểm tra, không đưa vào repository.
+### Xác thực và phiên tab
 
-## 3. Phần cần nghiệm thu trên Windows của nhóm
+Argon2id, email trùng, không tự cấp Admin, session rotation, TTL/gia hạn/thu hồi, CSRF thiếu/sai,
+phân quyền và vai trò đọc lại, CORS và lỗi phụ thuộc không lộ bí mật.
+Kiểm tra hai tài khoản trong **một cookie jar chung**, cookie HttpOnly, CSRF theo tab,
+đăng nhập/đăng xuất không ảnh hưởng tab khác, selector thiếu cookie không cấp quyền,
+không fallback sang cookie chung, header sai bị chặn và listener không tăng theo số tab.
+Redis opt-in kiểm tra session/TTL riêng và thu hồi độc lập.
 
-Làm theo README mục 11: `setup:media`, cấu hình Cloudinary local, `db:migrate`, khởi động API/worker/web,
-rồi chạy check/test/build/smoke/smoke:auth/smoke:m4. Không xóa dữ liệu hay volume M3.
+### Dữ liệu bài đăng và media
 
-Smoke M4 dùng tài khoản/dữ liệu UUID riêng: kiểm tra rollback SQL khi gắn media lỗi,
-retry tạo bài, quyền/CSRF, cặp trạng thái pending/reject/approve, kiểm duyệt đồng thời,
-kích hoạt đúng phiên, ẩn giá và fixture kết quả không người thắng/có người thắng cho đăng lại.
-Chỉ PASS nếu dọn cả SQL và Cloudinary thành công. Fixture không tạo API kết thúc thủ công.
-Đây là script **chờ chạy**, không phải bằng chứng đã thực thi trong môi trường chuẩn bị.
+Giá chuỗi 18 chữ số, input không được phép, UUID/version, lịch có múi giờ, lý do/quý hiếm,
+cặp trạng thái, điều kiện đăng lại latest/no-winner/winner/missing-result, public projection,
+quyền/CSRF, MIME/magic, giới hạn upload và phản hồi provider.
+Claim/cleanup được kiểm tra với Redis thật nhưng SQL/provider giả, gồm ownership, đồng thời,
+rollback/retry, SQL reference, SQL lỗi và commit chưa rõ.
 
-Chưa có kiểm thử tải lớn, thời lượng video, distributed commit SQL–Cloudinary hoặc phục hồi hoàn toàn khi mất Redis.
-Claim chưa rõ commit được giữ để đối soát thủ công; không đánh đổi an toàn media bằng xóa phỏng đoán.
-Mốc 5 (đặt giá/kết thúc), Mốc 6 realtime nghiệp vụ và Mốc 7 AI chưa triển khai trong bản này.
+### Phiên bản và nhập tiền
 
+Model thật cùng driver giả trả binary kiểm tra bytes → hex → JSON → HTTP → khóa dòng,
+duyệt thành công, kích hoạt pending 409 và chặn version cũ. Không nới validator để bỏ qua xung đột.
+Tiền kiểm tra lọc chữ, dấu chấm nhóm nghìn, giá trị chính xác qua chuỗi, 18 chữ số và vị trí caret.
+QA Chromium đã xác nhận nhập/dán/xóa, payload không có dấu chấm và gửi đúng dữ liệu;
+đồng thời kiểm tra luồng từ chối/bổ sung/duyệt/kích hoạt, không tràn ngang ở 390 px, desktop 1440 px và không có pageerror.
+Ảnh render đã được xem để kiểm tra bố cục. Redis thật, SQL/Cloudinary giả; harness và ảnh QA là đầu ra tạm ngoài repository.
 
-## 4. Sửa lỗi phiên bản dữ liệu — 23/10/2026
+## Xác nhận trên máy nhóm
 
-Hải đã chạy smoke M4 trên máy Windows với dịch vụ thật. Log cho thấy lệnh đến bước
-“quyền sở hữu, CSRF, không kích hoạt trước duyệt”, nhận HTTP 400 `INVALID_POST_INPUT` thay vì 409.
-Script báo đã dọn dữ liệu/media thử. Hải đồng thời báo Admin không phê duyệt được vì “Thiếu phiên bản dữ liệu”.
-Đây là kết quả **FAIL**, chưa phải bằng chứng hoàn tất smoke M4.
+| Chức năng | Bằng chứng đã nhận |
+|---|---|
+| Hạ tầng | Nhóm xác nhận SQL/Redis healthy, đủ trạng thái, probe completed và smoke PASS |
+| Tài khoản | Nhóm xác nhận tạo/đăng nhập Admin và người dùng, smoke:auth PASS |
+| Kiểm duyệt | Ngày 23/10/2026, nhóm xác nhận Admin phê duyệt hoạt động sau sửa row_version |
+| Smoke toàn luồng bài đăng | Trước sửa version đã FAIL 400 thay vì 409; cleanup báo hoàn tất. Chưa có xác nhận PASS toàn luồng sau cập nhật |
+| Tách phiên tab/định dạng tiền | Cần nghiệm thu bản cập nhật này trên Windows và dịch vụ thật |
 
-Bản sửa:
-- Đọc BINARY(8), mã hóa bytes thành hex 16 ký tự ở model cho cả list/detail/locked.
-- Giữ validator HTTP chặt chẽ, vẫn chặn dữ liệu cũ 409; không giả lập token khi thiếu.
-- Thêm test model thật và HTTP, driver trả bytes thay cho model giả đã trả sẵn chuỗi hợp lệ.
-- Smoke kiểm tra hình dạng row_version ngay sau GET detail và in thêm thông báo lỗi API.
-- README giải thích rõ chưa có xóa bài và không tự xóa Cloudinary khi xóa SQL thủ công.
+Xác nhận Admin duyệt thành công không tự chứng minh toàn bộ smoke bài đăng đã đạt.
+Không khẳng định ảnh/log nghiệm thu riêng của nhóm đã được lưu trong repository.
 
-Kiểm tra bản sửa đã chạy: `npm run check` đạt 53 file; `npm test` mặc định 49 đạt/2 SKIP;
-bật Redis thật đạt 51/51; `npm run build` thành công. Các test mới dùng model thật với driver SQL giả trả bytes,
-không phải bằng chứng đã chạy T-SQL trên SQL Server thật.
-SQL/Cloudinary thật không có sẵn trong môi trường sửa; cần chạy lại smoke trên máy Hải sau cập nhật và restart API.
+## Nghiệm thu còn lại
+
+Theo [README](README.md), cập nhật cả API và Frontend, đăng nhập lại trong từng tab,
+chạy các lệnh check/test/build/smoke/smoke:auth/smoke:m4 và thử ảnh/video thật.
+Smoke bài đăng chỉ PASS khi dọn xong cả SQL và Cloudinary của dữ liệu UUID thử.
+
+Chưa có bằng chứng tải lớn, thời lượng video, production HTTPS, distributed commit hoặc phục hồi hoàn toàn khi mất Redis.
+Claim chưa rõ commit vẫn cần đối soát thủ công. Lõi đặt giá/kết thúc, realtime nghiệp vụ và AI chưa triển khai.

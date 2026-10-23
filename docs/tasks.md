@@ -23,12 +23,14 @@
 | Kích hoạt | Chủ sách đặt lịch và cập nhật đúng phiên đã duyệt | Đã triển khai; chờ nghiệm thu SQL thật đầy đủ |
 | Đăng lại | Phiên cuối kết thúc không người thắng, giữ sách và lịch sử | Đã triển khai; có test policy và fixture trong smoke |
 | Danh mục | Chỉ bài đã duyệt/phiên kích hoạt, ẩn ngưỡng giá | Đã triển khai; có kiểm thử HTTP |
+| Quy tắc đấu giá | Giá, lịch, cooldown, kết thúc sớm/hết hạn và tiền 18 chữ số | Đã có policy thuần và test; chưa nối vào API/SQL |
+| Khóa phiên | Redis token, lease, gia hạn/xóa có điều kiện | Đã có module và test Redis; chưa nối vào worker |
 
 ## Công việc tiếp theo
 
 | Lĩnh vực | Công việc |
 |---|---|
-| Đặt giá | Tiếp nhận qua Streams, khóa theo phiên, giá hợp lệ, cooldown và idempotency |
+| Đặt giá | Thống nhất [lưu kết quả yêu cầu](auction-processing.md), rồi nối API/Streams/SQL/worker; policy và khóa đã chuẩn bị |
 | Kết thúc | Hết hạn/ngưỡng giá, kết quả duy nhất, giao dịch chỉ khi có người thắng |
 | Realtime | Xác thực socket, room, worker → API, phục hồi sau COMMIT |
 | AI | Tích hợp Gemini, trích xuất bằng chứng, bộ chấm điểm và trạng thái thiếu dữ liệu |

@@ -2,6 +2,16 @@
 
 # Bản đồ mã nguồn
 
+## Thành phần xử lý đấu giá đang chuẩn bị
+
+| File | Trách nhiệm |
+|---|---|
+| `backend/src/services/bidPolicy.js` | Kiểm tra body, giá, thời gian, cooldown và suy ra kết quả; chưa nối vào API/SQL |
+| `backend/src/concurrency/auctionLock.js` | Khóa Redis theo phiên với token và Lua gia hạn/xóa; chưa nối vào worker |
+| `backend/test/bidPolicy.test.js` | Kiểm tra biên nghiệp vụ và tiền 18 chữ số bằng policy thuần |
+| `backend/test/auctionLock.test.js` | Kiểm tra tranh khóa/hết hạn/chủ cũ với Redis thật khi bật biến kiểm thử |
+| `docs/auction-processing.md` | Hợp đồng dự kiến, thành phần đã có và đề xuất lưu kết quả chờ thống nhất |
+
 ## Cấu trúc chung
 
 | Đường dẫn | Trách nhiệm |

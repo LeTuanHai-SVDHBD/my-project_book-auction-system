@@ -243,6 +243,7 @@ và kiểm tra lại cookie Secure. Không commit thông tin kết nối hoặc 
 
 - [Kiến trúc hệ thống](docs/architecture.md)
 - [Luồng nghiệp vụ và hợp đồng API](docs/flows.md)
+- [Xử lý đặt giá và đề xuất lưu kết quả](docs/auction-processing.md)
 - [Quyết định kỹ thuật](docs/decisions.md)
 - [Bản đồ mã nguồn](docs/file-map.md)
 - [Trạng thái chức năng và công việc](docs/tasks.md)

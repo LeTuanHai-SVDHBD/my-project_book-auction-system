@@ -18,19 +18,31 @@ và xác nhận sử dụng trên Windows của nhóm.
 
 Redis trong Compose của nhóm là Redis 8. Kết quả Redis 7 riêng không thay xác minh trên môi trường đó.
 
-## Kết quả bản cập nhật hiện tại
+## Kết quả kiểm tra gần nhất theo phạm vi
 
 | Hạng mục | Trạng thái |
 |---|---|
-| Cú pháp Backend/script | Đạt: 55 file qua `npm run check` |
-| Test mặc định | Đạt: 56 ca, 3 SKIP theo opt-in |
-| Test bật Redis thật | Đạt: 59/59 ca với Redis riêng |
+| Cú pháp Backend/script | Đạt: 59 file qua `npm run check` |
+| Test mặc định ở bản tách phiên tab | Đạt: 56 ca, 3 SKIP theo opt-in |
+| Test bật Redis thật ở bản chuẩn bị đấu giá | Đạt: 70/70 ca với Redis riêng |
 | Build Frontend | Đạt: Vite 8.3.5, không thêm dependency |
-| Hai tab cùng một browser context | Đạt: Admin/người dùng, F5, opener sao chép storage, tab mới và logout riêng |
-| Nhập tiền và payload | Đạt cả ba ô: gõ/dán/lọc chữ, caret, giới hạn 18 chữ số và POST nguyên chính xác |
+| Hai tab cùng một browser context ở bản tách phiên tab | Đạt: Admin/người dùng, F5, opener sao chép storage, tab mới và logout riêng |
+| Nhập tiền và payload ở bản tách phiên tab | Đạt cả ba ô: gõ/dán/lọc chữ, caret, giới hạn 18 chữ số và POST nguyên chính xác |
 | Liên kết Markdown và bố cục README | Đạt kiểm tra đường dẫn, fence, thuật ngữ và mục Tài liệu cuối README |
 
 ## Phạm vi hồi quy
+
+### Quy tắc đấu giá và khóa phiên
+
+Chín test policy thuần bao phủ validator UUID/chuỗi tiền, từ chối trường client tự chèn,
+lượt đầu/lượt sau/bước giá, ranh giới thời gian xử lý, cooldown 10/20/30 giây,
+ngưỡng bằng giá khởi điểm, đạt/vượt ngưỡng, hết giờ có/không người thắng và snapshot sai.
+Hai test khóa kiểm tra cấu hình và Redis thật: 12 lần tranh khóa chỉ một chủ,
+hai phiên độc lập, gia hạn, hết hạn và token cũ không xóa/gia hạn khóa của chủ mới.
+
+Các module chưa được nối vào API/worker hoặc transaction SQL; đây không phải kiểm thử đặt giá toàn luồng.
+Schema, dependency, Frontend và cơ chế xác thực không đổi trong bản chuẩn bị này.
+Phương án bổ sung dữ liệu nằm tại [Xử lý đấu giá](docs/auction-processing.md), chưa áp dụng migration.
 
 ### Xác thực và phiên tab
 
@@ -78,4 +90,5 @@ chạy các lệnh check/test/build/smoke/smoke:auth/smoke:m4 và thử ảnh/vi
 Smoke bài đăng chỉ PASS khi dọn xong cả SQL và Cloudinary của dữ liệu UUID thử.
 
 Chưa có bằng chứng tải lớn, thời lượng video, production HTTPS, distributed commit hoặc phục hồi hoàn toàn khi mất Redis.
-Claim chưa rõ commit vẫn cần đối soát thủ công. Lõi đặt giá/kết thúc, realtime nghiệp vụ và AI chưa triển khai.
+Claim chưa rõ commit vẫn cần đối soát thủ công. Lõi đặt giá/kết thúc mới có policy/khóa độc lập;
+API, stream nghiệp vụ, transaction SQL và job chốt hạn chưa được nối. Realtime nghiệp vụ và AI chưa triển khai.

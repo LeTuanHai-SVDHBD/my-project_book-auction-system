@@ -23,15 +23,15 @@
 | Kích hoạt | Chủ sách đặt lịch và cập nhật đúng phiên đã duyệt | Đã triển khai; chờ nghiệm thu SQL thật đầy đủ |
 | Đăng lại | Phiên cuối kết thúc không người thắng, giữ sách và lịch sử | Đã triển khai; có test policy và fixture trong smoke |
 | Danh mục | Chỉ bài đã duyệt/phiên kích hoạt, ẩn ngưỡng giá | Đã triển khai; có kiểm thử HTTP |
-| Quy tắc đấu giá | Giá, lịch, cooldown, kết thúc sớm/hết hạn và tiền 18 chữ số | Đã có policy thuần và test; chưa nối vào API/SQL |
-| Khóa phiên | Redis token, lease, gia hạn/xóa có điều kiện | Đã có module và test Redis; chưa nối vào worker |
+| Đặt giá | API/Streams/worker/SQL, giá/lịch/cooldown, quyết định cuối và tiền 18 chữ số | Đã kiểm tra SQL/Redis thật và smoke tích hợp; chờ môi trường nhóm |
+| Khóa và phục hồi | Lease/token, rowversion, UNIQUE, pending/XAUTOCLAIM | Đã kiểm tra mất lease và crash sau COMMIT/trước ACK |
+| Kết thúc | Hết hạn/ngưỡng, một kết quả, giao dịch chỉ khi có người thắng | Đã kiểm tra SQL/Redis thật và smoke tích hợp |
+| Giao diện đấu giá | Gửi giá, chờ/chấp nhận/từ chối, retry cùng mã và kết quả | Đã kiểm tra nhiều tab, mất phản hồi mạng và desktop/mobile |
 
 ## Công việc tiếp theo
 
 | Lĩnh vực | Công việc |
 |---|---|
-| Đặt giá | Thống nhất [lưu kết quả yêu cầu](auction-processing.md), rồi nối API/Streams/SQL/worker; policy và khóa đã chuẩn bị |
-| Kết thúc | Hết hạn/ngưỡng giá, kết quả duy nhất, giao dịch chỉ khi có người thắng |
 | Realtime | Xác thực socket, room, worker → API, phục hồi sau COMMIT |
 | AI | Tích hợp Gemini, trích xuất bằng chứng, bộ chấm điểm và trạng thái thiếu dữ liệu |
 | Hồ sơ | Cập nhật thông tin cá nhân theo phạm vi được thống nhất |
@@ -44,12 +44,13 @@ Không triển khai thêm trạng thái nghiệp vụ, cổng thanh toán hay c�
 ## Checklist nghiệm thu môi trường nhóm
 
 - [ ] Cập nhật mã, giữ cấu hình và volume hiện tại; khởi động lại API/worker/web.
-- [ ] SQL readiness 19 bảng/144 cột; cấu hình Cloudinary đầy đủ.
+- [ ] SQL readiness 20 bảng/152 cột; cấu hình Cloudinary đầy đủ.
 - [ ] Hai tab cùng trình duyệt giữ Admin/người dùng riêng; F5, logout và mở tab mới đúng chính sách.
 - [ ] Ba ô tiền lọc chữ, định dạng khi nhập/dán/xóa; API nhận chuỗi nguyên chính xác.
 - [ ] Đăng sách với ảnh và video thật; Admin từ chối, bổ sung, duyệt và chủ sách kích hoạt đúng phiên.
-- [ ] API danh mục không có `gia_toi_thieu`.
-- [ ] `check`, `test`, `build`, `smoke`, `smoke:auth`, `smoke:m4` đạt sau cập nhật.
+- [ ] API danh mục/đấu giá không có `gia_toi_thieu`.
+- [ ] Gửi giá đúng bước/cooldown; theo dõi quyết định và hai kiểu kết thúc trên SQL Server 2022/Redis Compose của nhóm.
+- [ ] `check`, `test`, `build`, `smoke`, `smoke:auth`, `smoke:m4`, `smoke:m5` đạt sau cập nhật.
 - [ ] Lưu log/ảnh nghiệm thu phù hợp, đã loại thông tin nhạy cảm.
 
 Các xác nhận cũ không tự thay thế kiểm tra hồi quy cho bản cập nhật mới.

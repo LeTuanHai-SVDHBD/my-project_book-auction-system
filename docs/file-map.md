@@ -2,15 +2,25 @@
 
 # Bản đồ mã nguồn
 
-## Thành phần xử lý đấu giá đang chuẩn bị
+## Thành phần xử lý đấu giá
 
-| File | Trách nhiệm |
+| File/nhóm | Trách nhiệm |
 |---|---|
-| `backend/src/services/bidPolicy.js` | Kiểm tra body, giá, thời gian, cooldown và suy ra kết quả; chưa nối vào API/SQL |
-| `backend/src/concurrency/auctionLock.js` | Khóa Redis theo phiên với token và Lua gia hạn/xóa; chưa nối vào worker |
-| `backend/test/bidPolicy.test.js` | Kiểm tra biên nghiệp vụ và tiền 18 chữ số bằng policy thuần |
-| `backend/test/auctionLock.test.js` | Kiểm tra tranh khóa/hết hạn/chủ cũ với Redis thật khi bật biến kiểm thử |
-| `docs/auction-processing.md` | Hợp đồng dự kiến, thành phần đã có và đề xuất lưu kết quả chờ thống nhất |
+| `backend/migrations/003_auction_decisions.sql` | Receipt quyết định, backfill lượt hợp lệ cũ và lý do kết thúc |
+| `backend/scripts/schemaMigrations.js` | Chạy cùng danh sách migration cho init/migrate |
+| `backend/src/services/bidPolicy.js` | Validator, giá/lịch/cooldown và suy ra kết quả |
+| `backend/src/models/auction.model.js` | Transaction quyết định, lượt giá, kết quả/giao dịch; snapshot công khai |
+| `backend/src/services/auction.service.js` | Admission và kết quả, SQL trước Redis |
+| `backend/src/routes/auction.routes.js`, `backend/src/controllers/auction.controller.js` | Quyền/CSRF, hợp đồng HTTP và projection |
+| `backend/src/constants/auction.js` | Stream/group/prefix và thời hạn phối hợp |
+| `backend/src/events/auctionPublisher.js`, `backend/src/events/auctionConsumer.js` | Lua admission, xếp hạn, pending/reclaim, ACK và dead-letter |
+| `backend/src/concurrency/auctionLock.js`, `backend/src/processors/auction.processor.js` | Token/lease, gia hạn, bảo vệ trước COMMIT |
+| `backend/src/jobs/auctionExpiry.js` | Tìm hạn SQL và xếp sự kiện chốt |
+| `backend/test/auctionHttp.test.js`, `auctionStream.test.js`, `auctionSql.test.js` | HTTP, Redis thật, SQL thật opt-in và phục hồi |
+| `backend/test/bidPolicy.test.js`, `auctionLock.test.js` | Biên nghiệp vụ/tiền và quyền sở hữu khóa |
+| `frontend/src/components/AuctionPanel.jsx`, `frontend/src/services/auctionApi.js` | Gửi giá, theo dõi quyết định, retry cùng mã và snapshot |
+| `scripts/smokeM5.mjs` | Smoke API/worker/SQL/Redis thật và cleanup fixture riêng |
+| `docs/auction-processing.md` | Hợp đồng, lưu quyết định, kết thúc và phục hồi |
 
 ## Cấu trúc chung
 
@@ -51,7 +61,7 @@ Các đường dẫn bên dưới tương đối với `backend/`.
 | Hạ tầng | `src/constants/infrastructure.js`, `src/controllers/health.controller.js`, `src/services/infrastructure.service.js` | Readiness, heartbeat và hằng số probe |
 | Sự kiện | `src/events/eventPublisher.js`, `eventConsumer.js`, `src/processors/systemProbe.processor.js` | Xuất bản, đọc/nhận lại/xác nhận và xử lý probe |
 | Utility | `src/utils/rowVersion.js`, `logger.js`, `src/middlewares/errorHandler.js` | Mã hóa version, log che bí mật và lỗi HTTP |
-| Schema | `migrations/001_schema.sql`, `002_cloudinary_metadata.sql`, `schema-manifest.json` | DDL nền, migration media và số cấu trúc dự kiến |
+| Schema | `migrations/001_schema.sql`, `002_cloudinary_metadata.sql`, `003_auction_decisions.sql`, `schema-manifest.json` | DDL nền, migration media/quyết định và cấu trúc dự kiến |
 | CLI | `scripts/initDatabase.js`, `migrateDatabase.js`, `createAdmin.js` | Tạo/nâng schema và tạo Admin qua terminal |
 
 `src/concurrency/`, `src/jobs/`, `src/ai/` được giữ cho chức năng tương ứng; không coi thư mục placeholder là nghiệp vụ đã có.

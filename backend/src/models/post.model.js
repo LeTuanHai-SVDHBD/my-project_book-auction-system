@@ -70,14 +70,14 @@ export function createPostModel({ getPool, sql }) {
       const result=await request(await getPool()).input('owner',sql.Int,owner).input('pending',sql.Bit,pending).input('public',sql.Bit,publicOnly).input('after',sql.Int,after)
         .query(`SELECT TOP(30) ${projection} ${joins} WHERE b.bai_dang_id<@after AND (@owner IS NULL OR b.nguoi_dung_id=@owner)
           AND (@pending=0 OR (b.trang_thai='cho_kiem_duyet' AND p.trang_thai='cho_kiem_duyet'))
-          AND (@public=0 OR (b.trang_thai='da_duyet' AND p.trang_thai='da_kich_hoat')) ORDER BY b.bai_dang_id DESC`);
+          AND (@public=0 OR (b.trang_thai='da_duyet' AND p.trang_thai IN ('da_kich_hoat','da_ket_thuc'))) ORDER BY b.bai_dang_id DESC`);
       return result.recordset.map(withRowVersion);
     },
     async detail(postId,{owner=null,admin=false,publicOnly=false}={}) {
       const pool=await getPool();
       const result=await request(pool).input('id',sql.Int,postId).query(`SELECT ${projection}${publicOnly?'':',CONVERT(VARCHAR(18),p.gia_toi_thieu) AS gia_toi_thieu'} ${joins} WHERE b.bai_dang_id=@id`);
       const row=withRowVersion(result.recordset[0]);
-      if (!row || publicOnly && (row.trang_thai_bai!=='da_duyet'||row.trang_thai_phien!=='da_kich_hoat') || !publicOnly && !admin && row.nguoi_dung_id!==owner) notFound();
+      if (!row || publicOnly && (row.trang_thai_bai!=='da_duyet'||!['da_kich_hoat','da_ket_thuc'].includes(row.trang_thai_phien)) || !publicOnly && !admin && row.nguoi_dung_id!==owner) notFound();
       row.media=(await media(pool,postId)).map(({publicId,...item})=>item);
       if (publicOnly) return row;
       row.kiem_duyet=(await request(pool).input('id',sql.Int,postId).query('SELECT kiem_duyet_id,ket_qua,phan_hoi_admin,ngay_kiem_duyet FROM dbo.KiemDuyet WHERE bai_dang_id=@id ORDER BY kiem_duyet_id DESC')).recordset;

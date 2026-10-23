@@ -1,21 +1,23 @@
-<!-- Mục đích: Mô tả quy tắc xử lý đấu giá và đề xuất lưu kết quả yêu cầu trước khi nối API/worker. -->
+<!-- Mục đích: Mô tả tiếp nhận, quyết định SQL, kết thúc và phục hồi yêu cầu đấu giá. -->
 
 # Xử lý đặt giá và kết thúc phiên
 
-## Trạng thái triển khai
+## Phạm vi hiện tại
 
-Đã có bộ quy tắc thuần `bidPolicy.js` và khóa theo phiên `auctionLock.js`, kèm kiểm thử.
-Hai thành phần này chưa được nối vào API/worker. Chưa có endpoint đặt giá, scheduler chốt hạn,
-giao dịch ghi lượt giá hay kết quả SQL. Giao diện danh mục chưa nhận đặt giá.
+Đã triển khai API, Redis admission/Streams, processor có khóa phiên, transaction SQL,
+job hết hạn và giao diện gửi giá/theo dõi quyết định qua HTTP.
+Schema sau migration 003 có 20 bảng/152 cột. Không thay dependency hoặc cơ chế xác thực theo tab.
+Socket.IO nghiệp vụ, AI và xác nhận hoàn tất giao dịch chưa triển khai.
 
-Phần lưu kết quả yêu cầu dưới đây là đề xuất cần được thống nhất trước khi bổ sung migration.
-Database hiện tại vẫn giữ 19 bảng và 144 cột; không cần chạy migration cho bản chuẩn bị này.
+## Hợp đồng HTTP
 
-## Hợp đồng yêu cầu
+| Phương thức | Endpoint | Quyền và phản hồi |
+|---|---|---|
+| GET | `/api/auctions/:id` | Công khai với phiên đã duyệt và kích hoạt/kết thúc; snapshot và kết quả |
+| POST | `/api/auctions/:id/bids` | Người dùng, cookie và CSRF; 202 đang chờ hoặc 200 quyết định đã có |
+| GET | `/api/auctions/:id/requests/:requestId` | Chủ yêu cầu; SQL trước Redis, người khác nhận 404 |
 
-Dự kiến `POST /api/auctions/:id/bids`, cần session, vai trò người dùng và CSRF.
-Người đặt được xác định từ session; không nhận `nguoi_dung_id`, thời gian, trạng thái hay giá ẩn từ client.
-Body chỉ gồm:
+Body gửi giá chỉ gồm:
 
 ```json
 {
@@ -24,101 +26,120 @@ Body chỉ gồm:
 }
 ```
 
-Validator hiện có kiểm tra UUID v4 và chuỗi số nguyên dương tối đa 18 chữ số.
-Cùng mã phải gắn cùng người, cùng phiên và cùng giá. Dùng lại mã cho nội dung khác dự kiến trả 409;
-không trả kết quả riêng của người khác. Endpoint theo dõi kết quả cũng phải kiểm tra chủ yêu cầu.
-HTTP 202 chỉ xác nhận đã tiếp nhận; không coi việc xếp hàng là đặt giá thành công.
+Mã là UUID v4 được chuẩn hóa chữ thường; giá nguyên dương dạng chuỗi tối đa 18 chữ số.
+Không nhận người đặt, thời gian, rowversion hoặc trạng thái từ client. Người đặt lấy từ session,
+vai trò đọc lại tại API và worker. Chủ sách không tự đặt; Admin chỉ xem.
+Cùng mã phải gắn cùng người/phiên/giá; nội dung khác trả 409 mà không tiết lộ quyết định của người khác.
+API không trả giá ngưỡng ẩn, email hay version nội bộ qua projection công khai.
 
-## Quy tắc đã mã hóa
+| Trạng thái HTTP | Nguồn | Ý nghĩa |
+|---|---|---|
+| `dang_cho_xu_ly` | Redis admission | Đã tiếp nhận, chưa có quyết định cuối |
+| `da_chap_nhan` | YeuCauDatGia | SQL đã COMMIT lượt hợp lệ |
+| `bi_tu_choi` | YeuCauDatGia | SQL đã COMMIT quyết định từ chối với mã lý do |
 
-`evaluateBid` nhận snapshot nội bộ sau khóa: trạng thái, chủ sách, giá, lịch, cooldown,
-lượt hợp lệ trước của cùng người trong cùng phiên và đồng hồ SQL tại lúc kiểm tra.
+HTTP 202 không đồng nghĩa đặt giá thành công. Giao diện poll yêu cầu của mình;
+khi mất phản hồi, nút thử lại giữ nguyên UUID và mức giá. Sau kết quả cuối mới tạo yêu cầu mới.
+Giá/trạng thái mới của phiên được phản ánh trong chi tiết sau khi lấy snapshot;
+các tab khác bấm tải lại, chưa có đồng bộ giá qua Socket.IO.
 
-- Chỉ nhận khi `trang_thai = da_kich_hoat` và `bắt đầu <= now < kết thúc`.
-- Chủ sách không đặt giá cho sách của mình.
+## Quyết định trong SQL
+
+1. Consumer lấy khóa Redis của phiên; chưa lấy được khóa thì để pending.
+2. Mở transaction SERIALIZABLE, khóa/đọc YeuCauDatGia theo mã yêu cầu trước.
+3. Nếu đã có quyết định, so nội dung và trả quyết định đó; không đánh giá lại.
+4. Với yêu cầu mới, lấy khóa BaiDang rồi PhienDauGia bằng UPDLOCK/HOLDLOCK,
+   đọc lại vai trò, lượt hợp lệ trước của cùng người/phiên và đồng hồ SQL.
+5. Policy kiểm tra trạng thái/lịch, chủ sách, cooldown và mức giá. Lỗi dữ liệu nội bộ
+   phải retry/đối soát, không biến thành từ chối nghiệp vụ giả.
+6. Lượt hợp lệ ghi LuotDatGia, cập nhật giá bằng rowversion và điều kiện trạng thái, ghi lịch sử.
+7. Nếu đạt/vượt ngưỡng, kết thúc ngay trong cùng transaction. Nếu yêu cầu đã muộn,
+   từ chối giá và chốt hạn nếu phiên vẫn đang hoạt động.
+8. Ghi quyết định cuối vào YeuCauDatGia, kiểm tra lease rồi COMMIT.
+9. Chỉ sau COMMIT, consumer XACK/XDEL; client đọc quyết định SQL để biết kết quả.
+
+Quyết định, giá, lịch sử, kết quả và giao dịch liên quan cùng rollback nếu chưa COMMIT.
+Kết quả COMMIT chưa rõ được retry và đối chiếu receipt; không gửi thông báo từ chối giả.
+Thứ tự xử lý do quyền ghi SQL dưới khóa quyết định, không lấy thứ tự bấm nút hoặc đồng hồ client làm căn cứ.
+
+## Quy tắc giá và thời gian
+
+- Chỉ nhận khi phiên `da_kich_hoat`, `bắt đầu <= now < kết thúc`.
+- Thời gian là SYSUTCDATETIME sau khi worker lấy khóa SQL và dữ liệu mới nhất.
 - Lượt đầu bằng `gia_khoi_diem + k × buoc_gia`, `k >= 0`.
 - Lượt sau bằng `gia_hien_tai + k × buoc_gia`, `k >= 1`.
-- Cooldown 10–30 giây theo cấu hình phiên; đúng thời điểm hết chờ thì được đặt lại.
-- Giá được tính bằng BigInt; chuỗi 18 chữ số giữ nguyên khi vào/ra.
-- Lượt hợp lệ đạt/vượt ngưỡng yêu cầu kết thúc sớm trong cùng transaction ghi giá.
-- Yêu cầu xử lý từ thời điểm hết hạn bị từ chối và yêu cầu kiểm tra chốt hạn.
+- Cooldown 10–30 giây theo phiên, mặc định 20 giây; đúng hạn chờ thì được đặt lại.
+- Chỉ lượt hợp lệ trước của cùng người/cùng phiên ảnh hưởng cooldown.
+- Giá BigInt trong policy, DECIMAL(18,0) trong SQL; driver/JSON dùng chuỗi, không Number.
+- Không nhận thêm lượt sau kết thúc; không có kết thúc thủ công hoặc hủy giữa phiên.
 
-`deriveEndResult` kiểm tra giá hiện tại khớp lượt hợp lệ cao nhất và xác định kết quả.
-Hết hạn có lượt hợp lệ thì người giá cao nhất thắng dù chưa đạt ngưỡng; không có lượt thì không có người thắng.
-Chỉ có hai lý do kết thúc: `het_thoi_gian` và `dat_gia_toi_thieu`.
-Hàm trả giá trị dự kiến, không tự ghi kết quả/giao dịch và không bảo đảm idempotency SQL.
-Snapshot sai phải báo lỗi để retry/đối soát; không đổi lỗi dữ liệu thành kết quả từ chối giả.
+## Dữ liệu và migration
 
-## Khóa và ranh giới nhất quán
+Migration 003 thêm YeuCauDatGia:
 
-`auctionLock.js` dùng `SET NX PX`, token ngẫu nhiên và Lua so token trước khi gia hạn/xóa.
-Hai phiên dùng hai khóa độc lập. Chủ khóa cũ không được xóa hoặc gia hạn khóa đã thuộc worker khác.
-Không tự đợi khóa, không tự gia hạn bằng timer; processor sẽ quyết định retry và quản lý thời hạn.
-
-Redis lock là lớp phối hợp, không bảo đảm độc quyền sau khi hết lease, failover hoặc mất kết nối.
-Luồng SQL dự kiến vẫn cần transaction, đọc lại bằng `UPDLOCK/HOLDLOCK`,
-kiểm tra `row_version`, UPDATE có điều kiện và UNIQUE hiện có.
-Đồng hồ phải được đọc sau khi transaction đã lấy được quyền xử lý phiên, không dùng thời gian gửi từ client.
-Thứ tự khóa bài/phiên phải thống nhất với kiểm duyệt/kích hoạt để hạn chế deadlock; lỗi deadlock để retry.
-
-## Đề xuất bổ sung dữ liệu
-
-Schema hiện có `LuotDatGia` chỉ lưu lượt hợp lệ với `ma_yeu_cau` UNIQUE.
-Nó bảo vệ lượt đã ghi nhưng chưa giữ được quyết định từ chối qua restart/mất Redis.
-`LichSuDauGia.hanh_dong` là nhật ký nghiệp vụ, không nên dùng thay bảng kết quả có khóa duy nhất.
-
-### Bảng kết quả yêu cầu
-
-Đề xuất thêm `dbo.YeuCauDatGia`, chỉ lưu quyết định cuối sau khi xử lý SQL; hàng chờ vẫn ở Redis Streams.
-
-| Cột | Kiểu và ràng buộc đề xuất | Mục đích |
+| Cột | Kiểu/ràng buộc | Mục đích |
 |---|---|---|
-| `ma_yeu_cau` | VARCHAR(64), collation BIN2, PRIMARY KEY | Chặn quyết định trùng trên toàn hệ thống |
-| `phien_dau_gia_id` | INT NOT NULL, FK PhienDauGia | Xác định phiên và kiểm tra nội dung khi retry |
-| `nguoi_dung_id` | INT NOT NULL, FK NguoiDung | Quyền đọc kết quả và kiểm tra cùng người gửi |
-| `muc_gia` | DECIMAL(18,0) NOT NULL, CHECK > 0 | Giá nguyên gốc của yêu cầu |
-| `trang_thai` | VARCHAR(20) NOT NULL | Chỉ `da_chap_nhan` hoặc `bi_tu_choi` |
-| `ly_do` | VARCHAR(64) NULL | Mã lý do ổn định; NULL khi chấp nhận, bắt buộc khi từ chối |
-| `thoi_gian_xu_ly` | DATETIME2(3) NOT NULL | Đồng hồ SQL tại quyết định |
+| `ma_yeu_cau` | VARCHAR(64), BIN2, PRIMARY KEY | Một quyết định cho một mã |
+| `phien_dau_gia_id` | INT NOT NULL, FK | Phiên và kiểm tra nội dung retry |
+| `nguoi_dung_id` | INT NOT NULL, FK | Chủ yêu cầu |
+| `muc_gia` | DECIMAL(18,0) NOT NULL, CHECK > 0 | Giá nguyên gốc |
+| `trang_thai` | VARCHAR(20), hai quyết định cuối | Chấp nhận hoặc từ chối |
+| `ly_do` | VARCHAR(64) NULL | NULL khi chấp nhận; bắt buộc khi từ chối |
+| `thoi_gian_xu_ly` | DATETIME2(3) NOT NULL | Đồng hồ quyết định SQL |
 
-Không sửa hoặc bỏ bảng/cột hiện có. Lượt hợp lệ tiếp tục lưu tại `LuotDatGia`.
-Quyết định, lượt giá, cập nhật giá, lịch sử và kết quả/giao dịch nếu kết thúc phải cùng COMMIT.
-Khi xử lý lại, đọc quyết định đã lưu và so nội dung trước; không đánh giá lại một quyết định từ chối đã chốt.
+LuotDatGia tiếp tục chỉ lưu lượt hợp lệ với mã yêu cầu và cặp phiên/giá UNIQUE.
+Migration backfill lượt hợp lệ cũ thành receipt chấp nhận; chạy lại không tạo trùng.
+Nếu receipt cũ mâu thuẫn lượt giá, migration dừng để đối soát, không ghi đè.
 
-### Lý do kết thúc
+KetQuaDauGia thêm `ly_do_ket_thuc VARCHAR(30) NULL`, chỉ nhận NULL,
+`het_thoi_gian` hoặc `dat_gia_toi_thieu`. Dữ liệu cũ chưa rõ lý do giữ NULL, không đoán backfill;
+code kết thúc mới luôn ghi lý do. Hai trạng thái có/không người thắng được giữ nguyên.
+Không sửa DDL nền, không tạo lại database và không xóa volume. Dừng API/worker trước migration.
 
-Đề xuất thêm `KetQuaDauGia.ly_do_ket_thuc VARCHAR(30) NULL`,
-CHECK chỉ nhận NULL, `het_thoi_gian` hoặc `dat_gia_toi_thieu`.
-NULL bảo toàn dữ liệu cũ không rõ căn cứ; code mới luôn ghi một trong hai lý do.
-Không suy đoán để backfill dữ liệu lịch sử. Hai trạng thái có/không người thắng hiện tại được giữ nguyên.
+## Kết thúc và giao dịch
 
-Đây chưa phải migration đã được áp dụng. Khi thống nhất sẽ bổ sung migration có thể chạy lại,
-cập nhật init/migrate/schema manifest/readiness và tài liệu cùng lúc; không tạo lại database hoặc volume.
+Job mỗi giây đọc tối đa 50 phiên đang kích hoạt đã hết hạn theo đồng hồ SQL, xếp sự kiện chốt.
+Redis ngăn xếp lại cùng phiên trong 10 giây. Processor dùng cùng khóa/transaction với đặt giá.
 
-## Luồng tích hợp dự kiến
+Lượt hợp lệ đạt/vượt ngưỡng kết thúc sớm; ngưỡng bằng khởi điểm thì lượt đầu đúng khởi điểm kết thúc.
+Hết hạn có lượt hợp lệ thì lượt giá cao nhất thắng dù chưa đạt ngưỡng.
+Hết hạn không có lượt hợp lệ thì không có người thắng và không tạo giao dịch.
 
-1. API kiểm tra session/CSRF/body, xếp sự kiện vào stream nghiệp vụ riêng, trả 202.
-2. Consumer lấy khóa theo phiên; tranh khóa hoặc lỗi dịch vụ thì để pending, không XACK sớm.
-3. Transaction SQL kiểm tra mã yêu cầu, đọc dữ liệu mới nhất, đồng hồ và lượt trước; chạy policy.
-4. SQL lưu quyết định và mọi thay đổi liên quan. Có người thắng mới tạo GiaoDich;
-   UNIQUE kết quả theo phiên và giao dịch theo kết quả bảo vệ xử lý lại.
-5. Sau COMMIT mới công bố kết quả xử lý và XACK. Crash sau COMMIT/trước XACK phải phát lại quyết định SQL.
-6. Consumer dùng XAUTOCLAIM để nhận lại pending. Lỗi cấu trúc sự kiện vào dead-letter;
-   lỗi SQL/Redis tạm thời không được đổi thành từ chối hoặc ACK bỏ.
-7. Job tìm phiên hết hạn, đưa yêu cầu chốt vào luồng dùng chung khóa/transaction/idempotency.
-   Race giữa yêu cầu giá và chốt hạn quyết định bằng dữ liệu và đồng hồ SQL dưới khóa.
+UPDATE trạng thái dùng rowversion/điều kiện. UNIQUE kết quả theo phiên và giao dịch theo kết quả
+bảo vệ xử lý lại. GiaoDich ghi người mua/bán và số tiền ở trạng thái `cho_xac_nhan`.
+Bài đăng tiếp tục giữ `da_duyet`; trạng thái kết thúc thuộc PhienDauGia.
+Job/bid cạnh tranh được quyết định bằng snapshot và đồng hồ SQL sau khóa.
 
-Realtime nghiệp vụ và tích hợp AI thuộc phần phát triển tiếp theo, chưa nằm trong bản chuẩn bị này.
+## Redis lock và phục hồi
 
-## Kiểm chứng và công việc còn lại
+Khóa SET NX PX có lease 15 giây, token ngẫu nhiên, Lua so token khi gia hạn/xóa.
+Processor gia hạn mỗi khoảng 5 giây và kiểm tra trước COMMIT. Chủ cũ không xóa/gia hạn khóa của chủ mới.
+Redis lock chỉ phối hợp; SQL transaction/rowversion/UNIQUE bảo vệ khi lease mất hoặc lúc COMMIT kéo dài.
 
-Kiểm thử hiện có bao phủ các biên giá/thời gian/cooldown, kết thúc sớm/hết hạn, không người thắng,
-tiền 18 chữ số, snapshot sai và quyền sở hữu khóa Redis thật.
-Không dùng kết quả này để khẳng định đã kiểm tra SQL đồng thời hoặc phục hồi toàn luồng.
+Stream nghiệp vụ `bookauction:auction:events` tách khỏi probe, có consumer group riêng.
+Consumer dùng kết nối BLOCK riêng; mỗi khoảng 5 giây XAUTOCLAIM thông điệp idle từ 30 giây.
+Tranh khóa, deadlock hoặc lỗi dịch vụ tạm thời giữ pending. Không ACK để bỏ lỗi SQL.
+Sau COMMIT, ACK và xóa event cùng MULTI; không MAXLEN-trim làm mất pending.
+Receipt SQL là lịch sử quyết định bền vững, không tuyên bố Streams xử lý đúng một lần.
 
-Trước khi nghiệm thu lõi cần kiểm tra với SQL Server/Redis thật: hai yêu cầu cùng giá,
-cùng mã xử lý lặp, retry sau SQL COMMIT, lock hết hạn giữa chừng, kết quả/giao dịch duy nhất,
-hết giờ không người thắng và thông điệp pending được worker khác tiếp nhận lại.
+Admission pending chưa có TTL; sau ACK giữ thêm tối đa một ngày để hỗ trợ truy vấn/retry.
+SQL receipt được ưu tiên kể cả khi cache hết hạn. Mất dữ liệu Redis có thể mất yêu cầu chưa COMMIT;
+gửi lại cùng UUID giúp khôi phục tiếp nhận, còn quyết định SQL đã lưu được giữ nguyên.
+
+Sự kiện sai cấu trúc hoặc tham chiếu không còn tồn tại vào `bookauction:auction:dead` để đối soát.
+Không chuyển lỗi kỹ thuật thành quyết định nghiệp vụ. Admission của tham chiếu mất được đánh dấu lỗi;
+API chủ yêu cầu trả 410, không treo trạng thái đang chờ vô hạn. Không có công cụ tự động replay dead-letter.
+
+## Kiểm chứng
+
+`npm.cmd run smoke:m5` kiểm tra các dịch vụ thật, không cần Cloudinary; tạo tài khoản/phiên UUID riêng.
+Script kiểm tra quyền/CSRF, tranh giá, cooldown, replay, tiền 18 chữ số, hai kiểu kết thúc,
+kết quả/giao dịch duy nhất và gián đoạn sau COMMIT trước ACK bằng stream kiểm thử riêng.
+Chỉ PASS khi dọn xong SQL/khóa thử; nếu còn pending, giữ fixture để worker/nhóm đối soát.
+
+`AUCTION_TEST_SQL=true` cùng database tên `BookAuctionTest_*` và Redis kiểm thử bật test SQL riêng,
+bao gồm rollback toàn transaction và lease hết hạn khi đang giữ quyền ghi SQL.
+Môi trường và giới hạn bằng chứng thực tế ghi tại [VALIDATION.md](../VALIDATION.md).
 
 Tham khảo: [Redis distributed locks](https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/),
 [XAUTOCLAIM](https://redis.io/docs/latest/commands/xautoclaim/),

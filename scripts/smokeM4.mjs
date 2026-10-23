@@ -109,6 +109,9 @@ finally {
           DELETE dbo.KiemDuyet WHERE bai_dang_id IN(SELECT id FROM @posts);
           DELETE dbo.HinhAnh WHERE bai_dang_id IN(SELECT id FROM @posts); DELETE dbo.Video WHERE bai_dang_id IN(SELECT id FROM @posts);
           DELETE dbo.LichSuDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
+          DELETE dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions));
+          DELETE dbo.YeuCauDatGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
+          DELETE dbo.LuotDatGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
           DELETE dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
           DELETE dbo.PhienDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
           DELETE dbo.BaiDang WHERE bai_dang_id IN(SELECT id FROM @posts);

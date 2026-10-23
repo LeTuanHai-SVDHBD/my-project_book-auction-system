@@ -1,14 +1,10 @@
 /**
  * Kiểm tra API, SQL, Redis, worker, Socket.IO và probe bằng các dịch vụ đang chạy thật.
  */
-import { readFileSync } from 'node:fs';
+import {config} from '../backend/src/config/env.js';
 import { createRequire } from 'node:module';
 const { io } = createRequire(new URL('../frontend/package.json', import.meta.url))('socket.io-client');
-const lines = readFileSync(new URL('../.env', import.meta.url), 'utf8').split(/\r?\n/);
-const env = Object.fromEntries(lines.filter(x => x && !x.startsWith('#')).map(line => {
-  const p = line.indexOf('='); return [line.slice(0, p), line.slice(p + 1)];
-}));
-const base = `http://${env.API_HOST || '127.0.0.1'}:${env.API_PORT || 5000}`;
+const base = `http://${config.host}:${config.port}`;
 try {
   const live = await fetch(base + '/api/health/live', { signal: AbortSignal.timeout(10000) });
   if (!live.ok) throw new Error('API chưa chạy.');
@@ -21,7 +17,7 @@ try {
     socket.once('system:hello', () => { clearTimeout(timer); socket.disconnect(); resolve(); });
     socket.once('connect_error', error => { clearTimeout(timer); socket.disconnect(); reject(error); });
   });
-  const headers = { 'x-dev-token': env.DEV_PROBE_TOKEN, 'Content-Type': 'application/json' };
+  const headers = { 'x-dev-token': config.probeToken, 'Content-Type': 'application/json' };
   const queued = await fetch(base + '/api/dev/probes', { method: 'POST', headers, body: '{}', signal: AbortSignal.timeout(10000) });
   const probe = await queued.json();
   if (queued.status !== 202 || probe.status !== 'queued') throw new Error('Không xếp hàng được sự kiện thử nghiệm.');
@@ -34,8 +30,8 @@ try {
     if (result.status === 'completed' && result.sqlOk) { completed = true; break; }
   }
   if (!completed) throw new Error('Worker chưa hoàn tất yêu cầu thử nghiệm.');
-  console.log(`PASS: API, SQL Server (19 bảng/144 trường), Redis, worker, Socket.IO và luồng Streams → worker → SQL đều hoạt động.`);
+  console.log(`PASS: API, SQL Server (20 bảng/152 trường), Redis, worker, Socket.IO và luồng Streams → worker → SQL đều hoạt động.`);
 } catch (error) {
-  console.error('FAIL:', String(error.message).replaceAll(env.DEV_PROBE_TOKEN || '___', '[REDACTED]').replaceAll(env.DB_PASSWORD || '___', '[REDACTED]'));
+  console.error('FAIL:', String(error.message).replaceAll(config.probeToken, '[REDACTED]').replaceAll(config.sql.password, '[REDACTED]'));
   process.exitCode = 1;
 }

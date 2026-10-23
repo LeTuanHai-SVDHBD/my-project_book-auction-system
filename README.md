@@ -13,10 +13,13 @@ Hệ thống hướng tới xử lý tranh chấp đặt giá đồng thời và
 - Admin phê duyệt hoặc từ chối có lý do; chủ sách bổ sung bài bị từ chối và gửi duyệt lại.
 - Chủ sách đặt lịch, kích hoạt phiên đã duyệt và đăng lại bản sách đủ điều kiện.
 - Danh mục công khai; giữ ẩn giá kết thúc sớm đối với người mua.
+- Đặt giá qua Redis Streams; kiểm tra bước giá/cooldown, chống xử lý trùng và theo dõi quyết định.
+- Tự kết thúc khi hết giờ hoặc đạt ngưỡng; một kết quả mỗi phiên, tạo giao dịch khi có người thắng.
 - Kiểm tra hạ tầng, heartbeat của worker và probe qua Redis Streams.
 
-Lõi đặt giá, tự kết thúc phiên, cập nhật nghiệp vụ qua Socket.IO, tích hợp Gemini và các chức năng sau phiên
-đang chờ triển khai. Socket.IO hiện phục vụ kiểm tra kết nối; giao diện chưa cung cấp đặt giá.
+Cập nhật nghiệp vụ qua Socket.IO, tích hợp Gemini và các chức năng sau phiên đang chờ triển khai.
+Socket.IO hiện phục vụ kiểm tra kết nối; giao diện theo dõi quyết định đặt giá qua HTTP,
+các phiên ở tab khác cần bấm tải lại để xem giá/trạng thái mới nhất.
 
 ## Yêu cầu môi trường
 
@@ -55,7 +58,7 @@ npm.cmd run admin:create
 ```
 
 `setup` tạo `.env` và cấu hình Frontend khi chưa có; các script setup giữ nguyên giá trị đã tồn tại.
-`db:init` tạo schema nền rồi áp dụng migration metadata Cloudinary. Schema hiện tại có **19 bảng, 144 cột**.
+`db:init` tạo schema nền rồi áp dụng các migration media và quyết định đấu giá. Schema hiện tại có **20 bảng, 152 cột**.
 `admin:create` yêu cầu tên, email và mật khẩu kín trong terminal. Admin đã tồn tại được giữ nguyên mật khẩu;
 script không tự nâng quyền tài khoản người dùng thường.
 
@@ -72,7 +75,9 @@ npm.cmd run setup:media
 npm.cmd run db:migrate
 ```
 
-`db:migrate` chạy migration có thể lặp lại, bổ sung hai cột `cloudinary_public_id` nullable và index vào bảng media.
+`db:migrate` chạy migration có thể lặp lại: metadata Cloudinary, bảng `YeuCauDatGia` và
+cột `KetQuaDauGia.ly_do_ket_thuc`. Lượt giá cũ được backfill thành quyết định chấp nhận;
+lý do kết thúc chưa biết của dữ liệu cũ giữ NULL. Dừng API/worker trước khi nâng cấp.
 DDL nền, tài khoản, dữ liệu và volume hiện có được giữ lại. Không cần khởi tạo lại database.
 Khi đổi Docker project hoặc tên volume, thực hiện theo [hướng dẫn bảo toàn dữ liệu](docs/docker-migration.md).
 
@@ -171,6 +176,21 @@ Chưa có phân tích AI thì Admin kiểm tra thủ công; không tạo điểm
 Tình trạng đẹp không thay thế điều kiện quý hiếm. Nếu đã có kết quả AI trong database, giao diện hiển thị để tham khảo.
 Giờ được lưu theo UTC và kiểm tra bằng đồng hồ SQL Server.
 
+### Đặt giá và xem kết quả
+
+1. Đăng nhập bằng tài khoản người dùng, mở **Danh mục → Xem chi tiết**.
+2. Nhập mức giá; giao diện tự thêm dấu chấm. Lượt đầu từ giá khởi điểm, lượt sau tăng ít nhất một bước.
+3. Bấm **Gửi mức giá**; “đang chờ” chỉ xác nhận đã tiếp nhận. Chỉ thông báo chấp nhận sau khi SQL COMMIT.
+4. Nếu mất phản hồi mạng, **Thử lại cùng yêu cầu** giữ nguyên mã và mức giá, không tạo lượt trùng.
+5. Sau mỗi lượt hợp lệ của cùng người trong cùng phiên, chờ đủ thời gian cấu hình (10–30 giây).
+6. Phiên tự kết thúc khi hết giờ hoặc một giá hợp lệ đạt/vượt ngưỡng ẩn. Không có nút kết thúc thủ công.
+7. **Tải lại phiên và kết quả** lấy trạng thái SQL mới nhất. Danh mục giữ phiên đã kết thúc để xem kết quả.
+
+Hết giờ có lượt hợp lệ thì người có giá cao nhất thắng dù chưa đạt ngưỡng. Không có lượt hợp lệ thì
+không có người thắng và không tạo giao dịch. Người bán không tự đặt giá vào sách của mình; Admin chỉ xem.
+Giao dịch được tạo ở trạng thái chờ xác nhận; trao đổi/xác nhận hoàn tất chưa được triển khai.
+Chi tiết xử lý và phục hồi tại [Xử lý đấu giá](docs/auction-processing.md).
+
 ### Đăng lại và quản lý media
 
 Chỉ đăng lại khi phiên mới nhất của bản sách đã kết thúc và có kết quả rõ **không có người thắng**.
@@ -197,16 +217,18 @@ npm.cmd run build
 npm.cmd run smoke
 npm.cmd run smoke:auth
 npm.cmd run smoke:m4
+npm.cmd run smoke:m5
 ```
 
 | Lệnh | Phạm vi |
 |---|---|
 | `check` | Kiểm tra cú pháp JavaScript máy chủ và script |
-| `test` | Hợp đồng HTTP, xác thực, trạng thái, media, phiên tab và định dạng tiền |
+| `test` | HTTP, xác thực, media, phiên tab, giá/cooldown; Redis/SQL thật bật bằng opt-in |
 | `build` | Build Frontend production |
 | `smoke` | Hạ tầng thật, Socket.IO và probe qua Streams |
 | `smoke:auth` | Đăng ký/đăng nhập, CSRF, cookie, quyền và thu hồi phiên |
 | `smoke:m4` | Cloudinary, tạo/duyệt/kích hoạt bài, rollback SQL, retry và điều kiện đăng lại |
+| `smoke:m5` | API/worker thật, tranh giá, replay, hai kiểu kết thúc, kết quả/giao dịch và phục hồi sau COMMIT trước ACK; không cần Cloudinary |
 
 Smoke tạo dữ liệu UUID riêng, dọn đúng dữ liệu thử và trả FAIL nếu không dọn hoàn tất.
 Kiểm thử đăng lại dùng fixture chỉ thay đổi phiên của tài khoản smoke trong development.
@@ -223,11 +245,27 @@ Remove-Item Env:AUTH_TEST_REDIS_URL
 
 Các bài này dùng prefix UUID riêng và tự dọn khóa của chúng, không xóa toàn bộ Redis.
 
+Kiểm thử SQL tự động yêu cầu database riêng có tên bắt đầu bằng `BookAuctionTest_` và Redis kiểm thử:
+
+```powershell
+$env:DB_DATABASE = "BookAuctionTest_Local"
+$env:AUTH_TEST_REDIS_URL = "redis://127.0.0.1:63790"
+$env:AUCTION_TEST_SQL = "true"
+npm.cmd test
+Remove-Item Env:AUCTION_TEST_SQL
+Remove-Item Env:AUTH_TEST_REDIS_URL
+Remove-Item Env:DB_DATABASE
+```
+
+Lệnh này có thể tạo database kiểm thử nếu chưa có, nâng schema và chỉ dọn fixture UUID của lần chạy.
+Không đặt tên database làm việc của nhóm vào biến kiểm thử. Với database đang dùng, chạy `smoke:m5`
+sau migration và khi API/worker đã khởi động; script tự tạo/dọn tài khoản và phiên thử riêng.
+
 ## Xử lý sự cố
 
 | Hiện tượng | Kiểm tra |
 |---|---|
-| SQL readiness chưa đạt 19 bảng/144 cột | Kiểm tra đúng database, kết nối và chạy `npm.cmd run db:migrate` |
+| SQL readiness chưa đạt 20 bảng/152 cột | Kiểm tra đúng database, kết nối và chạy `npm.cmd run db:migrate` |
 | Không upload được | Kiểm tra ba biến Cloudinary, giới hạn tệp và khởi động lại API |
 | Lỗi CSRF hoặc phiên hết hạn | F5 tab hiện tại và đăng nhập lại nếu cần |
 | HTTP 409 khi duyệt/kích hoạt | Tải lại chi tiết trước khi thao tác; không dùng `row_version` cũ |
@@ -243,7 +281,7 @@ và kiểm tra lại cookie Secure. Không commit thông tin kết nối hoặc 
 
 - [Kiến trúc hệ thống](docs/architecture.md)
 - [Luồng nghiệp vụ và hợp đồng API](docs/flows.md)
-- [Xử lý đặt giá và đề xuất lưu kết quả](docs/auction-processing.md)
+- [Xử lý đặt giá và phục hồi](docs/auction-processing.md)
 - [Quyết định kỹ thuật](docs/decisions.md)
 - [Bản đồ mã nguồn](docs/file-map.md)
 - [Trạng thái chức năng và công việc](docs/tasks.md)

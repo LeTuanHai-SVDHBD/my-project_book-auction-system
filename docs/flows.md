@@ -107,11 +107,26 @@ API trả 202 queued; worker chỉ xác nhận completed sau truy vấn kiểm t
 Kết quả probe được lấy qua HTTP; Socket.IO chỉ gửi lời chào kết nối.
 Endpoint development cần `DEV_PROBE_TOKEN`, không dùng khóa này thay tài khoản.
 
-## Thiết kế đặt giá và kết thúc — chưa triển khai
+## Đặt giá và kết thúc phiên
 
 API tiếp nhận yêu cầu hợp lệ về cấu trúc, đưa vào Streams và trả 202; đây chưa phải đặt giá thành công.
+Các endpoint đã triển khai:
+
+| Phương thức | Endpoint | Điều kiện |
+|---|---|---|
+| GET | `/api/auctions/:id` | Công khai, chỉ phiên đã công bố; không có ngưỡng giá ẩn |
+| POST | `/api/auctions/:id/bids` | Người dùng + CSRF; body chỉ `ma_yeu_cau` UUID v4 và `muc_gia` chuỗi nguyên |
+| GET | `/api/auctions/:id/requests/:requestId` | Chỉ chủ yêu cầu; đọc SQL trước admission Redis |
+
+Trạng thái HTTP kết quả gồm `dang_cho_xu_ly`, `da_chap_nhan`, `bi_tu_choi`.
+YeuCauDatGia chỉ lưu hai quyết định cuối; hàng chờ ở Redis. Mã đã có quyết định trả 200;
+mã cùng người/phiên/giá chưa xử lý trả 202, không xếp lại. Dùng lại mã cho nội dung khác trả 409.
+
 Worker lấy quyền xử lý phiên, mở transaction SQL, kiểm tra mã yêu cầu rồi đọc lại quyền, lịch, trạng thái,
-giá và cooldown. Chỉ thông báo thành công sau COMMIT; sự kiện được giao lại không tạo bản ghi trùng.
+giá và cooldown. Quyết định chấp nhận/từ chối được lưu cùng thay đổi nghiệp vụ trong SQL.
+Chỉ thông báo thành công sau COMMIT; sự kiện giao lại đọc quyết định đã lưu, không đánh giá lại hoặc tạo trùng.
+XACK/XDEL chỉ sau xử lý thành công; lỗi tạm giữ pending, XAUTOCLAIM nhận lại.
+Chi tiết retention, dead-letter và lease nằm tại [Xử lý đấu giá](auction-processing.md).
 
 | Quy tắc | Điều kiện |
 |---|---|
@@ -128,7 +143,8 @@ Hết hạn có lượt hợp lệ thì lượt cao nhất thắng dù chưa đ�
 
 ## Thiết kế sau phiên — chưa triển khai
 
-Giao dịch từ kết quả có người thắng xác định người mua/bán và số tiền, mở trao đổi gắn đúng giao dịch.
+Giao dịch đã được tạo từ kết quả có người thắng, xác định người mua/bán và số tiền.
+Các chức năng mở trao đổi gắn giao dịch, xác nhận hoàn tất và phản hồi chưa triển khai.
 Hoàn tất cần đủ xác nhận hai bên; đánh giá uy tín theo quyền và điều kiện hoàn tất.
 Khiếu nại kiểm tra quan hệ người gửi–giao dịch–cuộc trò chuyện, lưu bằng chứng và xử lý theo quyền Admin.
 Không tự thay đổi người thắng hoặc trạng thái giao dịch chỉ vì có khiếu nại.

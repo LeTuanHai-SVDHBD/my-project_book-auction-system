@@ -35,7 +35,7 @@ KhieuNai cho phép Admin NULL trước khi tiếp nhận. Tính tùy chọn ở 
 
 ## ADR-005 — Tiếp nhận bất đồng bộ và idempotency
 
-**Trạng thái:** áp dụng cho probe; lõi đặt giá chưa triển khai.
+**Trạng thái:** áp dụng cho probe và đấu giá.
 
 HTTP 202 chỉ xác nhận tiếp nhận. Worker chỉ thông báo nghiệp vụ thành công sau SQL COMMIT.
 UUID yêu cầu và UNIQUE là lớp bảo vệ khi sự kiện được giao lại; xử lý lại không tạo dữ liệu trùng.
@@ -43,7 +43,7 @@ Không khẳng định Redis Streams cung cấp cơ chế xử lý đúng một 
 
 ## ADR-006 — Giá và điều kiện kết thúc
 
-**Trạng thái:** quy tắc thiết kế được giữ nguyên; lõi đặt giá đang chờ triển khai.
+**Trạng thái:** đã triển khai trong policy và transaction đấu giá.
 
 - `gia_toi_thieu` là ngưỡng kết thúc sớm, ẩn đối với người mua.
 - Lượt đầu bằng `gia_khoi_diem + k × buoc_gia`, `k >= 0`; lượt sau bằng `gia_hien_tai + k × buoc_gia`, `k >= 1`.
@@ -129,7 +129,8 @@ Không tự đổi tên, sao chép hoặc xóa volume đang có dữ liệu. Xem
 
 React gửi tệp nhị phân qua API xác thực/CSRF; server dùng fetch/FormData/Blob của Node 24 và credentials riêng
 để gọi Cloudinary REST. SQL lưu URL/public_id; migration 002 thêm hai cột nullable và index, giữ nguyên DDL nền.
-Schema sau nâng cấp có 19 bảng/144 cột. URL cũ có thể chưa có public_id.
+Migration 002 nâng schema nền lên 19 bảng/144 cột; migration 003 nâng tiếp lên 20 bảng/152 cột.
+URL cũ có thể chưa có public_id.
 
 Redis lưu vé và lịch cleanup, không lưu bytes. Tạo vé trước upload, thời hạn sử dụng một giờ;
 không TTL-xóa ledger. Lua claim kiểm tra chủ sở hữu và trạng thái nguyên tử.
@@ -183,3 +184,30 @@ Input hiển thị tách khỏi hidden input mang chuỗi nguyên gửi API. Kh�
 không làm tròn và không âm thầm cắt bớt khi vượt 18 chữ số. Chỉnh sửa/xóa ở giữa chuỗi giữ con trỏ theo chữ số.
 Giá hiện tại thuộc nghiệp vụ đặt giá, không cho chủ sách tự nhập.
 Backend tiếp tục kiểm tra chuỗi nguyên dương, ngưỡng không nhỏ hơn giá khởi điểm và các ràng buộc SQL.
+
+
+## ADR-016 — Quyết định đặt giá và phục hồi consumer
+
+**Trạng thái:** áp dụng; việc bổ sung schema đã được chủ dự án thống nhất.
+
+Migration 003 thêm YeuCauDatGia với mã yêu cầu PRIMARY KEY, dữ liệu người/phiên/giá, quyết định cuối,
+lý do từ chối và thời điểm xử lý. LuotDatGia chỉ chứa lượt hợp lệ. Cùng mã được chuẩn hóa UUID v4;
+dùng lại cho nội dung khác trả 409. Migration giữ dữ liệu cũ, backfill lượt hợp lệ thành quyết định chấp nhận,
+giữ lý do kết thúc lịch sử NULL nếu chưa biết; không sửa DDL nền hoặc tự xóa database.
+
+Redis admission ngăn xếp lặp cùng payload khi pending. Worker dùng stream nghiệp vụ riêng,
+Redis lock SET NX PX và token/Lua gia hạn/xóa. SQL vẫn quyết định bằng transaction SERIALIZABLE,
+khóa bài rồi phiên, rowversion, UPDATE có điều kiện và UNIQUE.
+Đọc đồng hồ SQL sau khi lấy khóa và dữ liệu mới nhất. Mất lease trước COMMIT thì rollback/retry;
+SQL bảo vệ tính nhất quán ngay cả khi lease hết hạn lúc COMMIT.
+
+Quyết định, lượt giá, cập nhật giá/lịch sử và kết quả/giao dịch khi cần cùng COMMIT.
+Lỗi COMMIT chưa rõ không báo từ chối giả; giữ thông điệp để xử lý lại và đọc quyết định SQL.
+Consumer ACK rồi xóa thông điệp đã xử lý trong cùng Redis MULTI sau COMMIT;
+pending nhận lại bằng XAUTOCLAIM, không tuyên bố xử lý đúng một lần.
+Không tự cắt stream theo MAXLEN để tránh xóa mất pending. Dead-letter cần đối soát riêng.
+
+Job mỗi giây tìm tối đa 50 phiên hết hạn theo SQL và xếp yêu cầu chốt, chống xếp lặp trong 10 giây.
+Kết thúc có hai lý do đã chốt, lưu tại KetQuaDauGia.ly_do_ket_thuc; chỉ tạo GiaoDich khi có người thắng.
+Giao diện poll quyết định của mình, tải lại snapshot phiên khi cần; realtime nghiệp vụ chưa triển khai.
+Chi tiết: [Xử lý đấu giá](auction-processing.md).

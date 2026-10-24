@@ -3,6 +3,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {postApi} from '../services/postApi.js';
 import PostForm from './PostForm.jsx';
 import AuctionPanel from './AuctionPanel.jsx';
+import CommentsPanel from './CommentsPanel.jsx';
 import AiPanel from './AiPanel.jsx';
 import {useAuctionRealtime} from '../services/auctionRealtime.js';
 const states={cho_kiem_duyet:'Chờ kiểm duyệt',khong_dat_kiem_duyet:'Bị từ chối',da_qua_kiem_duyet:'Đã duyệt · chờ đặt lịch',da_kich_hoat:'Đã kích hoạt',da_ket_thuc:'Đã kết thúc'};
@@ -25,8 +26,9 @@ function Detail({post,mode,user,onRefresh,onForm,onClose,onAuctionChange}) {
     <dl className="post-info"><dt>Tên sách</dt><dd>{post.ten_sach}</dd><dt>Tác giả / thể loại</dt><dd>{post.tac_gia||'Chưa rõ'} / {post.the_loai||'Chưa rõ'}</dd><dt>Xuất bản / ISBN</dt><dd>{post.nha_xuat_ban||'Chưa rõ'} · {post.nam_xuat_ban||'Chưa rõ'} · {post.isbn||'Chưa rõ'}</dd><dt>Tình trạng sách</dt><dd>{post.tinh_trang_sach}</dd></dl>
     {post.mo_ta&&<p className="preserve-lines">{post.mo_ta}</p>}<h3>Tình trạng và bằng chứng</h3><p className="preserve-lines">{post.mo_ta_tinh_trang}</p><Gallery items={post.media}/>
     <dl className="post-info"><dt>Giá khởi điểm</dt><dd>{money(post.gia_khoi_diem)}</dd><dt>Giá hiện tại</dt><dd>{money(post.gia_hien_tai)}</dd><dt>Bước giá</dt><dd>{money(post.buoc_gia)}</dd>
-      {mode!=='catalog'&&<><dt>Giá kết thúc sớm (riêng tư)</dt><dd>{money(post.gia_toi_thieu)}</dd></>}<dt>Chờ đặt lại</dt><dd>{post.thoi_gian_cho_dat_lai} giây</dd><dt>Bắt đầu / kết thúc</dt><dd>{date(post.thoi_gian_bat_dau)} / {date(post.thoi_gian_ket_thuc)}</dd></dl>
+    {mode!=='catalog'&&<><dt>Giá kết thúc sớm (riêng tư)</dt><dd>{money(post.gia_toi_thieu)}</dd></>}<dt>Chờ đặt lại</dt><dd>{post.thoi_gian_cho_dat_lai} giây</dd><dt>Bắt đầu / kết thúc</dt><dd>{date(post.thoi_gian_bat_dau)} / {date(post.thoi_gian_ket_thuc)}</dd></dl>
     {['da_kich_hoat','da_ket_thuc'].includes(post.trang_thai_phien)&&<AuctionPanel key={`${post.phien_dau_gia_id}-${user?.nguoi_dung_id||'guest'}`} auctionId={post.phien_dau_gia_id} user={user} onSnapshot={onAuctionChange}/>}
+    {['da_kich_hoat','da_ket_thuc'].includes(post.trang_thai_phien)&&<CommentsPanel auctionId={post.phien_dau_gia_id} user={user}/>}
     {mode!=='catalog'&&<><h3>Kiểm duyệt và căn cứ</h3>
       <AiPanel post={post} user={user}/>
       {!post.kiem_duyet?.length&&<p>Chưa có quyết định kiểm duyệt.</p>}{post.kiem_duyet?.map(item=><blockquote key={item.kiem_duyet_id}><strong>{item.ket_qua}</strong> · {date(item.ngay_kiem_duyet)}<p className="preserve-lines">{item.phan_hoi_admin}</p></blockquote>)}

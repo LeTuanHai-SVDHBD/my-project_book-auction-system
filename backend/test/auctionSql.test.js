@@ -42,12 +42,17 @@ test('SQL/Redis thật: migration, tranh chấp, quyết định bền vững, k
           INSERT @p SELECT bai_dang_id FROM dbo.BaiDang WHERE nguoi_dung_id IN (${ids});
           INSERT @a SELECT phien_dau_gia_id FROM dbo.PhienDauGia WHERE bai_dang_id IN(SELECT id FROM @p);
           INSERT @b SELECT sach_id FROM dbo.BaiDang WHERE bai_dang_id IN(SELECT id FROM @p);
-          DELETE dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a));
+          DELETE dbo.BangChungKhieuNai WHERE khieu_nai_id IN(SELECT khieu_nai_id FROM dbo.KhieuNai WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a))));
+      DELETE dbo.KhieuNai WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a)));
+      DELETE dbo.TinNhan WHERE cuoc_tro_chuyen_id IN(SELECT cuoc_tro_chuyen_id FROM dbo.CuocTroChuyen WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a))));
+      DELETE dbo.CuocTroChuyen WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a)));
+      DELETE dbo.DanhGia WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a)));
+      DELETE dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a));
           DELETE dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
           DELETE dbo.YeuCauDatGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
           DELETE dbo.LuotDatGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
           DELETE dbo.LichSuDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
-          DELETE dbo.PhienDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
+          DELETE dbo.BinhLuan WHERE phien_dau_gia_id IN(SELECT id FROM @a);DELETE dbo.PhienDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
           DELETE dbo.BaiDang WHERE bai_dang_id IN(SELECT id FROM @p);DELETE dbo.Sach WHERE sach_id IN(SELECT id FROM @b);
           DELETE dbo.NguoiDung WHERE nguoi_dung_id IN (${ids});COMMIT TRANSACTION;`);
       }

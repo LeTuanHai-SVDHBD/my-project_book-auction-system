@@ -7,7 +7,8 @@
 Đã triển khai API, Redis admission/Streams, processor có khóa phiên, transaction SQL,
 job hết hạn và giao diện gửi giá/theo dõi quyết định qua HTTP.
 Schema sau migration 003 có 20 bảng/152 cột. Không thay dependency hoặc cơ chế xác thực theo tab.
-Socket.IO nghiệp vụ đã có theo [hợp đồng thời gian thực](realtime.md); AI đã có theo [hợp đồng phân tích](ai-analysis.md); xác nhận hoàn tất giao dịch chưa triển khai.
+Socket.IO nghiệp vụ đã có theo [hợp đồng thời gian thực](realtime.md); AI đã có theo [hợp đồng phân tích](ai-analysis.md).
+Giao dịch, chat và xác nhận hoàn tất hai bên theo [hợp đồng sau đấu giá](after-sales.md).
 
 ## Hợp đồng HTTP
 

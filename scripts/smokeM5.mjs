@@ -15,8 +15,9 @@ import {ensureAuctionGroup,processAuctionMessage} from '../backend/src/events/au
 import {AUCTION} from '../backend/src/constants/auction.js';
 import {pathToFileURL} from 'node:url';
 import {io} from 'socket.io-client';
+import {runAfterSalesChecks} from './smokeAfterSales.mjs';
 
-export async function runAuctionSmoke({realtime=false}={}) {
+export async function runAuctionSmoke({realtime=false,afterSales=false}={}) {
 const base=`http://${config.host}:${config.port}/api`,runId=randomUUID(),secret=randomBytes(24).toString('base64url');
 const accounts=[],auctions=[],requests=new Set(),recoveryPrefix=`bookauction:smoke:auction:${runId}:`;
 const sockets=[],socketErrors=[];
@@ -154,6 +155,7 @@ try {
   await processAuctionMessage({client:redis,message:claimed.messages[0],handle,settings});
   assert.equal((await redis.xPending(settings.stream,settings.group)).pending,0);assert.equal((await counts(recovery)).bids,1);
   assert.equal(check(await a.call(`/auctions/${recovery}/requests/${recoveryId}`),200).trang_thai,'da_chap_nhan');
+  if(afterSales)await runAfterSalesChecks({createAuction,submit,moneyInput,seller,buyer:a,other:b,admin,check,progress,pool,sql});
   assert.deepEqual(socketErrors,[]);passed=true;
 } catch(error) {
   console.error(`FAIL đấu giá tại ${stage}; run=${runId}.`,error.name==='AssertionError'?error.message:'Kiểm tra terminal API/worker, migration SQL và kết nối Redis.');process.exitCode=1;
@@ -169,10 +171,15 @@ try {
       INSERT @p SELECT bai_dang_id FROM dbo.BaiDang WITH (UPDLOCK,HOLDLOCK) WHERE nguoi_dung_id IN (${ids});
       INSERT @a SELECT phien_dau_gia_id FROM dbo.PhienDauGia WHERE bai_dang_id IN(SELECT id FROM @p);
       INSERT @b SELECT sach_id FROM dbo.BaiDang WHERE bai_dang_id IN(SELECT id FROM @p);
+      DELETE dbo.BangChungKhieuNai WHERE khieu_nai_id IN(SELECT khieu_nai_id FROM dbo.KhieuNai WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a))));
+      DELETE dbo.KhieuNai WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a)));
+      DELETE dbo.TinNhan WHERE cuoc_tro_chuyen_id IN(SELECT cuoc_tro_chuyen_id FROM dbo.CuocTroChuyen WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a))));
+      DELETE dbo.CuocTroChuyen WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a)));
+      DELETE dbo.DanhGia WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a)));
       DELETE dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a));
       DELETE dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);DELETE dbo.YeuCauDatGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
       DELETE dbo.LuotDatGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);DELETE dbo.LichSuDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
-      DELETE dbo.KiemDuyet WHERE bai_dang_id IN(SELECT id FROM @p);DELETE dbo.PhienDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
+      DELETE dbo.KiemDuyet WHERE bai_dang_id IN(SELECT id FROM @p);DELETE dbo.BinhLuan WHERE phien_dau_gia_id IN(SELECT id FROM @a);DELETE dbo.PhienDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
       DELETE dbo.ChiTietPhanTichAI WHERE phan_tich_id IN(SELECT phan_tich_id FROM dbo.PhanTichAI WHERE bai_dang_id IN(SELECT id FROM @p));
       DELETE dbo.PhanTichAI WHERE bai_dang_id IN(SELECT id FROM @p);
       DELETE dbo.BaiDang WHERE bai_dang_id IN(SELECT id FROM @p);DELETE dbo.Sach WHERE sach_id IN(SELECT id FROM @b);

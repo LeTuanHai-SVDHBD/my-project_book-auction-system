@@ -5,6 +5,38 @@
 Cập nhật ngày 24/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
+## Giao dịch và tương tác sau đấu giá
+
+Kiểm tra ngày 24/10/2026 trên mã giữ Gemini; không áp dụng thay đổi Groq đã hủy:
+
+- `check`: **116 tệp PASS**; build Frontend PASS, 67 modules.
+- Mặc định `npm test`: **113 PASS, 10 SKIP**, không có lỗi.
+- Bật Redis 7.0.15 thật: **120 PASS, 3 SKIP** dành cho SQL; không xóa database hoặc FLUSH Redis.
+- `test:community`: **12 PASS, 1 SKIP SQL**. Policy/HTTP/session/CSRF và service media chạy thật;
+  SQL ở HTTP dùng fixture giả, không chứng minh transaction/khóa SQL Server đã đạt.
+- Trình duyệt Chromium bốn tab người mua/người bán/người ngoài/Admin, React/Express/session Redis/vé media thật:
+  chat riêng, cờ đọc phía người nhận, chuỗi tiền 18 chữ số, xác nhận từng bên rồi đánh giá 5 sao,
+  công khai uy tín; người ngoài không thấy giao dịch; HTML trong tin nhắn hiển thị text, không thực thi.
+- Khiếu nại upload ảnh qua API/vé Redis, claim/bind và phản hồi tự cập nhật; SQL/provider Cloudinary giả.
+  Admin chưa tiếp nhận bị chặn chat, đang xử lý được đọc, xử lý xong mất quyền chat; người dùng không thấy nút Admin.
+- Bình luận đang diễn ra được ghi, sau kết thúc khóa ô nhập và giữ lịch sử. Desktop và mobile 390 px
+  không tràn ngang, không page error hoặc cảnh báo key React trong luồng đã chạy; đã xem ảnh giao diện.
+- Đã thêm `COMMUNITY_TEST_SQL=true` trên database riêng `BookAuctionTest_*` để kiểm tra model SQL thật:
+  phòng tạo cùng kết quả, xác nhận/đánh giá đồng thời, rollback bằng chứng, tranh tiếp nhận và biên bình luận.
+  **Chưa chạy bài SQL này** vì môi trường hiện tại không có SQL Server.
+- Đã thêm `smoke:m8` gồm smoke:m5 và luồng sau phiên; **chưa chạy với dịch vụ thật**.
+  Smoke không kiểm tra Cloudinary/bằng chứng ảnh thật; cần nghiệm thu riêng theo [hướng dẫn](docs/after-sales.md).
+
+Không thêm dependency/migration, giữ 20 bảng/152 cột và cơ chế xác thực. Không có thanh toán/vận chuyển tự động,
+đính kèm ảnh vào chat hoặc receipt cho mọi POST. API hạn chế hồ sơ; URL delivery Cloudinary hiện tại chưa được bảo vệ riêng tại CDN.
+
+## Xác nhận tích hợp AI từ máy nhóm
+
+Hải xác nhận `smoke:ai` **PASS** sau chẩn đoán Gemini. Đây là kết quả do người dùng cung cấp,
+phân biệt với các lượt chạy trong môi trường chuẩn bị bên dưới. Kiểm tra sách có ảnh/video thật,
+đối chiếu bằng chứng và hai điểm được Hải chủ động để lại sau khi tìm được dữ liệu.
+Không coi lượt mẫu thiếu ảnh, hai điểm NULL là chứng minh chất lượng thẩm định media.
+
 ## Chẩn đoán lỗi Gemini
 
 Kiểm tra ngày 24/10/2026, giữ nguyên Gemini và không áp dụng thay đổi Groq đã hủy:
@@ -211,5 +243,6 @@ Chạy lại smoke:m4 để nghiệm thu media/đăng lại với Cloudinary th�
 Đối chiếu hai tab, nhập tiền, đặt giá và xem kết quả qua giao diện.
 
 Chưa có thực nghiệm tải lớn hoặc production HTTPS. Realtime đã triển khai, chờ smoke SQL thật cho bản mới;
-AI đã triển khai, chờ Gemini/SQL thật; xác nhận hoàn tất giao dịch chưa triển khai. Claim media chưa rõ COMMIT vẫn cần đối soát thủ công;
+AI đã triển khai, Hải xác nhận smoke:ai PASS; đối chiếu media thật còn chờ dữ liệu. Xác nhận hai bên đã triển khai,
+chờ nghiệm thu SQL thật theo mục giao dịch ở đầu tài liệu. Claim media chưa rõ COMMIT vẫn cần đối soát thủ công;
 dead-letter đấu giá cũng cần đối soát riêng.

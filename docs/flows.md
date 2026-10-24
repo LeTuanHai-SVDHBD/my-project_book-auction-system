@@ -144,11 +144,14 @@ Tác vụ hết hạn và worker đặt giá dùng cùng cơ chế bảo vệ ph
 Trong một transaction, chuyển phiên kết thúc, tạo một KetQuaDauGia và tạo GiaoDich chỉ nếu có người thắng.
 Hết hạn có lượt hợp lệ thì lượt cao nhất thắng dù chưa đạt ngưỡng. Không có kết thúc thủ công hoặc hủy giữa phiên.
 
-## Thiết kế sau phiên — chưa triển khai
+## Giao dịch và tương tác sau phiên
 
 Giao dịch đã được tạo từ kết quả có người thắng, xác định người mua/bán và số tiền.
-Các chức năng mở trao đổi gắn giao dịch, xác nhận hoàn tất và phản hồi chưa triển khai.
-Hoàn tất cần đủ xác nhận hai bên; đánh giá uy tín theo quyền và điều kiện hoàn tất.
-Khiếu nại kiểm tra quan hệ người gửi–giao dịch–cuộc trò chuyện, lưu bằng chứng và xử lý theo quyền Admin.
+Phòng trò chuyện được tạo cùng giao dịch; dữ liệu cũ thiếu phòng được tạo bổ sung sau khi kiểm tra quyền.
+Hai bên trao đổi văn bản, người nhận đánh dấu đã đọc. Hoàn tất cần đủ xác nhận độc lập bằng giờ SQL;
+chỉ người mua được đánh giá người bán một lần sau hoàn tất. Uy tín/nhận xét được đọc công khai ở chi tiết phiên.
+Khiếu nại kiểm tra quan hệ người gửi–giao dịch–cuộc trò chuyện, lưu bằng chứng ảnh và phân công một Admin.
+Chỉ Admin được phân công, hồ sơ đang xử lý, mới đọc chat liên quan; không gửi tin hoặc đánh dấu đọc thay hai bên.
 Không tự thay đổi người thắng hoặc trạng thái giao dịch chỉ vì có khiếu nại.
-Các chức năng này phải được đối chiếu thiết kế đã thống nhất trước khi triển khai.
+Bình luận chỉ nhận khi phiên đã công bố và đang trong [bắt đầu, kết thúc) theo giờ SQL; sau đó giữ lịch sử đọc.
+Hợp đồng `/api/community`, quyền, phân trang, retry và nghiệm thu tại [after-sales.md](after-sales.md).

@@ -109,11 +109,16 @@ finally {
           DELETE dbo.KiemDuyet WHERE bai_dang_id IN(SELECT id FROM @posts);
           DELETE dbo.HinhAnh WHERE bai_dang_id IN(SELECT id FROM @posts); DELETE dbo.Video WHERE bai_dang_id IN(SELECT id FROM @posts);
           DELETE dbo.LichSuDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
-          DELETE dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions));
+          DELETE dbo.BangChungKhieuNai WHERE khieu_nai_id IN(SELECT khieu_nai_id FROM dbo.KhieuNai WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions))));
+      DELETE dbo.KhieuNai WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions)));
+      DELETE dbo.TinNhan WHERE cuoc_tro_chuyen_id IN(SELECT cuoc_tro_chuyen_id FROM dbo.CuocTroChuyen WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions))));
+      DELETE dbo.CuocTroChuyen WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions)));
+      DELETE dbo.DanhGia WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions)));
+      DELETE dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions));
           DELETE dbo.YeuCauDatGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
           DELETE dbo.LuotDatGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
           DELETE dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
-          DELETE dbo.PhienDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
+          DELETE dbo.BinhLuan WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);DELETE dbo.PhienDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
           DELETE dbo.BaiDang WHERE bai_dang_id IN(SELECT id FROM @posts);
           DELETE dbo.Sach WHERE sach_id IN(SELECT id FROM @books) AND NOT EXISTS(SELECT 1 FROM dbo.BaiDang b WHERE b.sach_id=dbo.Sach.sach_id);
           DELETE dbo.NguoiDung WHERE nguoi_dung_id IN(${params});`);

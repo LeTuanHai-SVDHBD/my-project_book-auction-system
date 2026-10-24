@@ -12,7 +12,7 @@ SQL Server giữ trạng thái nghiệp vụ có thẩm quyền; Redis hỗ tr�
 
 | Thành phần | Trách nhiệm | Kết nối |
 |---|---|---|
-| React | Tài khoản, bài đăng, đặt giá, lịch sử, đồng hồ và kết quả | HTTP/JSON, upload và tín hiệu Socket.IO |
+| React | Tài khoản, bài đăng, đấu giá, giao dịch, chat, phản hồi và khiếu nại | HTTP/JSON, upload và tín hiệu Socket.IO |
 | Express API | Xác thực, phân quyền, đầu vào, nghiệp vụ HTTP và Socket.IO | SQL Server, Redis, Cloudinary |
 | SQL Server | Tài khoản, sách, bài, phiên, quyết định giá, kết quả, giao dịch và lịch sử | Thư viện `mssql`, truy vấn tham số hóa |
 | Redis | Session, vé media, admission đặt giá, khóa phiên, giới hạn thử, probe và heartbeat | Redis client; Lua khi cần thao tác nguyên tử |
@@ -41,7 +41,7 @@ Probe không ghi lượt giá, kết quả đấu giá hoặc giao dịch.
 Luồng đấu giá: `HTTP → Redis Streams → Consumer → Redis lock → SQL transaction → ACK`.
 Job hết hạn đọc đồng hồ SQL và xếp sự kiện chốt vào cùng stream nghiệp vụ.
 YeuCauDatGia lưu quyết định cuối; LuotDatGia chỉ lưu lượt hợp lệ.
-Cùng transaction ghi quyết định, lượt/giá/lịch sử, kết quả và giao dịch nếu phiên kết thúc.
+Cùng transaction ghi quyết định, lượt/giá/lịch sử, kết quả, giao dịch và phòng chat nếu có người thắng khi phiên kết thúc.
 SQL có 20 bảng/152 cột sau migration 003; DDL nền được giữ để nâng cấp tại chỗ.
 
 ## Xác thực theo tab
@@ -90,7 +90,12 @@ Tác vụ đối soát tìm bài pending chưa có lần phân tích của phiê
 Không gọi Gemini trong SQL transaction; không sửa trạng thái bài/phiên khi lưu AI.
 Chi tiết quy tắc, phục hồi và giới hạn tại [ai-analysis.md](ai-analysis.md).
 
-## Phạm vi phát triển tiếp theo
+## Giao dịch và tương tác sau phiên
 
-Xác nhận hoàn tất giao dịch, trò chuyện, bình luận, đánh giá và khiếu nại
-được theo dõi theo chức năng trong [tasks.md](tasks.md). Thiết kế tương lai được phân biệt với mã đã có tại [flows.md](flows.md).
+HTTP riêng kiểm tra chuỗi kết quả/người thắng/chủ bài trước khi cho hai bên đọc hoặc ghi giao dịch/chat.
+Các thao tác ghi khóa GiaoDich trong SERIALIZABLE; đủ hai xác nhận mới hoàn tất, UNIQUE giới hạn một phòng và một đánh giá.
+Khiếu nại kiểm tra cả giao dịch, người gửi và phòng; Admin được phân công chỉ đọc chat khi hồ sơ đang xử lý.
+Bình luận khóa dòng phiên rồi kiểm tra cửa sổ thời gian bằng SQL. Không phát chat/hồ sơ vào Socket công khai.
+Trang mới nhất tự đọc HTTP mỗi ba giây, lịch sử dùng cursor; không có receipt cho mọi POST hoặc cam kết giao đúng một lần.
+Bằng chứng ảnh dùng vé media hiện có; API hạn chế truy cập hồ sơ nhưng delivery Cloudinary chưa phải CDN riêng tư.
+Chi tiết tại [after-sales.md](after-sales.md); phần chờ nghiệm thu/thực nghiệm tại [tasks.md](tasks.md).

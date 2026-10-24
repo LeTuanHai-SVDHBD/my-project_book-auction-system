@@ -64,7 +64,7 @@ export function createPostModel({ getPool, sql }) {
   return {
     findRequest,
     async isMediaReferenced(publicId) {
-      const result=await request(await getPool()).input('publicId',sql.VarChar(255),publicId).query('SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.HinhAnh WHERE cloudinary_public_id=@publicId) OR EXISTS(SELECT 1 FROM dbo.Video WHERE cloudinary_public_id=@publicId) THEN 1 ELSE 0 END AS used');
+      const result=await request(await getPool()).input('publicId',sql.VarChar(255),publicId).query('SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.HinhAnh WHERE cloudinary_public_id=@publicId) OR EXISTS(SELECT 1 FROM dbo.Video WHERE cloudinary_public_id=@publicId) OR EXISTS(SELECT 1 FROM dbo.BangChungKhieuNai WHERE CHARINDEX(@publicId,duong_dan_anh_khieu_nai)>0) THEN 1 ELSE 0 END AS used');
       return result.recordset[0].used===1;
     },
     async list({owner=null,pending=false,publicOnly=false,after=2147483647}) {

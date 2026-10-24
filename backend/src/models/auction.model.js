@@ -96,8 +96,9 @@ export function createAuctionModel({getPool,sql}) {
     if(outcome.nguoi_thang_dau_id!==null) {
       await request(tx).input('code',sql.VarChar(40),'GD'+randomUUID().replaceAll('-','')).input('result',sql.Int,saved.recordset[0].ket_qua_id)
         .input('buyer',sql.Int,outcome.nguoi_thang_dau_id).input('seller',sql.Int,auction.nguoi_ban_id).input('amount',sql.VarChar(18),outcome.muc_gia_thang)
-        .query(`INSERT dbo.GiaoDich(ma_giao_dich,ket_qua_id,nguoi_mua_id,nguoi_ban_id,so_tien)
-          VALUES(@code,@result,@buyer,@seller,CAST(@amount AS DECIMAL(18,0)))`);
+        .query(`DECLARE @created TABLE(id INT);INSERT dbo.GiaoDich(ma_giao_dich,ket_qua_id,nguoi_mua_id,nguoi_ban_id,so_tien)
+          OUTPUT inserted.giao_dich_id INTO @created VALUES(@code,@result,@buyer,@seller,CAST(@amount AS DECIMAL(18,0)));
+          INSERT dbo.CuocTroChuyen(giao_dich_id,nguoi_mua_id,nguoi_ban_id) SELECT id,@buyer,@seller FROM @created`);
     }
     await history(tx,auction.phien_dau_gia_id,null,`Kết thúc phiên: ${reason}`,outcome.muc_gia_thang);
     return {...outcome,ket_qua_id:saved.recordset[0].ket_qua_id};

@@ -45,6 +45,22 @@
 | `docs/` | Tài liệu kỹ thuật theo chủ đề |
 | `academic/` | Hướng dẫn lưu báo cáo, slide, UML và bằng chứng được chọn |
 
+## Giao dịch và tương tác sau phiên
+
+| File/nhóm | Trách nhiệm |
+|---|---|
+| `backend/src/services/communityPolicy.js` | Quyền hai bên, liên kết kết quả, hai xác nhận, đánh giá, giờ bình luận và đầu vào chặt |
+| `backend/src/models/community.model.js` | SQL giao dịch/chat/đã đọc, đánh giá, bình luận, khiếu nại và phân công Admin |
+| `backend/src/services/community.service.js` | Claim ảnh, COMMIT/rollback và bind bằng chứng |
+| `backend/src/controllers/community.controller.js`, `routes/community.routes.js` | Hợp đồng /api/community, phân quyền, CSRF và cursor |
+| `frontend/src/components/TransactionsPanel.jsx` | Giao dịch riêng, trace, xác nhận và đánh giá |
+| `frontend/src/components/CommunityFeed.jsx`, `CommentsPanel.jsx` | Poll/cursor, chat text, bình luận và uy tín công khai |
+| `frontend/src/components/ComplaintForm.jsx`, `ComplaintsPanel.jsx` | Upload ảnh, hồ sơ của mình, tiếp nhận/phản hồi của Admin |
+| `frontend/src/services/communityApi.js` | Client dùng cookie/tab/CSRF chung |
+| `backend/test/community*.test.js`, `helpers/communityFixture.js` | Policy, HTTP/session, media service và SQL opt-in; fixture giả phân biệt rõ |
+| `scripts/smokeM8.mjs`, `smokeAfterSales.mjs` | Nghiệm thu dịch vụ thật, dùng fixture và cleanup của smokeM5 |
+| `docs/after-sales.md` | Quy tắc, API, quyền media/chat và nghiệm thu |
+
 Cài dependency từ gốc bằng `npm.cmd ci`. Không chỉnh thủ công node_modules, frontend/dist hoặc lockfile;
 lockfile được cập nhật bằng npm khi dependency thay đổi.
 

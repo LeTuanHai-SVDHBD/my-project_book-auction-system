@@ -217,7 +217,7 @@ Chi tiết: [Xử lý đấu giá](auction-processing.md).
 
 ## ADR-017 — AI quan sát, Backend tính điểm, Admin quyết định
 
-**Trạng thái:** áp dụng; chờ nghiệm thu SQL Server và Gemini thật.
+**Trạng thái:** áp dụng; Hải xác nhận smoke:ai PASS; đối chiếu ảnh/video thật còn chờ dữ liệu.
 
 Theo báo cáo tuần 7 và yêu cầu hiện tại, độ hiếm gồm bốn nhóm 25%; tình trạng gồm 20/25/30/15/10%.
 Giữ hai tổng độc lập; thiếu tiêu chí áp dụng giữ NULL, không áp dụng có căn cứ mới loại trọng số.
@@ -231,3 +231,23 @@ chống ghi trùng, cache kết quả đã kiểm tra hạn chế gọi lại Ge
 crash trước cache có thể tốn thêm lượt gọi. Không thêm bảng/cột hoặc dependency.
 Metadata có phiên bản quy tắc, hash đầu vào, model, nguồn và cảnh báo; lịch sử cũ được giữ.
 Xem [Phân tích AI](ai-analysis.md) để tra công thức, hợp đồng, cấu hình và giới hạn media.
+
+## ADR-018 — Giao dịch hai xác nhận và quyền chat theo hồ sơ
+
+**Trạng thái:** áp dụng; chờ SQL Server/Cloudinary thật và smoke:m8.
+
+Dùng các bảng sẵn có, không thêm schema/dependency. Kết quả có người thắng tạo GiaoDich và CuocTroChuyen
+cùng transaction; hai bên được suy từ kết quả/chủ bài, số tiền giữ nguyên chuỗi DECIMAL(18,0).
+Khóa giao dịch trong SERIALIZABLE khi xác nhận, tạo phòng, gửi tin, đánh giá hoặc xử lý khiếu nại.
+Mỗi bên chỉ ghi dấu xác nhận của mình; đủ hai dấu mới hoàn tất. UNIQUE giữ một phòng/một đánh giá.
+Chỉ người mua hoàn tất được đánh giá; cùng nội dung trả bản cũ, không cho ghi đè lịch sử.
+
+Chat riêng chỉ có hai bên. Admin xem hồ sơ/bằng chứng để tiếp nhận; chỉ người được phân công và đang xử lý
+mới đọc chat liên quan, không gửi tin hoặc đánh dấu đọc. Sau xử lý không tiếp tục quyền đọc chat qua hồ sơ.
+Khiếu nại không tự đổi giao dịch/kết quả. Ảnh dùng vé upload của người gửi; bind lỗi sau COMMIT không đảo kết quả.
+URL delivery Cloudinary hiện tại chưa có bảo vệ riêng tại CDN; quyền API không đồng nghĩa ảnh chỉ truy cập bằng session.
+
+Không mở room Socket riêng; trang mới nhất poll HTTP ba giây, lịch sử cursor không tự thay trang.
+POST tin/bình luận/hồ sơ không có receipt UUID, không tự retry khi mất phản hồi; đọc lại trước khi gửi.
+Chỉ retry deadlock 1205 đã rollback tối đa một lần. Bình luận khóa phiên và kiểm tra giờ SQL trước INSERT.
+Xem [Giao dịch và tương tác sau đấu giá](after-sales.md).

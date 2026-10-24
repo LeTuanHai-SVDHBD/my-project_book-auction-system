@@ -17,9 +17,11 @@ Hệ thống hướng tới xử lý tranh chấp đặt giá đồng thời và
 - Tự kết thúc khi hết giờ hoặc đạt ngưỡng; một kết quả mỗi phiên, tạo giao dịch khi có người thắng.
 - Cập nhật trực tiếp giá, trạng thái, lịch sử và kết quả giữa các trình duyệt; tự lấy lại dữ liệu khi nối mạng.
 - Phân tích sách bằng Gemini, kiểm tra bằng chứng và tính độc lập điểm độ hiếm/tình trạng; lưu lịch sử để Admin đối chiếu.
+- Giao dịch gắn kết quả, chat riêng, xác nhận hai bên, đánh giá người bán và bình luận theo thời gian phiên.
+- Khiếu nại kèm ảnh, phân công Admin và chỉ cho Admin đang xử lý đọc chat liên quan.
 - Kiểm tra hạ tầng, heartbeat của worker và probe qua Redis Streams.
 
-AI hỗ trợ kiểm duyệt; Admin tiếp tục quyết định. Các chức năng sau phiên đang chờ triển khai.
+AI hỗ trợ kiểm duyệt; Admin tiếp tục quyết định. Giao dịch chỉ hoàn tất sau xác nhận của cả người mua và người bán.
 Socket.IO báo phiên có thay đổi sau SQL COMMIT; giao diện lấy snapshot Backend để đồng bộ.
 Quyết định đặt giá riêng của từng tài khoản tiếp tục được kiểm tra qua HTTP có xác thực.
 
@@ -214,9 +216,23 @@ Giờ được lưu theo UTC và kiểm tra bằng đồng hồ SQL Server.
 Hết giờ có lượt hợp lệ thì người có giá cao nhất thắng dù chưa đạt ngưỡng. Không có lượt hợp lệ thì
 không có người thắng và không tạo giao dịch. Chủ sách chỉ xem thông tin phiên/kết quả, không có ô nhập hoặc nút đặt giá;
 Admin chỉ xem. Backend vẫn chặn chủ sách tự gửi giá và kiểm tra lại cooldown trước khi ghi nhận.
-Giao dịch được tạo ở trạng thái chờ xác nhận; trao đổi/xác nhận hoàn tất chưa được triển khai.
+Giao dịch được tạo ở trạng thái chờ xác nhận cùng phòng trò chuyện riêng giữa người thắng và chủ sách.
 Chi tiết xử lý và phục hồi tại [Xử lý đấu giá](docs/auction-processing.md).
 Hợp đồng Socket, lịch sử phân trang và bù thông báo bị mất tại [Cập nhật thời gian thực](docs/realtime.md).
+
+### Giao dịch, phản hồi và khiếu nại
+
+1. Người mua/người bán mở **Giao dịch**, chọn giao dịch để xem liên kết sách → bài → phiên → kết quả.
+2. Trao đổi bằng văn bản trong chat riêng; mỗi bên chỉ xác nhận phần hoàn tất của mình.
+3. Khi đủ hai xác nhận, giao dịch hoàn tất; người mua được đánh giá người bán một lần, từ 1 đến 5 sao.
+4. Hai bên có thể gửi khiếu nại kèm tối đa 5 ảnh; theo dõi trạng thái và phản hồi tại **Khiếu nại của tôi**.
+5. Admin mở **Khiếu nại**, tiếp nhận hồ sơ rồi đối chiếu chat chỉ đọc và lưu phản hồi xử lý.
+6. Chi tiết phiên hiển thị uy tín người bán và bình luận công khai. Chỉ gửi bình luận khi phiên đang diễn ra.
+
+Chat và hồ sơ mới nhất tự tải lại qua HTTP mỗi ba giây. Admin chỉ được đọc chat liên quan khi hồ sơ đang xử lý
+và được giao cho mình. Khiếu nại không tự đổi kết quả đấu giá hoặc xác nhận giao dịch.
+Không có cổng thanh toán/vận chuyển tự động. Quyền, giới hạn bằng chứng và nghiệm thu tại
+[Giao dịch và tương tác sau đấu giá](docs/after-sales.md).
 
 ### Đăng lại và quản lý media
 
@@ -247,6 +263,8 @@ npm.cmd run smoke:auth
 npm.cmd run smoke:m4
 npm.cmd run smoke:m5
 npm.cmd run smoke:m6
+npm.cmd run test:community
+npm.cmd run smoke:m8
 ```
 
 | Lệnh | Phạm vi |
@@ -263,6 +281,8 @@ npm.cmd run smoke:m6
 | `smoke:m4` | Cloudinary, tạo/duyệt/kích hoạt bài, rollback SQL, retry và điều kiện đăng lại |
 | `smoke:m5` | API/worker thật, tranh giá, replay, hai kiểu kết thúc, kết quả/giao dịch và phục hồi sau COMMIT trước ACK; không cần Cloudinary |
 | `smoke:m6` | Các kiểm tra đấu giá cùng Socket.IO: tín hiệu kích hoạt, hai kết nối, lịch sử/kết quả giống SQL và lấy lại snapshot sau nối lại |
+| `test:community` | Quyền giao dịch/chat, hai xác nhận, đánh giá, khiếu nại/media, bình luận; SQL thật bật bằng opt-in |
+| `smoke:m8` | Gồm smoke:m5 và luồng sau phiên: chat/đã đọc, hai xác nhận, đánh giá, khiếu nại/Admin, bình luận; không gọi Cloudinary |
 
 Smoke tạo dữ liệu UUID riêng, dọn đúng dữ liệu thử và trả FAIL nếu không dọn hoàn tất.
 Kiểm thử đăng lại dùng fixture chỉ thay đổi phiên của tài khoản smoke trong development.
@@ -294,6 +314,8 @@ Remove-Item Env:DB_DATABASE
 Lệnh này có thể tạo database kiểm thử nếu chưa có, nâng schema và chỉ dọn fixture UUID của lần chạy.
 Không đặt tên database làm việc của nhóm vào biến kiểm thử. Với database đang dùng, chạy `smoke:m5`
 sau migration và khi API/worker đã khởi động; script tự tạo/dọn tài khoản và phiên thử riêng.
+Để chạy bài SQL sau phiên, dùng `COMMUNITY_TEST_SQL=true` với `test:community` và database kiểm thử riêng;
+xem [hướng dẫn](docs/after-sales.md). Bản giao dịch mới không thêm dependency hoặc migration.
 
 ## Xử lý sự cố
 
@@ -320,6 +342,7 @@ và kiểm tra lại cookie Secure. Không commit thông tin kết nối hoặc 
 - [Xử lý đặt giá và phục hồi](docs/auction-processing.md)
 - [Cập nhật thời gian thực và nối lại](docs/realtime.md)
 - [Phân tích AI và bộ chấm điểm](docs/ai-analysis.md)
+- [Giao dịch và tương tác sau đấu giá](docs/after-sales.md)
 - [Quyết định kỹ thuật](docs/decisions.md)
 - [Bản đồ mã nguồn](docs/file-map.md)
 - [Trạng thái chức năng và công việc](docs/tasks.md)

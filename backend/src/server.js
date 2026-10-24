@@ -33,6 +33,9 @@ import {createAuctionService} from './services/auction.service.js';
 import {createAuctionRouter} from './routes/auction.routes.js';
 import {createAuctionNotifier,subscribeAuctionUpdates} from './events/auctionUpdates.js';
 import {attachAuctionSockets} from './realtime/auctionSockets.js';
+import {createCommunityModel} from './models/community.model.js';
+import {createCommunityService} from './services/community.service.js';
+import {createCommunityRouter} from './routes/community.routes.js';
 import {parseAiConfig} from './config/ai.js';
 import {createAiModel} from './models/ai.model.js';
 import {createAiQueue} from './ai/queue.js';
@@ -47,6 +50,8 @@ const aiService=createAiService({posts:model,model:createAiModel({getPool,sql}),
 const aiRouter=createAiRouter({sessionMiddleware,users,service:aiService});
 const provider = createCloudinary({config:mediaConfig});
 const ledger = createMediaLedger({getRedis:requireRedis,provider,isReferenced:id=>model.isMediaReferenced(id),config:mediaConfig});
+const communityModel=createCommunityModel({getPool,sql});
+const communityRouter=createCommunityRouter({sessionMiddleware,users,model:communityModel,service:createCommunityService({model:communityModel,ledger,log:logError})});
 const service = createPostService({model,ledger,limits:mediaConfig,notify:createAuctionNotifier({getRedis:requireRedis}),enqueueAi:aiService.enqueue,log:logError});
 const postRouter = createPostRouter({sessionMiddleware,users,model,service,limits:mediaConfig});
 const mediaRouter = createMediaRouter({sessionMiddleware,users,config:mediaConfig,provider,ledger});
@@ -56,7 +61,7 @@ const auctionRouter=createAuctionRouter({sessionMiddleware,users,model:auctionMo
 const authRouter = createAuthRouter({ authConfig, sessionMiddleware, users, passwords,
   limiter: createAuthRateLimiter({ getRedis: requireRedis, secret: authConfig.secret }),
   ready: () => redis.isReady });
-const app = createApp({ config, authRouter, postRouter, mediaRouter, auctionRouter, aiRouter, deps: { sqlserver: databaseStatus, redis: redisStatus, worker: workerStatus },
+const app = createApp({ config, authRouter, postRouter, mediaRouter, auctionRouter, aiRouter, communityRouter, deps: { sqlserver: databaseStatus, redis: redisStatus, worker: workerStatus },
   probes: { enqueue: () => enqueueProbe(requireRedis()), get: async id => {
     const raw = await requireRedis().get(INFRA.resultPrefix + id); return raw ? JSON.parse(raw) : null;
   } }, log: logError });

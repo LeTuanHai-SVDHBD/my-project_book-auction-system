@@ -321,6 +321,7 @@ xem [hướng dẫn](docs/after-sales.md). Bản giao dịch mới không thêm 
 
 | Hiện tượng | Kiểm tra |
 |---|---|
+| smoke:m5/m6/m8 dừng tại readiness | Giữ dev:all ở terminal khác; xem từng thành phần tại /api/health/ready và docker compose ps; [hướng dẫn chẩn đoán](docs/after-sales.md#dừng-tại-readiness) |
 | SQL readiness chưa đạt 20 bảng/152 cột | Kiểm tra đúng database, kết nối và chạy `npm.cmd run db:migrate` |
 | Không upload được | Kiểm tra ba biến Cloudinary, giới hạn tệp và khởi động lại API |
 | Lỗi CSRF hoặc phiên hết hạn | F5 tab hiện tại và đăng nhập lại nếu cần |

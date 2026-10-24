@@ -16,6 +16,7 @@ import {AUCTION} from '../backend/src/constants/auction.js';
 import {pathToFileURL} from 'node:url';
 import {io} from 'socket.io-client';
 import {runAfterSalesChecks} from './smokeAfterSales.mjs';
+import {checkSmokeReadiness,smokeConnectionCode} from './smokeReadiness.mjs';
 
 export async function runAuctionSmoke({realtime=false,afterSales=false}={}) {
 const base=`http://${config.host}:${config.port}/api`,runId=randomUUID(),secret=randomBytes(24).toString('base64url');
@@ -64,8 +65,9 @@ async function counts(id) {
 try {
   assert.equal(config.mode,'development','Chỉ chạy smoke trong development.');
   const seller=new Client(),a=new Client(),b=new Client(),admin=new Client();
-  const health=check(await seller.call('/health/ready'),200);assert.equal(health.ok,true);
-  pool=await getPool();redis=createClient({url:config.redisUrl,disableOfflineQueue:true,socket:{connectTimeout:3000,reconnectStrategy:false}});redis.on('error',()=>{});await redis.connect();
+  await checkSmokeReadiness({base});
+  stage='kết nối SQL của script';pool=await getPool();
+  stage='kết nối Redis của script';redis=createClient({url:config.redisUrl,disableOfflineQueue:true,socket:{connectTimeout:3000,reconnectStrategy:false}});redis.on('error',()=>{});await redis.connect();
   const users=createUserModel({getPool,sql}),hash=await passwords.hash(secret);
   progress('tạo tài khoản và phiên thử riêng');
   for(const [label,role,client] of [['seller','nguoi_dung',seller],['buyer-a','nguoi_dung',a],['buyer-b','nguoi_dung',b],['admin','admin',admin]]) {
@@ -158,7 +160,7 @@ try {
   if(afterSales)await runAfterSalesChecks({createAuction,submit,moneyInput,seller,buyer:a,other:b,admin,check,progress,pool,sql});
   assert.deepEqual(socketErrors,[]);passed=true;
 } catch(error) {
-  console.error(`FAIL đấu giá tại ${stage}; run=${runId}.`,error.name==='AssertionError'?error.message:'Kiểm tra terminal API/worker, migration SQL và kết nối Redis.');process.exitCode=1;
+  console.error(`FAIL đấu giá tại ${stage}; run=${runId}.`,error.smokeDiagnostic===true||error.name==='AssertionError'?error.message:`${smokeConnectionCode(error)}. Kiểm tra terminal API/worker, cấu hình SQL/Redis của script và log dịch vụ.`);process.exitCode=1;
 } finally {
   sockets.forEach(socket=>socket.disconnect());
   if(accounts.length)try {

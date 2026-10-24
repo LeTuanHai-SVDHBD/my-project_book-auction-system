@@ -155,6 +155,26 @@ quyền chat, cờ đọc, hai xác nhận, đánh giá/replay, khiếu nại/ph
 SQL kiểm tra phòng/đánh giá chỉ có một dòng. Dọn đúng dữ liệu thử theo thứ tự FK; FAIL khi chưa dọn xong.
 Không dùng Cloudinary trong smoke này, ảnh bằng chứng thật cần nghiệm thu riêng trên giao diện.
 
+### Dừng tại readiness
+
+Smoke không tự khởi động API, worker hoặc Docker. Giữ `npm.cmd run dev:all` ở terminal thứ nhất,
+chờ log API/worker sẵn sàng rồi chạy smoke ở terminal thứ hai. Kiểm tra mà không tạo dữ liệu thử:
+
+```powershell
+docker compose ps
+Invoke-RestMethod http://127.0.0.1:5000/api/health/ready | ConvertTo-Json -Depth 6
+```
+
+Địa chỉ trên dùng cấu hình mặc định; nếu đổi API_HOST/API_PORT thì thay cho khớp.
+Không kết nối được HTTP thường do API chưa chạy, sai cổng hoặc tiến trình đã dừng; xem log [API].
+HTTP 503 trả từng thành phần: sqlserver/redis/worker. WORKER_NOT_RUNNING là chưa có heartbeat;
+schema thiếu bảng/cột cần kiểm tra đúng database và migration. DEPENDENCY_UNAVAILABLE là kiểm tra dịch vụ bị lỗi,
+cần xem log API và trạng thái container, không suy ra ngay là phải chạy lại migration.
+
+Script phân biệt readiness HTTP, kết nối SQL trực tiếp của script và kết nối Redis trực tiếp của script.
+API healthy chưa chứng minh cấu hình/kết nối ở terminal smoke giống tiến trình API đang chạy; khởi động lại dev:all
+sau khi cập nhật cấu hình. Chẩn đoán chỉ in mã kết nối cho phép, số bảng/cột và trạng thái; không in mật khẩu/URL Redis/body lỗi.
+
 Nếu Gemini đang bật, các bài fixture tạo qua API cũng có thể được phân tích tự động, dùng quota thật.
 Để chỉ nghiệm thu giao dịch, có thể tạm đặt AI_ENABLED=false và khởi động lại API/worker trước smoke; bật lại sau khi kiểm tra.
 Không cần đổi/xóa khóa Gemini hoặc dữ liệu AI đã lưu.

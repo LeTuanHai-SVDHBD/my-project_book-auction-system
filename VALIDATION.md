@@ -7,6 +7,13 @@ Không coi việc Admin duyệt thành công hoặc probe completed là bằng c
 
 ## Giao dịch và tương tác sau đấu giá
 
+Chẩn đoán smoke readiness được bổ sung sau khi Hải báo dừng trước luồng nghiệp vụ:
+ba test riêng đạt; bộ test mặc định **116 PASS, 10 SKIP**, check **118 tệp PASS**. Chẩn đoán phân biệt
+API không kết nối/timeout, HTTP sai/JSON sai và trạng thái SQL/Redis/worker;
+không phản chiếu credentials/body lỗi. Script tách giai đoạn kết nối SQL/Redis, không đổi tiêu chí readiness hoặc tự bỏ qua lỗi.
+CLI smoke:m8 với API không chạy dừng đúng exit 1 và hướng dẫn giữ dev:all, trước khi tạo fixture.
+Kết quả từ máy Hải chưa đủ xác định dependency cụ thể. Chi tiết nghiệm thu chức năng bên dưới giữ nguyên phạm vi thật/giả.
+
 Kiểm tra ngày 24/10/2026 trên mã giữ Gemini; không áp dụng thay đổi Groq đã hủy:
 
 - `check`: **116 tệp PASS**; build Frontend PASS, 67 modules.

@@ -1,174 +1,119 @@
-<!-- Mục đích: Tra cứu vị trí, trách nhiệm và trạng thái của các thành phần mã nguồn. -->
+<!-- Mục đích: Tra cứu thư mục, trách nhiệm và trạng thái thành phần mã nguồn. -->
 
 # Bản đồ mã nguồn
 
-## 1. Nguyên tắc tổ chức
+## Thành phần xử lý đấu giá
 
-- Một repository chứa cả Backend và Frontend.
-- Quản lý dependency bằng npm workspaces.
-- Cài thư viện tại thư mục gốc bằng `npm.cmd ci`.
-- Commit `package-lock.json` ở gốc.
-- API và worker là hai tiến trình dùng chung Backend.
-- Tài liệu thiết kế nằm trong `docs/`.
-- Giữ tên thư mục nhất quán; không tạo thêm lớp khi chưa cần.
+| File/nhóm | Trách nhiệm |
+|---|---|
+| `backend/migrations/003_auction_decisions.sql` | Receipt quyết định, backfill lượt hợp lệ cũ và lý do kết thúc |
+| `backend/scripts/schemaMigrations.js` | Chạy cùng danh sách migration cho init/migrate |
+| `backend/src/services/bidPolicy.js` | Validator, giá/lịch/cooldown và suy ra kết quả |
+| `backend/src/models/auction.model.js` | Transaction quyết định, lượt giá, kết quả/giao dịch; snapshot công khai |
+| `backend/src/services/auction.service.js` | Admission và kết quả, SQL trước Redis |
+| `backend/src/routes/auction.routes.js`, `backend/src/controllers/auction.controller.js` | Quyền/CSRF, hợp đồng HTTP và projection |
+| `backend/src/constants/auction.js` | Stream/group/prefix và thời hạn phối hợp |
+| `backend/src/events/auctionPublisher.js`, `backend/src/events/auctionConsumer.js` | Lua admission, xếp hạn, pending/reclaim, ACK và dead-letter |
+| `backend/src/concurrency/auctionLock.js`, `backend/src/processors/auction.processor.js` | Token/lease, gia hạn, bảo vệ trước COMMIT |
+| `backend/src/jobs/auctionExpiry.js` | Tìm hạn SQL và xếp sự kiện chốt |
+| `backend/test/auctionHttp.test.js`, `auctionStream.test.js`, `auctionSql.test.js` | HTTP, Redis thật, SQL thật opt-in và phục hồi |
+| `backend/test/bidPolicy.test.js`, `auctionLock.test.js` | Biên nghiệp vụ/tiền và quyền sở hữu khóa |
+| `frontend/src/components/AuctionPanel.jsx`, `frontend/src/services/auctionApi.js` | Gửi giá, theo dõi quyết định, retry cùng mã và snapshot |
+| `frontend/src/utils/bidAvailability.js`, `backend/test/bidAvailability.test.js` | Đếm chờ từ giờ SQL, xử lý biên thời gian và dữ liệu thiếu/sai |
+| `scripts/smokeM5.mjs` | Smoke API/worker/SQL/Redis thật và cleanup fixture riêng |
+| `docs/auction-processing.md` | Hợp đồng, lưu quyết định, kết thúc và phục hồi |
 
-## 2. Thư mục gốc
+## Cấu trúc chung
 
 | Đường dẫn | Trách nhiệm |
 |---|---|
-| `AGENTS.md` | Quy tắc dành cho AI Agent |
-| `README.md` | Giới thiệu và hướng dẫn chạy dự án |
-| `VALIDATION.md` | Kết quả kiểm tra và giới hạn xác minh |
-| `package.json` | Khai báo workspaces và lệnh dùng chung |
-| `package-lock.json` | Khóa phiên bản dependency |
-| `compose.yaml` | Khởi động SQL Server và Redis |
-| `.env.example` | Mẫu cấu hình Backend và Docker |
-| `.env` | Cấu hình riêng trên máy; không commit |
-| `.gitignore` | Loại cấu hình riêng và file sinh tự động khỏi Git |
-| `backend/` | API, worker và truy cập dữ liệu |
-| `frontend/` | Giao diện React |
-| `scripts/` | Công cụ hỗ trợ toàn dự án |
-| `docs/` | Tài liệu kiến trúc và tiến độ |
+| `README.md` | Cài đặt, cấu hình, sử dụng và kiểm tra |
+| `VALIDATION.md` | Bằng chứng chạy và giới hạn xác minh |
+| `AGENTS.md` | Quy tắc thay đổi repository |
+| `package.json`, `package-lock.json` | npm workspaces, lệnh và dependency khóa phiên bản |
+| `compose.yaml` | SQL Server, Redis và volume phát triển |
+| `.env.example`, `frontend/.env.example` | Cấu hình mẫu; không chứa credentials thật |
+| `backend/` | HTTP API, worker và nghiệp vụ |
+| `frontend/` | React và client HTTP |
+| `scripts/` | Công cụ điều phối/cài đặt/kiểm thử |
+| `docs/` | Tài liệu kỹ thuật theo chủ đề |
+| `academic/` | Hướng dẫn lưu báo cáo, slide, UML và bằng chứng được chọn |
 
-## 3. Backend
+Cài dependency từ gốc bằng `npm.cmd ci`. Không chỉnh thủ công node_modules, frontend/dist hoặc lockfile;
+lockfile được cập nhật bằng npm khi dependency thay đổi.
 
-Các đường dẫn bên dưới nằm trong `backend/`.
+`npm.cmd run dev:all` dùng devDependency `concurrently` ở gốc để chạy API, worker và React cùng lúc,
+gắn nhãn màu cho log và dừng cả nhóm bằng `Ctrl+C`. Các lệnh `dev:api`, `dev:worker`, `dev:web`
+vẫn dùng được khi cần kiểm tra riêng. SQL Server và Redis được khởi động bằng Docker Compose trước đó.
 
-| Đường dẫn | Trách nhiệm | Trạng thái |
+## Backend
+
+Các đường dẫn bên dưới tương đối với `backend/`.
+
+| Nhóm | File | Trách nhiệm |
 |---|---|---|
-| `package.json` | Dependency và lệnh Backend | Đã có |
-| `schema-manifest.json` | Danh sách bảng và số lượng cấu trúc dự kiến | Đã có |
-| `migrations/001_schema.sql` | DDL khởi tạo 19 bảng | Đã có |
-| `scripts/initDatabase.js` | Tạo database và chạy DDL khi phù hợp | Đã có |
-| `src/app.js` | Tạo Express app, gắn middleware và API hiện tại | Đã có |
-| `src/server.js` | Khởi động HTTP, Socket.IO và kết nối dịch vụ | Đã có |
-| `src/worker.js` | Khởi động worker và heartbeat | Đã có |
-| `src/config/env.js` | Nạp cấu hình từ môi trường | Đã có |
-| `src/config/parseConfig.js` | Kiểm tra và chuyển kiểu cấu hình | Đã có |
-| `src/config/database.js` | Quản lý connection pool SQL Server | Đã có |
-| `src/config/redis.js` | Tạo và quản lý Redis client | Đã có |
-| `src/constants/infrastructure.js` | Hằng số luồng kiểm tra hạ tầng | Đã có |
-| `src/controllers/health.controller.js` | Tổng hợp trạng thái dịch vụ | Đã có |
-| `src/services/infrastructure.service.js` | Kiểm tra SQL, Redis và worker | Đã có |
-| `src/events/eventPublisher.js` | Đưa probe vào Redis Streams | Đã có |
-| `src/events/eventConsumer.js` | Đọc, nhận lại pending và xác nhận probe | Đã có |
-| `src/processors/systemProbe.processor.js` | Xử lý sự kiện kiểm tra SQL | Đã có |
-| `src/middlewares/errorHandler.js` | Chuẩn hóa lỗi HTTP | Đã có |
-| `src/utils/logger.js` | Log có cấu trúc và che thông tin nhạy cảm | Đã có |
-| `test/infrastructure.test.js` | Kiểm thử hạ tầng và API bằng giả lập | Đã có |
-| `src/routes/` | Router nghiệp vụ | Đã có auth.routes.js, post.routes.js và media.routes.js |
-| `src/models/` | Truy vấn dữ liệu nghiệp vụ | Đã có user.model.js và post.model.js |
-| `src/concurrency/` | Khóa theo phiên và hỗ trợ xử lý đồng thời | Chờ triển khai |
-| `src/jobs/` | Tác vụ kiểm tra hết hạn phiên | Chờ triển khai |
-| `src/ai/` | Kết nối và kiểm tra kết quả phân tích AI | Chờ triển khai |
+| Khởi động | `src/app.js`, `src/server.js`, `src/worker.js` | Ghép HTTP middleware/router, Socket.IO, dịch vụ và worker |
+| Cấu hình | `src/config/env.js`, `parseConfig.js`, `database.js`, `redis.js` | Nạp/kiểm tra môi trường, pool SQL, Redis |
+| Xác thực | `src/config/auth.js`, `src/middlewares/session.js`, `auth.js` | Cookie/session, chọn phiên tab, CSRF, quyền và rate limit |
+| Tài khoản | `src/routes/auth.routes.js`, `src/controllers/auth.controller.js` | HTTP tài khoản và vòng đời phiên |
+| Tài khoản | `src/services/auth.service.js`, `password.service.js`, `authRateLimit.service.js` | Đầu vào, đăng ký/đăng nhập, Argon2id và Redis Lua |
+| Tài khoản | `src/models/user.model.js` | NguoiDung qua SQL tham số hóa |
+| Bài đăng | `src/routes/post.routes.js`, `src/controllers/post.controller.js` | Endpoint, quyền, phân trang và projection công khai |
+| Bài đăng | `src/services/post.service.js`, `postValidation.js`, `postPolicy.js` | Điều phối claim/commit, hợp đồng và quy tắc chuyển trạng thái |
+| Bài đăng | `src/models/post.model.js` | Transaction SQL tạo/duyệt/bổ sung/kích hoạt/đăng lại |
+| Media | `src/config/media.js`, `src/routes/media.routes.js`, `src/controllers/media.controller.js` | Giới hạn, raw upload sau xác thực và HTTP vé media |
+| Media | `src/services/cloudinary.service.js`, `mediaLedger.service.js` | REST provider, kiểm tra bytes, vé Redis và cleanup |
+| Hạ tầng | `src/constants/infrastructure.js`, `src/controllers/health.controller.js`, `src/services/infrastructure.service.js` | Readiness, heartbeat và hằng số probe |
+| Sự kiện | `src/events/eventPublisher.js`, `eventConsumer.js`, `src/processors/systemProbe.processor.js` | Xuất bản, đọc/nhận lại/xác nhận và xử lý probe |
+| Utility | `src/utils/rowVersion.js`, `logger.js`, `src/middlewares/errorHandler.js` | Mã hóa version, log che bí mật và lỗi HTTP |
+| Schema | `migrations/001_schema.sql`, `002_cloudinary_metadata.sql`, `003_auction_decisions.sql`, `schema-manifest.json` | DDL nền, migration media/quyết định và cấu trúc dự kiến |
+| CLI | `scripts/initDatabase.js`, `migrateDatabase.js`, `createAdmin.js` | Tạo/nâng schema và tạo Admin qua terminal |
 
-Khi thêm chức năng, tạo controller, service và model tương ứng.
-Các file tài khoản đã có được liệt kê tại mục 9.
+`src/concurrency/`, `src/jobs/`, `src/ai/` được giữ cho chức năng tương ứng; không coi thư mục placeholder là nghiệp vụ đã có.
 
-## 4. Frontend
+## Frontend
 
-Các đường dẫn bên dưới nằm trong `frontend/`.
-
-| Đường dẫn | Trách nhiệm | Trạng thái |
-|---|---|---|
-| `package.json` | Dependency và lệnh Frontend | Đã có |
-| `index.html` | Trang HTML khởi đầu | Đã có |
-| `vite.config.js` | Cấu hình Vite và cổng phát triển | Đã có |
-| `.env.example` | Mẫu địa chỉ API | Đã có |
-| `.env` | Cấu hình riêng; không commit | Tạo bằng setup |
-| `src/main.jsx` | Gắn React vào trang HTML | Đã có |
-| `src/App.jsx` | Điều hướng tài khoản, bài đăng, kiểm duyệt, danh mục và hạ tầng | Đã có |
-| `src/style.css` | Giao diện tài khoản và kiểm tra hệ thống | Đã có |
-| `src/pages/` | Trang nghiệp vụ | Tạo khi cần |
-| `src/components/` | Màn hình tài khoản và hạ tầng | Đã có |
-| `src/services/` | Hàm gọi HTTP API tài khoản | Đã có |
-| `src/hooks/` | React hook dùng lại | Tạo khi cần |
-
-Không đưa truy vấn SQL, mật khẩu database hoặc Redis client vào Frontend.
-
-## 5. Script dùng chung
-
-| Đường dẫn | Trách nhiệm |
-|---|---|
-| `scripts/setup.mjs` | Tạo cấu hình riêng nếu chưa tồn tại |
-| `scripts/check.mjs` | Kiểm tra cú pháp JavaScript phía máy chủ |
-| `scripts/smoke.mjs` | Kiểm tra tích hợp với dịch vụ thật |
-
-Script chỉ phục vụ Backend nằm trong `backend/scripts/`.
-Script điều phối nhiều thành phần nằm trong `scripts/` ở gốc.
-
-## 6. Tài liệu
-
-| Đường dẫn | Trách nhiệm |
-|---|---|
-| `docs/architecture.md` | Kiến trúc và mô hình kết nối |
-| `docs/flows.md` | Luồng nghiệp vụ và quy tắc xử lý |
-| `docs/file-map.md` | Bản đồ mã nguồn |
-| `docs/decisions.md` | Quyết định kỹ thuật và nội dung chưa chốt |
-| `docs/tasks.md` | Công việc, tiến độ và điều kiện nghiệm thu |
-
-## 7. File sinh tự động
-
-Không chỉnh sửa thủ công:
-- `node_modules/`: thư viện cài bằng npm.
-- `frontend/dist/`: kết quả build Frontend.
-- `package-lock.json`: cập nhật thông qua npm khi thay đổi dependency.
-
-Thư mục rỗng cần lưu trong Git được giữ bằng `.gitkeep`.
-
-## 8. Quy ước chú thích
-
-Mỗi file mã nguồn viết tay có comment đầu file mô tả trách nhiệm chính.
-Các hàm chỉ cần comment thêm khi có quy tắc hoặc lý do khó thấy từ mã.
-
-Không chèn comment vào `package.json`, `package-lock.json`
-hoặc `schema-manifest.json` vì các file này sử dụng JSON chuẩn.
-
-## 9. Các file bổ sung cho tài khoản
+Các đường dẫn bên dưới tương đối với `frontend/`.
 
 | File | Trách nhiệm |
 |---|---|
-| `backend/src/config/auth.js` | Kiểm tra secret, cookie và thời hạn session |
-| `backend/src/models/user.model.js` | Đọc/ghi NguoiDung bằng tham số SQL |
-| `backend/src/services/password.service.js` | Băm và kiểm tra Argon2id |
-| `backend/src/services/auth.service.js` | Kiểm tra đầu vào, đăng ký và đăng nhập |
-| `backend/src/services/authRateLimit.service.js` | Bộ đếm giới hạn thử dùng Redis Lua |
-| `backend/src/middlewares/auth.js` | CSRF, xác thực và phân quyền HTTP |
-| `backend/src/controllers/auth.controller.js` | Phản hồi HTTP và vòng đời session |
-| `backend/src/routes/auth.routes.js` | Endpoint tài khoản và cấu hình middleware session |
-| `backend/scripts/createAdmin.js` | Tạo Admin qua terminal, nhập mật khẩu kín |
-| `frontend/src/components/AccountPanel.jsx` | Form và thông tin tài khoản |
-| `frontend/src/components/InfrastructurePanel.jsx` | Màn hình hạ tầng được tách từ App cũ |
-| `frontend/src/services/authApi.js` | Fetch kèm cookie và CSRF trong bộ nhớ |
-| `scripts/setupAuth.mjs` | Bổ sung cấu hình auth còn thiếu |
-| `scripts/smokeAuth.mjs` | Kiểm tra API/SQL/Redis thật và dọn tài khoản thử |
-| `backend/test/auth.test.js` | HTTP auth, model/store giả và Argon2 thật |
-| `backend/test/authRedis.test.js` | Kiểm tra Redis thật theo opt-in |
-| `backend/test/setupAuth.test.js` | Kiểm tra giữ nguyên cấu hình và chạy lại an toàn |
+| `src/main.jsx`, `src/App.jsx` | Khởi tạo React và điều hướng theo tài khoản/vai trò |
+| `src/components/AccountPanel.jsx` | Đăng ký/đăng nhập/đăng xuất và thông tin tài khoản |
+| `src/components/InfrastructurePanel.jsx` | Kiểm tra hạ tầng/probe |
+| `src/components/PostsPanel.jsx` | Danh sách/chi tiết, duyệt, bổ sung và lịch kích hoạt |
+| `src/components/PostForm.jsx` | Thông tin sách/bài/giá và upload trước khi gửi |
+| `src/components/MoneyInput.jsx` | Input tiền có phân cách, lọc chữ và giá trị nguyên gửi API |
+| `src/services/authApi.js` | HTTP dùng cookie, CSRF trong bộ nhớ và selector tab |
+| `src/services/tabIdentity.js` | Mã tab trong sessionStorage, giữ khi reload, xoay khi tài liệu mới |
+| `src/services/postApi.js` | HTTP bài đăng/media qua client xác thực chung |
+| `src/utils/moneyInput.js` | Định dạng tiền/caret không dùng Number |
+| `src/style.css` | Giao diện và responsive |
+| `vite.config.js`, `index.html` | Cấu hình dev/build và HTML khởi đầu |
 
-
-## 10. Các file Mốc 4
+## Script và kiểm thử
 
 | File | Trách nhiệm |
 |---|---|
-| `backend/migrations/002_cloudinary_metadata.sql` | Thêm hai cột public_id nullable và index, không xóa dữ liệu |
-| `backend/scripts/migrateDatabase.js` | Chạy migration hiện có, có thể chạy lại |
-| `backend/src/config/media.js` | Cấu hình bí mật Cloudinary và projection giới hạn công khai |
-| `backend/src/middlewares/session.js` | Factory session dùng chung auth/posts/media |
-| `backend/src/services/cloudinary.service.js` | Native REST upload/destroy, kiểm tra magic và phản hồi provider |
-| `backend/src/services/mediaLedger.service.js` | Vé Redis, claim/release nguyên tử, cleanup kiểm tra SQL reference |
-| `backend/src/services/postValidation.js` | Kiểm tra payload, tiền dạng chuỗi, version và lịch ISO |
-| `backend/src/services/postPolicy.js` | Quy tắc trạng thái, version và điều kiện đăng lại |
-| `backend/src/services/post.service.js` | Điều phối claim, SQL commit/rollback và acknowledgement |
-| `backend/src/models/post.model.js` | SQL tham số hóa; tạo/duyệt/bổ sung/kích hoạt/đăng lại trong transaction |
-| `backend/src/controllers/post.controller.js` | HTTP, phân trang và projection công khai không chứa giá ẩn |
-| `backend/src/routes/post.routes.js` | Quyền công khai/chủ sách/Admin và CSRF |
-| `backend/src/controllers/media.controller.js` | HTTP upload/discard, kiểm tra bytes và trả vé |
-| `backend/src/routes/media.routes.js` | Raw upload giới hạn bộ nhớ sau xác thực và CSRF |
-| `frontend/src/components/PostForm.jsx` | Form sách/bài, upload trước, vé đính kèm, bỏ tệp chưa dùng |
-| `frontend/src/components/PostsPanel.jsx` | Danh sách/chi tiết, kiểm duyệt, bổ sung và lịch kích hoạt |
-| `frontend/src/services/postApi.js` | HTTP M4 dùng chung session/CSRF trong bộ nhớ |
-| `scripts/setupMedia.mjs` | Chỉ bổ sung cấu hình mẫu còn thiếu, không đổi giá trị đã có |
-| `scripts/smokeM4.mjs` | Smoke thật với dữ liệu UUID, cleanup SQL/Cloudinary riêng |
-| `backend/test/posts.test.js` | Hợp đồng, policy, privacy, HTTP và provider giả |
-| `backend/test/mediaRedis.test.js` | Redis thật theo opt-in: claim đồng thời, ownership, cleanup và commit chưa rõ |
+| `scripts/setup.mjs`, `setupAuth.mjs`, `setupMedia.mjs` | Tạo/bổ sung cấu hình còn thiếu |
+| `scripts/check.mjs` | Kiểm tra cú pháp Backend/script |
+| `scripts/smoke.mjs` | Hạ tầng thật |
+| `scripts/smokeAuth.mjs` | Tài khoản qua API/SQL/Redis thật |
+| `scripts/smokeM4.mjs` | Bài đăng/Cloudinary/duyệt/kích hoạt/đăng lại với dữ liệu UUID riêng |
+| `backend/test/infrastructure.test.js` | Hợp đồng hạ tầng và probe |
+| `backend/test/auth.test.js`, `authRedis.test.js` | Auth HTTP/Argon2 và Redis thật theo opt-in |
+| `backend/test/posts.test.js`, `mediaRedis.test.js` | Policy/HTTP/provider và claim/cleanup Redis |
+| `backend/test/rowVersion.test.js` | Binary SQL → JSON → HTTP và optimistic version |
+| `backend/test/tabSession.test.js` | Cookie jar chung, quyền/CSRF, rotate/logout độc lập và Redis opt-in |
+| `backend/test/inputFormatting.test.js` | Vòng đời selector tab, tiền nguyên và caret |
+| `backend/test/setupAuth.test.js` | Setup giữ cấu hình cũ, idempotency và secret mẫu |
+
+## Tài liệu và quy ước
+
+- `architecture.md`: thành phần, kết nối và tính nhất quán.
+- `flows.md`: luồng thực thi, API và quy tắc dự kiến.
+- `decisions.md`: các ADR còn hiệu lực và quyết định chưa hoàn tất.
+- `tasks.md`: trạng thái chức năng và backlog.
+- `docker-migration.md`: chuyển project, kiểm tra volume và dữ liệu.
+
+File mã nguồn viết tay có comment đầu file mô tả trách nhiệm. JSON chuẩn không chèn comment.
+Thư mục rỗng được giữ bằng `.gitkeep`; file này không chứng minh chức năng đã triển khai.

@@ -27,6 +27,10 @@ import { createPostModel } from './models/post.model.js';
 import { createPostService } from './services/post.service.js';
 import { createPostRouter } from './routes/post.routes.js';
 import { createMediaRouter } from './routes/media.routes.js';
+import {createAuctionModel} from './models/auction.model.js';
+import {createAuctionPublisher} from './events/auctionPublisher.js';
+import {createAuctionService} from './services/auction.service.js';
+import {createAuctionRouter} from './routes/auction.routes.js';
 const authConfig = parseAuthConfig(process.env);
 const users = createUserModel({ getPool, sql });
 const sessionMiddleware = createSessionMiddleware(authConfig, new RedisStore({ client: redis, prefix: 'bookauction:auth:session:' }));
@@ -37,10 +41,13 @@ const ledger = createMediaLedger({getRedis:requireRedis,provider,isReferenced:id
 const service = createPostService({model,ledger,limits:mediaConfig,log:logError});
 const postRouter = createPostRouter({sessionMiddleware,users,model,service,limits:mediaConfig});
 const mediaRouter = createMediaRouter({sessionMiddleware,users,config:mediaConfig,provider,ledger});
+const auctionModel=createAuctionModel({getPool,sql});
+const auctionService=createAuctionService({model:auctionModel,publisher:createAuctionPublisher({getRedis:requireRedis})});
+const auctionRouter=createAuctionRouter({sessionMiddleware,users,model:auctionModel,service:auctionService});
 const authRouter = createAuthRouter({ authConfig, sessionMiddleware, users, passwords,
   limiter: createAuthRateLimiter({ getRedis: requireRedis, secret: authConfig.secret }),
   ready: () => redis.isReady });
-const app = createApp({ config, authRouter, postRouter, mediaRouter, deps: { sqlserver: databaseStatus, redis: redisStatus, worker: workerStatus },
+const app = createApp({ config, authRouter, postRouter, mediaRouter, auctionRouter, deps: { sqlserver: databaseStatus, redis: redisStatus, worker: workerStatus },
   probes: { enqueue: () => enqueueProbe(requireRedis()), get: async id => {
     const raw = await requireRedis().get(INFRA.resultPrefix + id); return raw ? JSON.parse(raw) : null;
   } }, log: logError });

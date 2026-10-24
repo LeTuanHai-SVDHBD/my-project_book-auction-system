@@ -1,217 +1,152 @@
-<!-- Mục đích: Mô tả luồng nghiệp vụ và điều kiện cần bảo đảm khi triển khai. -->
+<!-- Mục đích: Mô tả luồng đã triển khai, hợp đồng API và quy tắc nghiệp vụ dự kiến. -->
 
-# Luồng hoạt động hệ thống
+# Luồng nghiệp vụ và API
 
-## 1. Phạm vi
+## Tài khoản
 
-Hạ tầng, tài khoản, đăng sách, kiểm duyệt và kích hoạt phiên đã có trong mã nguồn.
-Đặt giá/kết thúc, realtime nghiệp vụ, AI và chức năng sau phiên vẫn theo các mốc tiếp theo.
+1. React tạo mã chọn tab; gửi `X-Tab-ID` và cookie tương ứng khi gọi API.
+2. `GET /api/auth/csrf` tạo session ẩn danh và CSRF token gắn với session Redis.
+3. Đăng ký kiểm tra dữ liệu, CSRF và giới hạn thử, băm Argon2id rồi ghi NguoiDung.
+4. API công khai chỉ tạo `nguoi_dung`; UNIQUE email bảo vệ yêu cầu đăng ký đồng thời.
+5. Đăng nhập kiểm tra SQL/hash, đổi session ID và CSRF; lưu Redis trước khi trả thành công.
+6. Yêu cầu bảo vệ đọc lại tài khoản/vai trò từ SQL. Không tin mã người dùng do client khai báo.
+7. Đăng xuất hủy session được chọn và xóa đúng cookie của tab; không thu hồi tab khác.
 
-Tài khoản dùng session Redis, cookie HttpOnly và Argon2id theo ADR-010.
-Chi tiết luồng HTTP hiện tại được ghi ở mục 10.
+F5 giữ phiên tab; tài liệu mới tạo mã tab mới để không kế thừa tài khoản từ storage sao chép.
+Cookie session ký/HttpOnly và CSRF mới là thông tin xác thực, mã tab chỉ chọn phiên.
+Client HTTP không gửi `X-Tab-ID` dùng cookie chung độc lập với các cookie tab.
 
-## 2. Đăng ký
+## Đăng sách và media
 
-| Bước | Xử lý |
+1. Sau xác thực/quyền/CSRF, API kiểm tra MIME, magic bytes và kích thước của từng tệp.
+2. Tạo vé Redis trước khi gọi Cloudinary để theo dõi cả upload bị ngắt.
+3. Cloudinary trả URL/public_id; API trả vé UUID và URL xem trước cho đúng chủ sách.
+4. React gửi nội dung sách/bài/giá cùng vé; các ô tiền hiển thị dấu chấm nhưng gửi chuỗi nguyên.
+5. Service claim tất cả vé nguyên tử, xác nhận owner/trạng thái/tuổi vé; không tin URL do client khai báo.
+6. Transaction SQL tạo Sach, BaiDang, PhienDauGia pending, media và lịch sử; chưa có lịch đấu giá.
+7. Sau COMMIT, acknowledgement dọn vé. Cùng UUID yêu cầu trả lại bài đã tạo, không tạo trùng.
+8. Rollback chắc chắn release vé để retry; kết quả commit chưa rõ giữ claim để đối soát.
+
+Không upload, gọi AI hay destroy Cloudinary trong transaction SQL.
+Cleanup chỉ xóa vé bỏ dở/hết hạn sau kiểm tra SQL reference. File lịch sử và file đang dùng được giữ lại.
+Hiện không có luồng xóa bài; xóa bản ghi SQL thủ công không kích hoạt xóa Cloudinary.
+
+## Kiểm duyệt, bổ sung và kích hoạt
+
+| Thao tác | Điều kiện | Kết quả nguyên tử |
+|---|---|---|
+| Duyệt | Admin, bài/phiên pending, version hiện tại, lý do và xác nhận bằng chứng quý hiếm | Bài `da_duyet`, phiên `da_qua_kiem_duyet`, lưu quyết định/lịch sử |
+| Từ chối | Admin, cặp pending, version hiện tại và lý do | Bài `tu_choi`, phiên `khong_dat_kiem_duyet`, lưu quyết định/lịch sử |
+| Gửi lại | Chủ bài, cặp bị từ chối và version hiện tại | Cập nhật nội dung/giá, thêm media, cặp về pending; giữ ID và lịch sử |
+| Kích hoạt | Chủ bài, cặp đã duyệt, version hiện tại, lịch tương lai hợp lệ | Cập nhật cùng phiên thành `da_kich_hoat`; không tạo phiên khác |
+
+Model lấy khóa rồi đối chiếu rowversion. SQL xuất BINARY(8), utility mã hóa hex 16 ký tự cho JSON;
+HTTP 409 yêu cầu client đọc lại dữ liệu. Không cấp version mặc định khi thiếu.
+
+Admin ghi căn cứ quý hiếm và nguồn đối chiếu. Tình trạng vật lý tốt không thay điều kiện quý hiếm;
+thiếu bằng chứng phải được ghi rõ. Chưa tích hợp AI thì kiểm tra thủ công, không sinh phân tích giả.
+Kết quả AI đã có chỉ để tham khảo, không tự phê duyệt/từ chối.
+
+## Đăng lại
+
+1. Xác định sách vật lý và lấy khóa Sach ổn định qua các lần đăng.
+2. Đọc bài/phiên mới nhất của sách và kết quả dưới transaction.
+3. Chỉ chấp nhận khi phiên đã `da_ket_thuc`, kết quả `khong_co_nguoi_thang`, người thắng NULL.
+4. Tạo bài/phiên mới cùng `sach_id`, giá mới và trạng thái pending. Có thể dùng lại media.
+5. Giữ nguyên giá, lịch sử, kết quả và các quyết định của lần cũ.
+
+Không suy ra không có người thắng từ việc thiếu KetQuaDauGia. Phiên gần nhất chưa kết thúc
+hoặc đã có người thắng không được đăng lại, kể cả giao dịch chưa hoàn tất.
+
+## Hợp đồng HTTP hiện tại
+
+### Tài khoản
+
+| Phương thức | Endpoint | Điều kiện |
+|---|---|---|
+| GET | `/api/auth/csrf` | Cấp CSRF token gắn với session |
+| POST | `/api/auth/register` | CSRF; họ tên, email, mật khẩu |
+| POST | `/api/auth/login` | CSRF; email, mật khẩu; đổi session/CSRF |
+| POST | `/api/auth/logout` | CSRF; hủy session được chọn |
+| GET | `/api/auth/me` | Tài khoản hợp lệ |
+| GET | `/api/auth/admin-check` | Admin hợp lệ |
+
+### Bài đăng và media
+
+| Phương thức | Endpoint | Quyền |
+|---|---|---|
+| GET | `/api/posts/catalog`, `/api/posts/catalog/:id` | Công khai; projection không có giá ẩn hoặc dữ liệu nội bộ |
+| GET | `/api/posts/mine` | Người dùng, chỉ bài của mình |
+| GET | `/api/posts/pending` | Admin |
+| GET | `/api/posts/:id` | Chủ bài hoặc Admin |
+| POST | `/api/posts` | Người dùng + CSRF |
+| POST | `/api/posts/:id/resubmit` | Chủ bài bị từ chối + CSRF |
+| POST | `/api/posts/:id/relist` | Chủ bài đủ điều kiện + CSRF |
+| POST | `/api/posts/:id/review` | Admin + CSRF |
+| POST | `/api/posts/:id/activate` | Chủ bài đã duyệt + CSRF |
+| GET | `/api/media/config` | Cấu hình công khai không chứa credentials |
+| POST | `/api/media/image`, `/api/media/video` | Người dùng + CSRF; body nhị phân, MIME tương ứng |
+| DELETE | `/api/media/:upload_id` | Chủ vé + CSRF; tệp chưa gắn bài |
+
+Danh sách tối đa 30 bài, phân trang bằng `?before=<id>` theo `nextBefore`.
+Giá trong JSON là chuỗi nguyên dương tối đa 18 chữ số, không có dấu phân cách.
+
+- Tạo bài: `ma_yeu_cau` UUID v4, `sach`, `bai_dang`, `phien`, `media: [{upload_id,tieu_de}]`.
+- Đăng lại: bỏ `sach`, thêm `reuse_media`; tạo UUID mới cho lần đăng mới.
+- Gửi lại: bỏ `sach`/`ma_yeu_cau`, gửi `row_version`; giữ media đã lưu và thêm tệp mới.
+- Duyệt: `quyet_dinh: phe_duyet|tu_choi`, `ly_do`, `xac_nhan_quy_hiem`, `row_version`.
+- Kích hoạt: lịch ISO có múi giờ và `row_version`; SQL kiểm tra tương lai bằng đồng hồ server.
+
+Thiếu đăng nhập trả 401; thiếu quyền/CSRF sai trả 403; xung đột trả 409; quá giới hạn trả 429.
+Header chọn tab phải có 32 ký tự hex viết thường; header này không thay cookie hoặc CSRF.
+
+## Probe hạ tầng
+
+`React → API → Redis Streams → Worker → SQL SELECT → Redis result → React`.
+API trả 202 queued; worker chỉ xác nhận completed sau truy vấn kiểm tra thành công.
+Kết quả probe được lấy qua HTTP; Socket.IO chỉ gửi lời chào kết nối.
+Endpoint development cần `DEV_PROBE_TOKEN`, không dùng khóa này thay tài khoản.
+
+## Đặt giá và kết thúc phiên
+
+API tiếp nhận yêu cầu hợp lệ về cấu trúc, đưa vào Streams và trả 202; đây chưa phải đặt giá thành công.
+Các endpoint đã triển khai:
+
+| Phương thức | Endpoint | Điều kiện |
+|---|---|---|
+| GET | `/api/auctions/:id` | Công khai, chỉ phiên đã công bố; không có ngưỡng giá ẩn |
+| GET | `/api/auctions/:id/bid-status` | Đăng nhập; trạng thái chủ sách, thời điểm đặt lại của chính session và giờ SQL |
+| POST | `/api/auctions/:id/bids` | Người dùng + CSRF; body chỉ `ma_yeu_cau` UUID v4 và `muc_gia` chuỗi nguyên |
+| GET | `/api/auctions/:id/requests/:requestId` | Chỉ chủ yêu cầu; đọc SQL trước admission Redis |
+
+Trạng thái HTTP kết quả gồm `dang_cho_xu_ly`, `da_chap_nhan`, `bi_tu_choi`.
+YeuCauDatGia chỉ lưu hai quyết định cuối; hàng chờ ở Redis. Mã đã có quyết định trả 200;
+mã cùng người/phiên/giá chưa xử lý trả 202, không xếp lại. Dùng lại mã cho nội dung khác trả 409.
+
+Worker lấy quyền xử lý phiên, mở transaction SQL, kiểm tra mã yêu cầu rồi đọc lại quyền, lịch, trạng thái,
+giá và cooldown. Quyết định chấp nhận/từ chối được lưu cùng thay đổi nghiệp vụ trong SQL.
+Chỉ thông báo thành công sau COMMIT; sự kiện giao lại đọc quyết định đã lưu, không đánh giá lại hoặc tạo trùng.
+XACK/XDEL chỉ sau xử lý thành công; lỗi tạm giữ pending, XAUTOCLAIM nhận lại.
+Chi tiết retention, dead-letter và lease nằm tại [Xử lý đấu giá](auction-processing.md).
+
+| Quy tắc | Điều kiện |
 |---|---|
-| 1 | Người dùng nhập thông tin đăng ký |
-| 2 | Backend kiểm tra dữ liệu bắt buộc và định dạng |
-| 3 | Kiểm tra CSRF và giới hạn thử bằng Redis |
-| 4 | Băm mật khẩu bằng thư viện chuyên dụng có salt |
-| 5 | Lưu tài khoản vào `NguoiDung` |
-| 6 | Trả kết quả đăng ký, không trả trường mật khẩu |
-
-Điều kiện:
-- UNIQUE email tại database là lớp bảo vệ cuối khi đăng ký đồng thời.
-- Người dùng không được tự cấp quyền Admin qua dữ liệu đăng ký.
-- Không ghi mật khẩu nguyên văn vào database hoặc log.
-
-## 3. Đăng nhập và truy cập chức năng
-
-| Bước | Xử lý |
-|---|---|
-| 1 | Người dùng gửi thông tin đăng nhập |
-| 2 | Backend kiểm tra dữ liệu, CSRF, giới hạn thử và tài khoản trong SQL |
-| 3 | So khớp mật khẩu với chuỗi băm |
-| 4 | Đổi session ID, tạo phiên Redis và token CSRF mới |
-| 5 | Các yêu cầu tiếp theo được kiểm tra xác thực và quyền |
-| 6 | Khi đăng xuất hoặc hết hạn, xử lý theo chính sách phiên |
-
-Điều kiện:
-- Không trả mật khẩu hoặc chuỗi băm cho Frontend.
-- Không tin vai trò hoặc mã người dùng do client tự khai báo.
-- Kiểm tra quyền sở hữu tài nguyên tại Backend.
-- Token chẩn đoán Mốc 2 không phải tài khoản đăng nhập.
-
-## 4. Đăng sách và kích hoạt phiên
-
-| Bước | Xử lý |
-|---|---|
-| 1 | Người bán nhập thông tin sách, media và thông số giá |
-| 2 | Backend kiểm tra và lưu sách, bài đăng, phiên chờ kiểm duyệt |
-| 3 | Mốc 4: chưa gọi AI, hiển thị chưa có phân tích; Mốc 7 mới tích hợp |
-| 4 | Admin xem thông tin, bằng chứng và yếu tố quý hiếm |
-| 5 | Admin phê duyệt hoặc từ chối kèm lý do |
-| 6 | Sau khi được duyệt, người bán thiết lập lịch và kích hoạt |
-
-Điều kiện:
-- Mỗi bài đăng chào bán một cuốn sách vật lý.
-- AI hỗ trợ, không tự quyết định phê duyệt.
-- Lỗi AI không tự động làm bài đăng bị từ chối.
-- Giá, bước giá, lịch và thời gian chờ được cố định sau kích hoạt.
-
-## 5. Đặt giá trong phiên
-
-### 5.1. Tiếp nhận
-
-1. Người dùng gửi mã phiên, mức giá và mã yêu cầu.
-2. API kiểm tra xác thực, quyền và cấu trúc đầu vào.
-3. API đưa yêu cầu vào Redis Streams.
-4. Trả HTTP 202: yêu cầu đã tiếp nhận, chưa xác nhận đặt giá thành công.
-
-### 5.2. Xử lý tại worker
-
-| Bước | Xử lý |
-|---|---|
-| 1 | Nhận sự kiện và lấy quyền xử lý theo mã phiên |
-| 2 | Mở giao dịch SQL, khóa dòng phiên theo thiết kế |
-| 3 | Kiểm tra mã yêu cầu đã được ghi nhận hay chưa |
-| 4 | Đọc lại quyền, trạng thái, lịch, giá và cooldown |
-| 5 | Nếu hợp lệ, thêm `LuotDatGia`, cập nhật giá và lịch sử |
-| 6 | UPDATE đối chiếu `row_version`; phải cập nhật đúng một dòng |
-| 7 | Nếu đạt ngưỡng kết thúc sớm, chốt phiên, kết quả và giao dịch |
-| 8 | COMMIT; sau đó ghi nhận kết quả xử lý và thông báo |
-| 9 | Xác nhận sự kiện; giải phóng khóa trong khối xử lý kết thúc |
-
-Nếu mã yêu cầu đã thành công, trả lại kết quả đã lưu.
-Không kiểm tra nó như một lượt đặt mới.
-
-### 5.3. Quy tắc hợp lệ
-
-| Điều kiện | Quy tắc |
-|---|---|
-| Trạng thái | Phiên phải là `da_kich_hoat` |
-| Thời gian | Đã đến giờ bắt đầu và chưa đến giờ kết thúc |
-| Mốc kiểm tra | Giờ máy chủ khi worker có quyền xử lý và kiểm tra để ghi nhận |
+| Trạng thái/thời gian | Phiên đã kích hoạt, đến giờ bắt đầu và chưa hết hạn tại thời điểm worker kiểm tra |
 | Lượt đầu | `gia_khoi_diem + k × buoc_gia`, `k >= 0` |
-| Lượt tiếp theo | `gia_hien_tai + k × buoc_gia`, `k >= 1` |
-| Chờ đặt lại | Theo cùng người trong cùng phiên; mặc định 20 giây, cho phép 10–30 giây |
-| Người bán | Không được đặt giá vào phiên của chính mình |
-| Xử lý lại | Không tạo thêm lượt giá từ cùng mã yêu cầu |
+| Lượt sau | `gia_hien_tai + k × buoc_gia`, `k >= 1` |
+| Cooldown | Cùng người/cùng phiên; mặc định 20 giây, cấu hình 10–30 giây |
+| Chủ sách | Không tự đặt giá vào phiên của mình |
+| Kết thúc | Chỉ hết hạn hoặc lượt hợp lệ đạt/vượt ngưỡng giá ẩn |
 
-Yêu cầu vào hàng đợi trước hạn vẫn bị từ chối nếu khi kiểm tra đã hết hạn.
+Tác vụ hết hạn và worker đặt giá dùng cùng cơ chế bảo vệ phiên.
+Trong một transaction, chuyển phiên kết thúc, tạo một KetQuaDauGia và tạo GiaoDich chỉ nếu có người thắng.
+Hết hạn có lượt hợp lệ thì lượt cao nhất thắng dù chưa đạt ngưỡng. Không có kết thúc thủ công hoặc hủy giữa phiên.
 
-### 5.4. Phân loại kết quả
+## Thiết kế sau phiên — chưa triển khai
 
-| Kết quả | Cách xử lý |
-|---|---|
-| Hợp lệ | Lưu thay đổi, COMMIT rồi thông báo |
-| Sai nghiệp vụ | Lưu/trả lý do từ chối theo thiết kế; kết thúc xử lý yêu cầu |
-| Lỗi kỹ thuật | ROLLBACK phần chưa hoàn tất; cho phép xử lý lại an toàn |
-
-Redis Streams có thể giao lại thông điệp.
-Không giả định mỗi sự kiện chỉ được xử lý đúng một lần.
-
-## 6. Kết thúc phiên
-
-Chỉ có hai nguyên nhân:
-- Hết thời gian.
-- Lượt đặt hợp lệ đạt hoặc vượt `gia_toi_thieu`.
-
-Tác vụ hết hạn và worker đặt giá phải dùng cùng cơ chế bảo vệ phiên.
-
-| Trường hợp | Kết quả |
-|---|---|
-| Hết hạn và có lượt hợp lệ | Người có giá hợp lệ cao nhất thắng |
-| Hết hạn và không có lượt hợp lệ | Không có người thắng, không tạo giao dịch |
-| Đạt/vượt `gia_toi_thieu` | Lượt hợp lệ đó thắng và phiên kết thúc ngay |
-
-Trong cùng giao dịch SQL:
-1. Chuyển phiên sang `da_ket_thuc`.
-2. Tạo duy nhất một `KetQuaDauGia`.
-3. Tạo `GiaoDich` nếu có người thắng.
-
-Lưu ý:
-- `gia_toi_thieu` là ngưỡng kết thúc sớm, được giữ ẩn với người mua.
-- Khi hết hạn, không bắt buộc đạt ngưỡng này mới có người thắng.
-- Không có thao tác hủy giữa phiên hoặc kết thúc thủ công.
-
-## 7. Giao dịch và trò chuyện sau phiên
-
-| Bước | Xử lý |
-|---|---|
-| 1 | Tạo giao dịch từ kết quả có người thắng |
-| 2 | Xác định người mua, người bán và số tiền theo kết quả |
-| 3 | Mở cuộc trò chuyện gắn với giao dịch |
-| 4 | Hai bên trao đổi và thực hiện xác nhận theo quyền |
-| 5 | Chỉ chuyển `hoan_tat` khi đủ xác nhận của hai bên |
-| 6 | Người mua được đánh giá người bán sau khi hoàn tất |
-
-Trạng thái giao dịch hiện có: `cho_xac_nhan`, `hoan_tat`.
-
-Không tự bổ sung cổng thanh toán, hoàn tiền tự động hoặc trạng thái khác
-nếu chưa cập nhật thiết kế và được nhóm thống nhất.
-
-## 8. Khiếu nại
-
-| Bước | Xử lý |
-|---|---|
-| 1 | Người tham gia giao dịch gửi nội dung và bằng chứng |
-| 2 | Backend kiểm tra quyền và quan hệ giao dịch–cuộc trò chuyện |
-| 3 | Lưu `KhieuNai`, `BangChungKhieuNai`; trạng thái `cho_xu_ly` |
-| 4 | Admin tiếp nhận; gán người xử lý và chuyển `dang_xu_ly` |
-| 5 | Admin xem bằng chứng và trao đổi liên quan theo quyền |
-| 6 | Ghi phản hồi, thời điểm xử lý; chuyển `da_xu_ly` |
-| 7 | Người gửi xem tiến độ và kết quả |
-
-Điều kiện:
-- Không cho gửi khiếu nại đối với giao dịch không thuộc quyền.
-- Cuộc trò chuyện phải thuộc đúng giao dịch khiếu nại.
-- Quyền Admin xem trao đổi gắn với khiếu nại liên quan.
-- Không tự động thay đổi người thắng hoặc trạng thái giao dịch
-  chỉ vì có khiếu nại.
-
-## 9. Luồng kiểm tra Mốc 2 đã có
-
-`React → API → Redis Streams → Worker → SELECT kiểm tra SQL → Redis → React`
-
-- API trả trạng thái `queued`.
-- Worker chỉ truy vấn kiểm tra, không ghi dữ liệu đấu giá.
-- Worker lưu `completed`; giao diện lấy kết quả qua API.
-- Socket.IO trong Mốc 2 mới kiểm tra kết nối bằng `system:hello`.
-
-## 10. Luồng tài khoản — đã triển khai trong bản cập nhật Mốc 3
-
-1. React gọi `GET /api/auth/csrf` với `credentials: include`.
-2. API tạo session ẩn danh trong Redis và trả token CSRF; cookie mang mã session.
-3. React đăng ký với họ tên, email, mật khẩu và header CSRF.
-4. Backend kiểm tra dữ liệu và giới hạn thử, băm Argon2id, INSERT tham số hóa vào NguoiDung.
-5. UNIQUE email bảo vệ đăng ký trùng; API công khai chỉ ghi vai trò `nguoi_dung`.
-6. Khi đăng nhập, backend đọc SQL và so hash, rồi đổi session ID và token CSRF.
-7. Trước khi trả thành công, session mới được lưu vào Redis.
-8. API `/me` và `/admin-check` đọc lại SQL để xác minh tài khoản và vai trò hiện tại.
-9. Đăng xuất hủy session trong Redis và xóa cookie; phát lại cookie cũ nhận 401.
-
-Luồng này không qua worker. HTTP 201 là đã tạo tài khoản; HTTP 200 đăng nhập chỉ trả
-sau khi session được lưu. Lỗi sau INSERT nhưng trước phản hồi có thể khiến client cần
-đăng nhập hoặc kiểm tra email thay vì gửi lại đăng ký nhiều lần.
-
-
-
-## 11. Chi tiết giao dịch Mốc 4 đã triển khai
-
-1. API xác thực chủ sách/CSRF, kiểm tra MIME/magic/kích thước, tạo vé Redis rồi upload Cloudinary.
-2. Client gửi nội dung và vé UUID; service claim toàn bộ vé nguyên tử, không tin URL/public_id từ client.
-3. Model mở transaction SQL, kiểm tra mã yêu cầu đã có; tạo sách, bài, phiên pending, media và lịch sử rồi COMMIT.
-4. Sau COMMIT, xóa ledger của vé đã gắn; acknowledgement lỗi được cleanup đối soát bằng reference SQL.
-5. Rollback chắc chắn trả vé về ready; kết quả commit không rõ giữ claim để tránh xóa nhầm file.
-6. Admin duyệt/từ chối trong transaction có khóa và đối chiếu row_version, ghi KiemDuyet và cập nhật cặp trạng thái.
-7. Chủ sách bị từ chối có thể bổ sung/gửi lại; giữ bài/phiên, media và lịch sử duyệt.
-8. Chủ sách đã duyệt đặt lịch/kích hoạt đúng phiên, SQL kiểm tra thời điểm UTC và trạng thái mới nhất.
-9. Đăng lại sau kết thúc không người thắng: khóa Sach, kiểm tra phiên cuối và kết quả,
-   tạo bài/phiên mới cùng Sach; giữ dữ liệu cũ. Thiếu KetQuaDauGia không đủ điều kiện đăng lại.
-10. Cleanup tệp hết hạn thực hiện ngoài transaction và chỉ destroy khi SQL xác nhận không được dùng.
-    Claim chưa rõ được giữ để đối soát, không tự chuyển thành orphan rồi xóa.
-
-Các thao tác Mốc 4 đi trực tiếp HTTP → SQL, không lẫn vào probe hoặc queue đặt giá dự kiến.
-AI lỗi/không có dữ liệu không khóa luồng duyệt thủ công.
+Giao dịch đã được tạo từ kết quả có người thắng, xác định người mua/bán và số tiền.
+Các chức năng mở trao đổi gắn giao dịch, xác nhận hoàn tất và phản hồi chưa triển khai.
+Hoàn tất cần đủ xác nhận hai bên; đánh giá uy tín theo quyền và điều kiện hoàn tất.
+Khiếu nại kiểm tra quan hệ người gửi–giao dịch–cuộc trò chuyện, lưu bằng chứng và xử lý theo quyền Admin.
+Không tự thay đổi người thắng hoặc trạng thái giao dịch chỉ vì có khiếu nại.
+Các chức năng này phải được đối chiếu thiết kế đã thống nhất trước khi triển khai.

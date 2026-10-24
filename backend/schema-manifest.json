@@ -9,6 +9,7 @@
     "PhienDauGia",
     "BinhLuan",
     "LuotDatGia",
+    "YeuCauDatGia",
     "LichSuDauGia",
     "KetQuaDauGia",
     "GiaoDich",
@@ -20,7 +21,7 @@
     "PhanTichAI",
     "ChiTietPhanTichAI"
   ],
-  "columns": 144,
-  "checks": 91,
+  "columns": 152,
+  "checks": 96,
   "uniqueConstraints": 14
 }

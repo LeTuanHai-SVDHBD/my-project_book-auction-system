@@ -1,220 +1,213 @@
-<!-- Mục đích: Lưu quyết định kỹ thuật, căn cứ và các lựa chọn chưa được thống nhất. -->
+<!-- Mục đích: Ghi quyết định kiến trúc, lý do áp dụng và giới hạn còn lại. -->
 
-# Nhật ký quyết định kỹ thuật
+# Quyết định kỹ thuật
 
-## ADR-001 — Một repository, hai tiến trình Backend
+## ADR-001 — Repository và tiến trình
 
-Trạng thái: Đã áp dụng trong bộ khung.
+**Trạng thái:** áp dụng.
 
-Quyết định:
-- Frontend và Backend nằm trong cùng repository.
-- Quản lý dependency bằng npm workspaces.
-- API và worker chạy riêng nhưng dùng chung mã nguồn Backend.
+Một repository chứa React và Backend, quản lý dependency bằng npm workspaces.
+API và worker là hai tiến trình dùng chung mã nguồn; không triển khai thành microservices.
+Mục tiêu là giữ cấu hình và quy tắc dùng chung, tách xử lý nền khỏi vòng đời HTTP request.
 
-Lý do:
-- Phù hợp quy mô đồ án.
-- Dễ chia sẻ cấu hình, quy tắc và công cụ kiểm tra.
-- Tách xử lý nền khỏi vòng đời HTTP request.
+## ADR-002 — Nguồn trạng thái có thẩm quyền
 
-## ADR-002 — SQL Server là nguồn trạng thái có thẩm quyền
+**Trạng thái:** áp dụng.
 
-Trạng thái: Đã chốt trong thiết kế.
+SQL Server quyết định trạng thái, lịch, giá và kết quả nghiệp vụ.
+Redis phục vụ session, hàng đợi, giới hạn thử và phối hợp; Redis lock không thay transaction SQL.
+Dữ liệu cần được đọc lại dưới khóa trước khi cập nhật, không dựa vào trạng thái client đang hiển thị.
 
-Quyết định:
-- Giá hiện tại, lượt hợp lệ, trạng thái phiên và người thắng
-  được xác định từ dữ liệu SQL Server.
-- Redis hỗ trợ hàng đợi và phối hợp xử lý.
-- Redis lock không thay thế giao dịch SQL và kiểm tra `row_version`.
+## ADR-003 — Quan hệ và ràng buộc dữ liệu
 
-Hệ quả:
-- Worker phải đọc lại dữ liệu trước khi quyết định.
-- Client không được quyết định kết quả từ dữ liệu đang hiển thị.
+**Trạng thái:** có trong schema.
 
-## ADR-003 — Dùng FK và UNIQUE cho quan hệ tối đa một bản ghi
+FK bảo vệ tham chiếu; UNIQUE bảo vệ quan hệ tối đa một bản ghi; NOT NULL xác định thuộc tính bắt buộc.
+Ví dụ KetQuaDauGia có FK/UNIQUE trên mã phiên, nên mỗi kết quả thuộc một phiên và mỗi phiên có tối đa một kết quả.
+Các ràng buộc đó không tự buộc mọi phiên phải có kết quả; luồng chốt phiên phải tạo dữ liệu nhất quán trong transaction.
 
-Trạng thái: Đã có trong DDL; chờ xác nhận thực thi trên SQL Server.
+## ADR-004 — Người thực hiện tùy chọn
 
-Ví dụ:
-`KetQuaDauGia.phien_dau_gia_id` có FK, UNIQUE và NOT NULL.
+**Trạng thái:** có trong schema.
 
-| Ràng buộc | Ý nghĩa |
-|---|---|
-| FK | Kết quả phải tham chiếu một phiên tồn tại |
-| UNIQUE | Một phiên không được xuất hiện trong nhiều kết quả |
-| NOT NULL | Mỗi kết quả phải thuộc một phiên |
+LichSuDauGia cho phép người thực hiện NULL để ghi hoạt động hệ thống.
+KhieuNai cho phép Admin NULL trước khi tiếp nhận. Tính tùy chọn ở bản ghi con không làm quan hệ trở thành một–một.
 
-Ký hiệu `FK, UNIQUE` trong bảng mô tả là cách liệt kê
-hai ràng buộc cùng áp dụng lên cột.
+## ADR-005 — Tiếp nhận bất đồng bộ và idempotency
 
-Trong SQL, FOREIGN KEY và UNIQUE vẫn là hai ràng buộc riêng.
+**Trạng thái:** áp dụng cho probe và đấu giá.
 
-Phía phiên có thể chưa có kết quả:
-- Mỗi phiên có `0..1` kết quả.
-- Mỗi kết quả thuộc đúng `1` phiên.
+HTTP 202 chỉ xác nhận tiếp nhận. Worker chỉ thông báo nghiệp vụ thành công sau SQL COMMIT.
+UUID yêu cầu và UNIQUE là lớp bảo vệ khi sự kiện được giao lại; xử lý lại không tạo dữ liệu trùng.
+Không khẳng định Redis Streams cung cấp cơ chế xử lý đúng một lần.
 
-FK và UNIQUE không tự buộc mọi phiên phải có kết quả.
-Khi phiên kết thúc, nghiệp vụ phải tạo kết quả nhất quán
-trong giao dịch chốt phiên.
+## ADR-006 — Giá và điều kiện kết thúc
 
-## ADR-004 — Cho phép thiếu người thực hiện ở một số quan hệ
+**Trạng thái:** đã triển khai trong policy và transaction đấu giá.
 
-Trạng thái: Đã chốt trong thiết kế.
+- `gia_toi_thieu` là ngưỡng kết thúc sớm, ẩn đối với người mua.
+- Lượt đầu bằng `gia_khoi_diem + k × buoc_gia`, `k >= 0`; lượt sau bằng `gia_hien_tai + k × buoc_gia`, `k >= 1`.
+- Chỉ kết thúc khi hết thời gian hoặc giá hợp lệ đạt/vượt ngưỡng; không có hủy giữa phiên/kết thúc thủ công.
+- Hết hạn có lượt hợp lệ thì giá cao nhất thắng dù chưa đạt ngưỡng.
+- Cooldown theo cùng người/cùng phiên, mặc định 20 giây, cấu hình 10–30 giây.
+- Chỉ tạo giao dịch nếu có người thắng.
 
-- `LichSuDauGia.nguoi_dung_id` được NULL để lưu hoạt động hệ thống.
-- `KhieuNai.admin_id` được NULL khi chưa có Admin tiếp nhận.
+## ADR-007 — Chẩn đoán tách khỏi nghiệp vụ
 
-Một người dùng vẫn có thể liên quan nhiều bản ghi lịch sử.
-Một Admin vẫn có thể xử lý nhiều khiếu nại.
+**Trạng thái:** áp dụng.
 
-Tính tùy chọn `0..1` ở mỗi bản ghi con không làm quan hệ thành 1–1.
+Probe có stream riêng, processor chỉ truy vấn đọc SQL.
+Endpoint chẩn đoán chỉ bật trong development và cần token riêng; token đó không thay đăng nhập.
+Probe không được ghi lượt đặt giá, kết quả hoặc giao dịch.
 
-## ADR-005 — Tiếp nhận bất đồng bộ và chống ghi trùng
+## ADR-008 — Dependency và cấu hình
 
-Trạng thái:
-- Đã áp dụng cho probe Mốc 2.
-- Luồng đặt giá chưa triển khai.
+**Trạng thái:** áp dụng.
 
-Quyết định:
-- HTTP 202 xác nhận tiếp nhận, không xác nhận nghiệp vụ thành công.
-- Mỗi yêu cầu đặt giá có mã định danh.
-- `LuotDatGia.ma_yeu_cau` có UNIQUE.
-- Xử lý lại yêu cầu đã thành công phải trả kết quả cũ.
-- Không khẳng định Redis Streams cung cấp xử lý đúng một lần.
-
-## ADR-006 — Quy tắc giá và kết thúc phiên
-
-Trạng thái: Đã chốt trong thiết kế.
-
-- Giữ tên cột `gia_toi_thieu`.
-- Cột này là ngưỡng kết thúc sớm, ẩn với người mua.
-- Phiên kết thúc khi hết thời gian hoặc đạt/vượt ngưỡng.
-- Khi hết hạn, lượt hợp lệ cao nhất vẫn thắng dù chưa đạt ngưỡng.
-- Không có kết thúc thủ công hoặc hủy giữa phiên.
-- Thời gian chờ đặt lại mặc định 20 giây, cho phép 10–30 giây.
-- Khoảng chờ áp dụng theo cùng người trong cùng phiên.
-
-## ADR-007 — Tách luồng kiểm tra khỏi nghiệp vụ
-
-Trạng thái: Đã áp dụng trong bộ khung.
-
-- Probe sử dụng stream hạ tầng riêng.
-- Processor probe chỉ kiểm tra SQL bằng truy vấn đọc.
-- Không dùng probe để ghi lượt đặt giá hoặc xác định người thắng.
-- API probe chỉ mở trong development và yêu cầu token chẩn đoán.
-- Token chẩn đoán không thay thế xác thực người dùng.
-
-## ADR-008 — Cấu hình và phiên bản thư viện
-
-Trạng thái: Đã áp dụng trong bộ khung.
-
-- Dùng Node.js 24 theo cấu hình `engines`.
-- Commit `package-lock.json` ở gốc.
-- Dùng `npm ci` khi cài theo bộ phiên bản đã khóa.
-- Không commit `.env`, dependency đã cài hoặc kết quả build.
-- Chỉ đưa `.env.example` chứa cấu hình mẫu vào repository.
+Dùng Node.js 24, lockfile ở gốc và npm workspaces. Cài theo lockfile bằng `npm ci`.
+Không commit `.env`, node_modules hoặc kết quả build. Cấu hình mẫu chỉ chứa placeholder.
+Thêm dependency hoặc thay kiến trúc cần được thống nhất trước; tích hợp Cloudinary dùng native Node APIs hiện có.
 
 ## ADR-009 — Phát thông báo sau COMMIT
 
-Trạng thái: Nguyên tắc đã chốt; cơ chế phục hồi chưa chốt.
+**Trạng thái:** nguyên tắc đã chốt; cơ chế phục hồi chưa triển khai.
 
-Yêu cầu:
-- Không phát thành công trước khi SQL COMMIT.
-- Worker và API là hai tiến trình riêng.
-- Cần cơ chế chuyển thông báo sang API và xử lý trường hợp
-  tiến trình dừng sau COMMIT nhưng trước khi phát thông báo.
+API và worker là tiến trình riêng. Cần chọn kênh chuyển thông báo, cơ chế phát lại sau COMMIT
+và loại trùng trước khi triển khai realtime nghiệp vụ. Transactional outbox là lựa chọn cần đánh giá,
+chưa phải thành phần đã có. Socket.IO hiện chỉ phát lời chào hạ tầng công khai.
 
-Chưa chọn:
-- Kênh chuyển thông báo từ worker sang API.
-- Có bổ sung transactional outbox hay cơ chế tương đương không.
-- Quy tắc phát lại và loại thông báo trùng.
+## ADR-010 — Session Redis và phân tách theo tab
 
-Phải thống nhất trước khi triển khai luồng đấu giá hoàn chỉnh.
+**Trạng thái:** áp dụng theo chính sách phiên riêng từng tab.
 
-## ADR-010 — Cơ chế đăng nhập
+- Argon2id lưu hash tại NguoiDung; API đăng ký công khai chỉ tạo người dùng thường.
+- `express-session`/RedisStore lưu session; API thật không chuyển sang MemoryStore khi Redis lỗi.
+- Cookie HttpOnly, SameSite=Lax, Secure khi production; thời hạn không hoạt động mặc định hai giờ.
+- Đăng nhập đổi session ID/CSRF, đăng xuất thu hồi ở Redis; tài khoản và vai trò được đọc lại từ SQL.
+- CSRF token chỉ giữ trong bộ nhớ. Không lưu mật khẩu, session ID hoặc bearer token vào Web Storage.
 
-Trạng thái: Đã chọn phương án A và triển khai trong bản cập nhật Mốc 3.
+Frontend tạo mã chọn tab ngẫu nhiên 32 ký tự hex trong sessionStorage và gửi `X-Tab-ID` cho mọi request tài khoản,
+bài đăng và media. Cookie của mỗi tab có tên `bookauction.sid.<tab-id>`. Backend chỉ đưa cookie được chọn
+vào middleware session; khi trả cookie hoặc clearCookie, ánh xạ về đúng tên của tab.
 
-Hải xác nhận chọn session Redis, cookie HttpOnly và Argon2.
+Dùng một middleware/store chung, không tạo middleware theo từng request/tab để tránh tăng listener và bộ nhớ.
+Mã tab không cấp quyền, không thay cookie ký hoặc CSRF. Header sai bị từ chối; tab có mã nhưng không có cookie vẫn chưa đăng nhập.
+Cookie chung không được dùng làm fallback cho request có mã tab. Client terminal không gửi header tiếp tục dùng
+`bookauction.sid` để giữ hợp đồng HTTP và smoke hiện có.
 
-- Dùng `express-session` và `connect-redis`; không dùng MemoryStore trong API thật.
-- Cookie chỉ chứa mã session, có HttpOnly và SameSite=Lax; Secure khi production.
-- Session hết hạn sau 2 giờ không hoạt động, gia hạn khi có request dùng session.
-- Đổi session ID và token CSRF sau khi đăng nhập thành công.
-- Đăng xuất xóa session ở Redis; không chỉ xóa thông tin trên React.
-- Argon2id lưu hash vào cột `NguoiDung.mat_khau` hiện có.
-- Đọc lại người dùng và vai trò từ SQL khi gọi API cần đăng nhập.
-- Đăng ký công khai chỉ tạo `nguoi_dung`; Admin tạo bằng script terminal riêng.
-- CSRF token gắn với session, gửi qua header; React chỉ giữ token trong bộ nhớ.
-- Redis giới hạn tổng lần thử đăng nhập, đăng ký và cấp CSRF; không bỏ qua khi Redis lỗi.
-- Không thêm bảng/cột session hoặc refresh token vào SQL Server.
+**Vòng đời đã thống nhất:** F5/Reload giữ đăng nhập; tài liệu mới tạo mã mới, kể cả khi sessionStorage được sao chép
+qua opener/nhân bản tab. Tab mới yêu cầu đăng nhập, logout chỉ ảnh hưởng tab hiện tại. Điều hướng nội bộ của ứng dụng
+là React state; nạp trang thành một tài liệu mới cũng tạo mã mới. Session cũ không còn được chọn vẫn hết hạn theo TTL;
+đóng tab không bảo đảm trình duyệt gửi được yêu cầu logout tới server.
 
-Các giới hạn mặc định đã triển khai:
+Đây là phân tách trải nghiệm theo tab, không phải ranh giới bảo mật giữa các script cùng origin.
+Trình duyệt vẫn quản lý cookie chung cho origin; client cần gửi đúng selector trên mọi API được bảo vệ.
 
 | Hoạt động | Giới hạn | Cửa sổ |
 |---|---|---|
-| Đăng nhập theo email | 10 lần thử | 15 phút |
-| Đăng nhập theo IP | 50 lần thử | 15 phút |
-| Đăng ký theo IP | 10 lần thử | 15 phút |
+| Đăng nhập theo email | 10 lần | 15 phút |
+| Đăng nhập theo IP | 50 lần | 15 phút |
+| Đăng ký theo IP | 10 lần | 15 phút |
 | Cấp CSRF theo IP | 60 lần | 1 phút |
 
-Bộ đếm tính tổng lần thử, kể cả lần thành công. Quá giới hạn trả HTTP 429 và `Retry-After`.
-Tên khóa dùng HMAC để không chứa email hoặc IP nguyên văn.
+Bộ đếm tính cả lần thành công; quá giới hạn trả 429/Retry-After. Khóa giới hạn dùng HMAC thay email/IP nguyên văn.
+Tham khảo: [express-session](https://expressjs.com/en/resources/middleware/session/),
+[sessionStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage).
 
-Hướng dẫn chạy, API và kiểm tra Admin: [README, mục 6–8](../README.md#6-kiểm-tra-tài-khoản-trên-giao-diện).
-Kết quả kiểm thử và xác nhận của nhóm: [VALIDATION.md](../VALIDATION.md).
+## ADR-011 — Bảo toàn volume Docker
 
-## ADR-011 — Tên volume Docker và bảo toàn liên kết dữ liệu
+**Trạng thái:** áp dụng.
 
-Trạng thái: Đã đồng bộ cấu hình mẫu và tài liệu; giữ nguyên fallback hiện hành.
+Compose project mang tên `my-project_book-auction-system`. Tên volume được cấu hình độc lập với project.
+Máy cài mới dùng hai tên chuẩn trong `.env.example`; cấu hình cũ thiếu biến giữ fallback hiện hành.
+Khi chuyển project phải lấy tên volume từ mount thực tế, không suy đoán theo tên repository.
+Không tự đổi tên, sao chép hoặc xóa volume đang có dữ liệu. Xem [docker-migration.md](docker-migration.md).
 
-- Project dùng tên `my-project_book-auction-system`.
-- Máy cài mới lấy `SQLSERVER_VOLUME_NAME` và `REDIS_VOLUME_NAME` từ `.env.example` qua `npm run setup`.
-- Tên volume mới lần lượt là `my-project_book-auction-system_sqlserver_data` và `my-project_book-auction-system_redis_data`.
-- `setup` không ghi đè hoặc bổ sung biến volume vào `.env` đã tồn tại.
-- Khi biến volume thiếu hoặc rỗng, Compose vẫn dùng `book-auction_sqlserver_data` / `book-auction_redis_data` như trước bản sửa này.
-- Khi chuyển từ volume mang tên khác, gán đúng tên đã quan sát bằng `docker inspect`; không suy đoán từ tên project.
-- Không tự đổi tên, sao chép hoặc xóa volume đã có dữ liệu.
+## ADR-012 — Cloudinary và ledger media
 
-Các bước chuyển đổi: [docker-migration.md](docker-migration.md).
+**Trạng thái:** áp dụng; còn giới hạn phục hồi cần đối soát thủ công.
+
+React gửi tệp nhị phân qua API xác thực/CSRF; server dùng fetch/FormData/Blob của Node 24 và credentials riêng
+để gọi Cloudinary REST. SQL lưu URL/public_id; migration 002 thêm hai cột nullable và index, giữ nguyên DDL nền.
+Migration 002 nâng schema nền lên 19 bảng/144 cột; migration 003 nâng tiếp lên 20 bảng/152 cột.
+URL cũ có thể chưa có public_id.
+
+Redis lưu vé và lịch cleanup, không lưu bytes. Tạo vé trước upload, thời hạn sử dụng một giờ;
+không TTL-xóa ledger. Lua claim kiểm tra chủ sở hữu và trạng thái nguyên tử.
+Không gọi provider khi giữ transaction SQL; sau COMMIT mới acknowledgement.
+SQL rollback chắc chắn trả vé về ready; kết quả commit chưa rõ giữ claim.
+
+Cleanup mỗi phút kiểm tra tham chiếu SQL trước khi destroy. SQL/provider lỗi giữ lại để retry.
+Claim chưa rõ và không có reference được giữ/cảnh báo để đối soát sau khi dừng API.
+Mất Redis có thể để lại orphan; không có distributed transaction SQL–Cloudinary.
+Chưa có chức năng xóa bài; xóa SQL thủ công không tự xóa tệp. File dùng chung giữa các lần đăng cần được bảo vệ theo reference.
+
+Giới hạn mặc định: 12 ảnh/3 video mỗi bài, 10 MB/ảnh, 50 MB/video, hai upload đồng thời/API process,
+60 lần thử/tài khoản/giờ. Đây là giới hạn kỹ thuật, không thay bộ tiêu chí thẩm định sách.
+Tham khảo: [Cloudinary Upload API](https://cloudinary.com/documentation/image_upload_api_reference).
+
+## ADR-013 — Vòng đời bài đăng và kiểm duyệt
+
+**Trạng thái:** áp dụng; tích hợp AI chưa triển khai.
+
+Tạo sách/bài/phiên/media/lịch sử trong transaction SERIALIZABLE; cặp pending và chưa có lịch.
+UUID ánh xạ `BK` + 32 ký tự hex thành mã sản phẩm UNIQUE; cùng mã trả bài đã tạo của đúng chủ,
+không dùng lại mã cho nội dung mới. Không thêm cột idempotency khác.
+
+Kiểm duyệt khóa cặp bài/phiên, kiểm tra version, ghi lý do và cập nhật nguyên tử.
+Duyệt cần xác nhận bằng chứng quý hiếm; điểm AI không tự quyết định duyệt.
+Bài từ chối có thể bổ sung nội dung/giá/media rồi gửi lại, giữ ID và lịch sử; không sửa Sach dùng trong lịch sử.
+Kích hoạt chỉ cập nhật đúng phiên đã duyệt của chủ sách, lịch hợp lệ theo đồng hồ SQL và UTC.
+
+Đăng lại khóa Sach, kiểm tra phiên cuối đã kết thúc và kết quả rõ không người thắng; tạo bài/phiên mới cùng Sach,
+không ghi đè lần trước. Thiếu kết quả không đủ điều kiện đăng lại.
+Public projection không có ngưỡng giá, owner/email, version hoặc nhận xét nội bộ.
+Chưa gọi Gemini thì trả `ai: null`, không tạo điểm/kết quả lỗi giả; kiểm duyệt thủ công vẫn hoạt động.
+
+## ADR-014 — Hợp đồng phiên bản dữ liệu
+
+**Trạng thái:** áp dụng.
+
+Đọc `CONVERT(BINARY(8), p.row_version)`, mã hóa bytes thành hex 16 ký tự viết hoa tại model.
+Dùng chung encoder cho list/detail và dòng đang khóa, giữ byte 0 đầu và không qua Number.
+Dữ liệu không đúng tám byte phải báo lỗi thay vì sinh token giả. HTTP vẫn yêu cầu đúng chuỗi hex;
+version cũ bị chặn 409 sau khi lấy khóa. Không thay đổi schema hoặc quy tắc trạng thái.
+Có test qua model thật/HTTP với driver giả trả binary; SQL thật cần smoke riêng.
+Tham khảo: [Microsoft rowversion](https://learn.microsoft.com/en-us/sql/t-sql/data-types/rowversion-transact-sql).
+
+## ADR-015 — Nhập tiền và độ chính xác
+
+**Trạng thái:** áp dụng.
+
+Ba ô giá khởi điểm/ngưỡng kết thúc sớm/bước giá chỉ hiển thị chữ số và dấu chấm nhóm nghìn.
+Input hiển thị tách khỏi hidden input mang chuỗi nguyên gửi API. Không chuyển tiền sang Number,
+không làm tròn và không âm thầm cắt bớt khi vượt 18 chữ số. Chỉnh sửa/xóa ở giữa chuỗi giữ con trỏ theo chữ số.
+Giá hiện tại thuộc nghiệp vụ đặt giá, không cho chủ sách tự nhập.
+Backend tiếp tục kiểm tra chuỗi nguyên dương, ngưỡng không nhỏ hơn giá khởi điểm và các ràng buộc SQL.
 
 
-## ADR-012 — Cloudinary và ranh giới giao dịch media
+## ADR-016 — Quyết định đặt giá và phục hồi consumer
 
-Trạng thái: Hải chọn Cloudinary; triển khai cho Mốc 4.
+**Trạng thái:** áp dụng; việc bổ sung schema đã được chủ dự án thống nhất.
 
-- React gửi tệp nhị phân qua API đã kiểm tra session, vai trò và CSRF. API dùng native fetch/FormData/Blob của Node 24,
-  gọi Cloudinary REST với credentials ở backend; không thêm dependency hoặc unsigned upload preset.
-- Cloudinary lưu tệp; SQL lưu URL và `cloudinary_public_id` để quản lý tài nguyên. Migration 002 thêm đúng hai cột nullable
-  cùng index, schema nền 001 không đổi. Tổng 19 bảng/144 cột sau migration; URL cũ vẫn sử dụng được, ID cũ có thể NULL.
-- Giới hạn tài nguyên cấu hình trong `.env`: mặc định 12 ảnh, 3 video, 10 MB/ảnh, 50 MB/video;
-  2 upload đồng thời/API process, 60 lần thử/tài khoản/giờ. Đây không phải tiêu chí nghiệp vụ của báo cáo.
-- Redis lưu vé upload và lịch cleanup, không lưu bytes. Tạo vé trước khi gọi provider để theo dõi cả upload bị ngắt.
-  Vé có thời hạn sử dụng 1 giờ, không TTL-xóa ledger; Lua claim kiểm tra chủ sở hữu và trạng thái nguyên tử.
-- Chỉ metadata từ vé đã claim được ghi vào SQL. COMMIT thành công mới trả kết quả nghiệp vụ.
-  Redis acknowledgement lỗi sau COMMIT không biến kết quả SQL thành rollback giả.
-- Cleanup mỗi phút kiểm tra SQL reference trước khi gọi destroy; không xóa file đã gắn bài hoặc đang claim chưa rõ.
-  Claim không rõ commit và không có reference được giữ lại/cảnh báo để đối soát thủ công; mất dữ liệu Redis có thể để lại orphan.
-  Không có distributed transaction SQL–Cloudinary; không khẳng định cleanup bảo đảm tuyệt đối sau mọi sự cố.
+Migration 003 thêm YeuCauDatGia với mã yêu cầu PRIMARY KEY, dữ liệu người/phiên/giá, quyết định cuối,
+lý do từ chối và thời điểm xử lý. LuotDatGia chỉ chứa lượt hợp lệ. Cùng mã được chuẩn hóa UUID v4;
+dùng lại cho nội dung khác trả 409. Migration giữ dữ liệu cũ, backfill lượt hợp lệ thành quyết định chấp nhận,
+giữ lý do kết thúc lịch sử NULL nếu chưa biết; không sửa DDL nền hoặc tự xóa database.
 
-Tài liệu REST chính thức: [Cloudinary Upload API](https://cloudinary.com/documentation/image_upload_api_reference).
+Redis admission ngăn xếp lặp cùng payload khi pending. Worker dùng stream nghiệp vụ riêng,
+Redis lock SET NX PX và token/Lua gia hạn/xóa. SQL vẫn quyết định bằng transaction SERIALIZABLE,
+khóa bài rồi phiên, rowversion, UPDATE có điều kiện và UNIQUE.
+Đọc đồng hồ SQL sau khi lấy khóa và dữ liệu mới nhất. Mất lease trước COMMIT thì rollback/retry;
+SQL bảo vệ tính nhất quán ngay cả khi lease hết hạn lúc COMMIT.
 
-## ADR-013 — Vòng đời bài đăng Mốc 4 và AI ở Mốc 7
+Quyết định, lượt giá, cập nhật giá/lịch sử và kết quả/giao dịch khi cần cùng COMMIT.
+Lỗi COMMIT chưa rõ không báo từ chối giả; giữ thông điệp để xử lý lại và đọc quyết định SQL.
+Consumer ACK rồi xóa thông điệp đã xử lý trong cùng Redis MULTI sau COMMIT;
+pending nhận lại bằng XAUTOCLAIM, không tuyên bố xử lý đúng một lần.
+Không tự cắt stream theo MAXLEN để tránh xóa mất pending. Dead-letter cần đối soát riêng.
 
-Trạng thái: triển khai theo lộ trình đã gửi.
-
-- Tạo `Sach`, `BaiDang`, `PhienDauGia`, media và lịch sử trong cùng transaction SQL SERIALIZABLE.
-  Bài/phiên chờ duyệt, chưa có lịch. Không gọi provider/AI khi đang giữ transaction.
-- Mã yêu cầu UUID ánh xạ thành `BaiDang.ma_san_pham` (`BK` + 32 ký tự hex); UNIQUE hiện có bảo vệ retry.
-  Cùng mã trả bài đã tạo của đúng chủ, không cập nhật bằng nội dung mới. Không thêm cột idempotency khác.
-- Kiểm duyệt khóa cặp bài/phiên, đối chiếu `row_version`, lưu lý do và cập nhật hai trạng thái nguyên tử.
-  Duyệt yêu cầu xác nhận kiểm tra bằng chứng quý hiếm; dữ liệu/điểm AI không tự quyết định duyệt.
-- Bài bị từ chối được bổ sung mô tả bài, thông số giá và media rồi gửi lại, giữ ID bài/phiên và mọi quyết định cũ.
-  Bản ghi sách và media đã lưu không bị sửa/xóa; khác với đăng lại sau phiên không có người thắng.
-- Kích hoạt chỉ cập nhật phiên đã qua kiểm duyệt của chủ sách. SQL kiểm tra giờ bắt đầu tương lai,
-  giờ kết thúc sau bắt đầu; lưu datetime UTC. Không có kết thúc thủ công hoặc sửa giá/lịch sau kích hoạt.
-- Đăng lại lấy sách làm điểm khóa ổn định, kiểm tra bài/phiên mới nhất đã kết thúc và kết quả rõ không người thắng.
-  Tạo bài/phiên mới giữ `sach_id`; thông số giá và lịch sử trước giữ nguyên. Không suy ra không người thắng từ việc thiếu kết quả.
-- Public API dùng projection cho phép riêng, không trả `gia_toi_thieu`, owner/email, row_version hay nhận xét nội bộ.
-  Tiền 18 chữ số dùng chuỗi JSON và VARCHAR→DECIMAL trong SQL để tránh làm tròn bằng JavaScript Number.
-- Mốc 4 chưa gọi Gemini. Không có phân tích thì trả `ai: null`, hiển thị chưa tích hợp; không ghi điểm/kết quả lỗi giả.
-  Đọc được kết quả AI đã có để Admin tham khảo, nhưng tích hợp và chấm điểm thực hiện ở Mốc 7.
+Job mỗi giây tìm tối đa 50 phiên hết hạn theo SQL và xếp yêu cầu chốt, chống xếp lặp trong 10 giây.
+Kết thúc có hai lý do đã chốt, lưu tại KetQuaDauGia.ly_do_ket_thuc; chỉ tạo GiaoDich khi có người thắng.
+Giao diện poll quyết định của mình, tải lại snapshot phiên khi cần; realtime nghiệp vụ chưa triển khai.
+Chi tiết: [Xử lý đấu giá](auction-processing.md).

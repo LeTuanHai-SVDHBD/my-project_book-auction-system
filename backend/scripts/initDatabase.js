@@ -5,6 +5,7 @@ import sql from 'mssql';
 import { readFile } from 'node:fs/promises';
 import { config } from '../src/config/env.js';
 import manifest from '../schema-manifest.json' with { type: 'json' };
+import {applyMigrations} from './schemaMigrations.js';
 let master; let app;
 try {
   master = await new sql.ConnectionPool({ ...config.sql, database: 'master' }).connect();
@@ -16,7 +17,8 @@ try {
   const found = await app.request().query(`SELECT COUNT(*) AS n FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name='dbo' AND t.name IN (${names})`);
   if (found.recordset[0].n > 0) {
     const columns = await app.request().query(`SELECT COUNT(*) AS n FROM sys.columns c JOIN sys.tables t ON c.object_id=t.object_id JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name='dbo' AND t.name IN (${names})`);
-    if (found.recordset[0].n !== 19 || ![142, manifest.columns].includes(columns.recordset[0].n)) throw new Error('Schema đang có chưa khớp 19 bảng/142 hoặc 144 trường. Dừng để bảo vệ dữ liệu; không tự sửa hay xóa.');
+    const signature=`${found.recordset[0].n}/${columns.recordset[0].n}`;
+    if (!['19/142','19/144',`${manifest.tables.length}/${manifest.columns}`].includes(signature)) throw new Error('Schema đang có không khớp cấu trúc đã biết. Dừng để bảo vệ dữ liệu; không tự sửa hay xóa.');
     console.log('Database đã có schema nền; giữ nguyên dữ liệu.');
   } else {
     const contents = await readFile(new URL('../migrations/001_schema.sql', import.meta.url), 'utf8');
@@ -24,8 +26,8 @@ try {
     for (const batch of batches) await app.request().batch(batch);
     console.log('Đã khởi tạo schema 19 bảng của hệ thống đấu giá sách.');
   }
-  await app.request().batch(await readFile(new URL('../migrations/002_cloudinary_metadata.sql', import.meta.url), 'utf8'));
-  console.log('Schema Mốc 4 sẵn sàng: 19 bảng, 144 cột.');
+  await applyMigrations(app);
+  console.log(`Schema sẵn sàng: ${manifest.tables.length} bảng, ${manifest.columns} cột.`);
 } catch (error) {
   console.error('Khởi tạo thất bại:', String(error.message).replaceAll(config.sql.password, '[REDACTED]'));
   process.exitCode = 1;

@@ -1,59 +1,138 @@
-<!-- Mục đích: Lưu bằng chứng kiểm tra, phân biệt phụ thuộc thật và giả. -->
+<!-- Mục đích: Ghi bằng chứng kiểm tra, phụ thuộc thật/giả và giới hạn nghiệm thu. -->
 
 # Kết quả kiểm tra
 
-Ngày 22/10/2026. Bản Mốc 4 được xây trên nhánh `feat/Hai`, nền commit
-`24447dba38445eac4221b980596f2ebf3fb08b02`.
+Cập nhật ngày 24/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
+Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
-## 1. Xác nhận của Hải trước Mốc 4
+## Giao diện đặt giá và thời gian chờ
 
-- SQL Server và Redis healthy, giao diện đủ năm trạng thái sẵn sàng, probe completed.
-- Đăng ký/đăng nhập người dùng và tạo/đăng nhập Admin thành công.
-- Hải xác nhận hai lệnh `npm.cmd run smoke` và `npm.cmd run smoke:auth` đều PASS.
+Kiểm tra ngày 24/10/2026 cho giao diện chủ sách/người mua:
 
-Theo bằng chứng đó Mốc 3 đã hoàn thành trên máy phát triển của nhóm.
-Không khẳng định đã nhận log/ảnh đầy đủ hoặc đã chạy trực tiếp SQL trên máy Hải.
-Sau khi cập nhật M4 cần chạy lại hai smoke để kiểm tra hồi quy.
+- Test mặc định: **75 PASS, 6 SKIP** theo opt-in SQL/Redis; không FAIL. Check cú pháp: **74 tệp PASS**; build PASS.
+- HTTP thật kiểm tra `bid-status` cần đăng nhập, lấy ID từ session, bỏ qua ID tự chèn trong query;
+  chỉ trả trạng thái chủ sách, mốc đặt lại của chính người xem và giờ máy chủ. Snapshot công khai không có dữ liệu này.
+- Unit test kiểm tra đếm chờ dựa trên giờ SQL, làm tròn lên, biên hết hạn và phản hồi không hợp lệ.
+- Chromium cùng browser context: chủ sách không có ô/nút đặt giá; người mua đang chờ không có ô/nút đặt tiếp;
+  hết chờ tự kiểm tra lại rồi hiện thông báo và nút. F5/mở lại chi tiết giữ chờ; người mua khác vẫn đặt được.
+- Trạng thái tab cũ dẫn tới `BID_COOLDOWN` được thay bằng đếm chờ, không hiển thị cảnh báo từ chối cũ.
+  Không tải được điều kiện đặt giá thì không mở thao tác; phiên kết thúc không cho đặt tiếp.
+- Gõ/dán chữ vào ô chờ được lọc; số ngoài 10–30 không gửi được, giá trị hợp lệ gửi API dạng số.
+  Đã xem ảnh desktop/mobile, không tràn ngang hoặc có pageerror.
 
-## 2. Kiểm tra bản Mốc 4 trong môi trường chuẩn bị
+Trình duyệt dùng React, HTTP và session thật; SQL, hàng đợi xử lý giá và media được giả lập.
+Đã bổ sung kiểm tra mốc cooldown vào test SQL opt-in và `smoke:m5`, chưa chạy hai phần này với dịch vụ thật
+cho bản sửa hiện tại. Không thay schema, dependency hoặc quy tắc cooldown 10–30 giây.
+Các bằng chứng SQL/Redis thật bên dưới thuộc lần triển khai lõi trước đó.
 
-| Hạng mục | Kết quả | Giới hạn |
-|---|---|---|
-| Node/dependency | Node 24.19.0, giữ nguyên dependency và package-lock | Dùng bộ dependency đã cài bằng npm ci ở bản nền; không thêm thư viện |
-| Cú pháp | Đạt, 51 file JavaScript qua `npm run check` | Không phải kiểm tra thực thi T-SQL |
-| Test mặc định | 45 đạt, 2 SKIP | SQL/Cloudinary giả; bài Redis thật bật opt-in |
-| Test có Redis thật | 47/47 đạt | Redis 7.0.15 riêng; SQL/provider vẫn giả |
-| Build React | Đạt, Vite 8.3.5 | Không chứng minh kết nối SQL/Cloudinary thật |
-| Browser desktop/mobile | Đạt luồng tạo → từ chối → bổ sung → duyệt → kích hoạt → danh mục | React/Express/Redis thật, SQL và Cloudinary giả; viewport 1440 và 390 px |
-| Cookie/session | Giữ cơ chế M3, HTTP test hồi quy đạt | Production HTTPS chưa kiểm tra |
-| SQL migration 002 | Đã kiểm tra mã: thêm hai cột nullable/index, 001 không đổi | Chưa chạy trên SQL Server thật trong môi trường này |
-| Upload/destroy Cloudinary | Test REST contract, kiểm tra URL/kind/public_id và lỗi redacted | Không có credentials; chưa upload/destroy thật |
-| Video thật | Chưa kiểm tra | Có test magic WebM và route dùng chung; nhóm cần thử MP4/WebM thật |
-| smoke, smoke:auth, smoke:m4 sau M4 | Chưa chạy thật | Không có SQL Server/Docker và credentials Cloudinary ở đây |
+## Chạy chung các tiến trình phát triển
 
-Các ca M4 gồm tiền chuỗi 18 chữ số, trường không được phép, UUID/version, lịch có múi giờ,
-quý hiếm/lý do duyệt, trạng thái đôi, điều kiện đăng lại latest/no-winner/winner/missing-result,
-public projection, auth/role/CSRF, MIME/magic và Cloudinary response validation.
-Service test phân biệt rollback chắc chắn, commit chưa rõ và acknowledgement Redis lỗi sau COMMIT.
+Kiểm tra ngày 24/10/2026 cho `npm.cmd run dev:all` dùng `concurrently` 10.0.6:
 
-Redis thật kiểm tra ownership, claim đồng thời chỉ một request thắng, release/retry,
-cleanup không xóa file được SQL tham chiếu, giữ claim chưa rõ, SQL lỗi không destroy,
-xóa tệp bỏ dở và vé hết hạn. Prefix UUID riêng được dọn; không xóa khóa ứng dụng.
-Browser kiểm tra upload PNG nhị phân qua API, role riêng, giữ ID phiên khi kích hoạt,
-không hiển thị ngưỡng giá trên trang công khai, không tràn ngang và không có pageerror.
-Ảnh QA là đầu ra tạm của quá trình kiểm tra, không đưa vào repository.
+- `npm ci` thành công với lockfile mới; phiên bản dependency đã có được giữ nguyên.
+- `npm run check`: PASS 73 tệp; `npm run build`: PASS.
+- Lệnh thực khởi chạy API, worker và Vite, log có nhãn `[API]`, `[WORKER]`, `[WEB]` và mã màu ANSI.
+- API và giao diện nhận HTTP; gửi SIGINT cho nhóm tiến trình để mô phỏng `Ctrl+C` dừng nhóm thành công.
+- SQL/Redis được cố ý cấu hình không khả dụng trong kiểm tra launcher; không kiểm tra readiness hoặc nghiệp vụ.
 
-## 3. Phần cần nghiệm thu trên Windows của nhóm
+Kiểm tra tự dừng khi cổng web bị chiếm chưa đạt trong môi trường Linux có PID namespace:
+`tree-kill` không tra cứu được cây PID của lệnh con qua `ps`. Đây là giới hạn kiểm chứng của môi trường này;
+không coi đó là bằng chứng tự dừng thành công. Cần thử `Ctrl+C` và lỗi cổng trên Windows của nhóm.
+Không chạy lại bộ kiểm thử nghiệp vụ hoặc smoke SQL/Cloudinary cho thay đổi lệnh khởi động này.
+Các kết quả nghiệp vụ bên dưới là bằng chứng của lần kiểm tra trước.
 
-Làm theo README mục 11: `setup:media`, cấu hình Cloudinary local, `db:migrate`, khởi động API/worker/web,
-rồi chạy check/test/build/smoke/smoke:auth/smoke:m4. Không xóa dữ liệu hay volume M3.
+## Môi trường
 
-Smoke M4 dùng tài khoản/dữ liệu UUID riêng: kiểm tra rollback SQL khi gắn media lỗi,
-retry tạo bài, quyền/CSRF, cặp trạng thái pending/reject/approve, kiểm duyệt đồng thời,
-kích hoạt đúng phiên, ẩn giá và fixture kết quả không người thắng/có người thắng cho đăng lại.
-Chỉ PASS nếu dọn cả SQL và Cloudinary thành công. Fixture không tạo API kết thúc thủ công.
-Đây là script **chờ chạy**, không phải bằng chứng đã thực thi trong môi trường chuẩn bị.
+| Thành phần | Kiểm tra đã thực hiện |
+|---|---|
+| Node.js | 24.19.0, dependency giữ theo lockfile |
+| HTTP | Express, session, CSRF và quyền qua HTTP thật |
+| SQL chuyên biệt đấu giá | SQL Server 2025 Developer 17.0.5035.5 trên Ubuntu 24.04, database riêng `BookAuctionTest_*` |
+| SQL trong các unit test cũ | Driver/model giả để kiểm tra hợp đồng và lỗi |
+| Redis | Redis 7.0.15 riêng, prefix UUID, cleanup đúng khóa test |
+| API/worker | Tiến trình thực từ server.js/worker.js với SQL/Redis thật |
+| Frontend | React/Vite 8.3.5, Chromium desktop/mobile trong cùng browser context |
+| Cloudinary | Provider/REST giả ở unit test; không dùng trong smoke đấu giá |
 
-Chưa có kiểm thử tải lớn, thời lượng video, distributed commit SQL–Cloudinary hoặc phục hồi hoàn toàn khi mất Redis.
-Claim chưa rõ commit được giữ để đối soát thủ công; không đánh đổi an toàn media bằng xóa phỏng đoán.
-Mốc 5 (đặt giá/kết thúc), Mốc 6 realtime nghiệp vụ và Mốc 7 AI chưa triển khai trong bản này.
+Compose của nhóm dùng SQL Server 2022 và Redis 8. Hai cấu hình này không bị thay đổi.
+Bằng chứng SQL Server 2025/Redis 7 không thay nghiệm thu với đúng phiên bản Compose và Cloudinary của nhóm.
+
+## Kết quả gần nhất
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Full test bật SQL/Redis thật | 87/87 PASS trước bản sửa giao diện; chưa chạy lại cho endpoint mới |
+| Test mặc định | 75 PASS, 6 SKIP theo opt-in, không FAIL |
+| Check cú pháp | PASS 74 file |
+| Build Frontend | Đã đạt; không thêm dependency |
+| db:init và db:migrate | PASS trên database kiểm tra, có chạy migration lặp lại |
+| smoke | PASS với SQL/Redis/API/worker thật, Socket.IO hello và probe |
+| smoke:auth | PASS qua API và SQL/Redis thật, cleanup tài khoản thử hoàn tất |
+| smoke:m5 | PASS toàn luồng thật, cleanup dữ liệu thử hoàn tất |
+| Browser đấu giá | PASS nhiều tab cùng context, trạng thái chờ, lỗi mạng/retry, người thắng và mobile |
+| Browser tài khoản/media trước đó | PASS tách tab và ba ô tiền; Redis thật, SQL/Cloudinary giả |
+
+## SQL và phục hồi đấu giá
+
+Test SQL riêng đã xác minh:
+
+- Migration 003 chạy lại giữ dữ liệu, backfill lượt cũ thành quyết định chấp nhận, giữ lý do lịch sử NULL.
+- Schema hiện tại có 20 bảng/152 cột.
+- Hai yêu cầu cùng giá chỉ một lượt được ghi; cùng mã xử lý đồng thời chỉ có một quyết định/lượt.
+- Nội dung khác dùng cùng mã bị chặn; quyết định từ chối cũ không đổi dù lịch phiên đã thay đổi.
+- SQL kiểm tra chủ sách, vai trò, bước giá và cooldown, không chỉ tin kết quả API.
+- Tiền 18 chữ số đi qua driver, DECIMAL, giá thắng và giao dịch nguyên vẹn.
+- Ngưỡng bằng khởi điểm hoặc giá hợp lệ vượt ngưỡng đều kết thúc đúng.
+- Hết hạn có lượt dưới ngưỡng vẫn có người thắng; không có lượt thì không tạo giao dịch.
+- Lỗi trước COMMIT rollback cả quyết định/lượt/giá/kết quả/giao dịch; retry ghi đúng một lần.
+- Lease hết hạn trong transaction: chủ cũ rollback, worker mới ghi một lượt.
+- Crash sau COMMIT/trước ACK: XAUTOCLAIM nhận lại và đọc receipt, không thêm lượt/lịch sử.
+- Job chốt hạn và xử lý lại không tạo thêm kết quả/giao dịch.
+
+Redis test riêng xác minh admission 12 request đồng thời chỉ xếp một event, kiểm tra payload trùng,
+pending khi lỗi SQL, reclaim, ACK/xóa sau xử lý và dead-letter cho sự kiện sai loại.
+Không dùng fake SQL của test consumer làm bằng chứng cho tính nguyên tử SQL; test SQL riêng ở trên kiểm tra phần đó.
+
+## Smoke dịch vụ thật
+
+Chạy init/migrate, API và worker thực, sau đó các lệnh smoke, smoke:auth và smoke:m5.
+Smoke đấu giá tạo sách/bài qua API, duyệt/kích hoạt, gửi giá qua stream thực, kiểm tra kết quả SQL.
+Kiểm tra chủ sách/CSRF/Admin, bước giá/cooldown, hai người cùng giá, replay cùng mã,
+giá 18 chữ số, hai kiểu kết thúc và kết quả/giao dịch duy nhất.
+Phục hồi sau COMMIT trước ACK dùng stream UUID riêng, không dừng worker của hệ thống.
+Không cần upload/credentials Cloudinary cho các bước này. Chỉ PASS khi dọn xong fixture riêng.
+
+## Trình duyệt
+
+Chromium dùng một browser context với Admin và ba người mua, chung cookie jar.
+Đăng nhập/đăng xuất từng tab không đổi tài khoản Admin ở tab còn lại.
+Tạm dừng worker kiểm tra phản hồi 202 vẫn là đang chờ, không báo mức giá được chấp nhận.
+Khôi phục worker thì giao diện lấy đúng quyết định SQL.
+
+Chặn phản hồi HTTP sau khi request đã tới API và chặn lần poll đầu để mô phỏng mất kết nối.
+Nút thử lại gửi đúng UUID/mức giá cũ; chỉ thêm một lượt hợp lệ.
+Phản hồi POST chậm không hạ quyết định cuối về đang chờ; card và chi tiết giữ cùng giá/trạng thái.
+Giá nhập có dấu chấm nhưng JSON nguyên, ngưỡng không xuất hiện trong public snapshot.
+Kết thúc sớm hiển thị người thắng; nút tải lại lấy đúng trạng thái/giá.
+Desktop 1440 px, mobile 390 px không tràn ngang; không có pageerror.
+Ảnh QA đã được xem để kiểm tra bố cục; harness/ảnh tạm nằm ngoài repository.
+
+## Hồi quy hiện có
+
+Full suite giữ các kiểm tra Argon2id, không tự nâng quyền, đổi/thu hồi session, TTL,
+CSRF, CORS, giới hạn thử, header tab và listener. SQL/HTTP rowversion kiểm tra bytes → hex và xung đột.
+Media test kiểm tra MIME/magic/giới hạn, ownership, claim/cleanup Redis, rollback và commit chưa rõ;
+provider Cloudinary giả. Các ô tiền kiểm tra lọc chữ, caret, giới hạn và độ chính xác 18 chữ số.
+
+## Xác nhận của nhóm và nghiệm thu còn lại
+
+Nhóm đã xác nhận hạ tầng healthy/probe completed, smoke tài khoản và Admin phê duyệt sau sửa row_version.
+Chưa có xác nhận smoke bài đăng toàn luồng sau bản sửa mới nhất; không tự coi đó là PASS Cloudinary thật.
+
+Trên Windows của nhóm: dừng các tiến trình, pull, chạy db:migrate, khởi động lại API/worker/web,
+kiểm tra readiness 20 bảng/152 cột và chạy smoke:m5 trên SQL Server 2022/Redis Compose.
+Chạy lại smoke:m4 để nghiệm thu media/đăng lại với Cloudinary thật.
+Đối chiếu hai tab, nhập tiền, đặt giá và xem kết quả qua giao diện.
+
+Chưa có thực nghiệm tải lớn hoặc production HTTPS. Realtime nghiệp vụ, AI và xác nhận hoàn tất giao dịch
+chưa triển khai. Claim media chưa rõ COMMIT vẫn cần đối soát thủ công; dead-letter đấu giá cũng cần đối soát riêng.

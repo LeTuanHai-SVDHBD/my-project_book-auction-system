@@ -1,10 +1,12 @@
 /** HTTP tài khoản: gửi cookie bằng credentials; CSRF chỉ giữ trong bộ nhớ. */
+import {getTabId} from './tabIdentity.js';
 const base = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
 let csrfToken;
 let bootstrap;
 export async function apiRequest(path, options = {}) {
-  const response = await fetch(`${base}/api${path}`, { credentials: 'include',
-    signal: AbortSignal.timeout(12000), ...options });
+  const headers=new Headers(options.headers);headers.set('x-tab-id',getTabId());
+  const response = await fetch(`${base}/api${path}`, { signal:AbortSignal.timeout(12000), ...options,
+    credentials:'include',headers });
   const body = response.status === 204 ? null : await response.json();
   if (!response.ok) {
     if (body?.error === 'INVALID_CSRF') csrfToken = undefined;

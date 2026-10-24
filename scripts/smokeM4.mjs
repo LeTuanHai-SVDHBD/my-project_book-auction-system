@@ -99,7 +99,7 @@ finally {
         ids.forEach((value,index)=>req.input(`u${index}`,sql.Int,value));
         const params=ids.map((_,index)=>`@u${index}`).join(',');
         const result=await req.query(`DECLARE @posts TABLE(id INT); DECLARE @auctions TABLE(id INT); DECLARE @books TABLE(id INT);
-          INSERT @posts SELECT bai_dang_id FROM dbo.BaiDang WHERE nguoi_dung_id IN (${params});
+          INSERT @posts SELECT bai_dang_id FROM dbo.BaiDang WITH (UPDLOCK,HOLDLOCK) WHERE nguoi_dung_id IN (${params});
           INSERT @auctions SELECT phien_dau_gia_id FROM dbo.PhienDauGia WHERE bai_dang_id IN(SELECT id FROM @posts);
           INSERT @books SELECT DISTINCT sach_id FROM dbo.BaiDang WHERE bai_dang_id IN(SELECT id FROM @posts);
           SELECT 'image' AS kind,cloudinary_public_id AS publicId FROM dbo.HinhAnh WHERE bai_dang_id IN(SELECT id FROM @posts) AND cloudinary_public_id IS NOT NULL

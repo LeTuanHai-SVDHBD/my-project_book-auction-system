@@ -33,14 +33,21 @@ import {createAuctionService} from './services/auction.service.js';
 import {createAuctionRouter} from './routes/auction.routes.js';
 import {createAuctionNotifier,subscribeAuctionUpdates} from './events/auctionUpdates.js';
 import {attachAuctionSockets} from './realtime/auctionSockets.js';
+import {parseAiConfig} from './config/ai.js';
+import {createAiModel} from './models/ai.model.js';
+import {createAiQueue} from './ai/queue.js';
+import {createAiService} from './services/ai.service.js';
+import {createAiRouter} from './routes/ai.routes.js';
 const authConfig = parseAuthConfig(process.env);
 const users = createUserModel({ getPool, sql });
 const sessionMiddleware = createSessionMiddleware(authConfig, new RedisStore({ client: redis, prefix: 'bookauction:auth:session:' }));
 const mediaConfig = parseMediaConfig(process.env);
 const model = createPostModel({getPool,sql});
+const aiService=createAiService({posts:model,model:createAiModel({getPool,sql}),queue:createAiQueue({getRedis:requireRedis}),config:parseAiConfig(process.env)});
+const aiRouter=createAiRouter({sessionMiddleware,users,service:aiService});
 const provider = createCloudinary({config:mediaConfig});
 const ledger = createMediaLedger({getRedis:requireRedis,provider,isReferenced:id=>model.isMediaReferenced(id),config:mediaConfig});
-const service = createPostService({model,ledger,limits:mediaConfig,notify:createAuctionNotifier({getRedis:requireRedis}),log:logError});
+const service = createPostService({model,ledger,limits:mediaConfig,notify:createAuctionNotifier({getRedis:requireRedis}),enqueueAi:aiService.enqueue,log:logError});
 const postRouter = createPostRouter({sessionMiddleware,users,model,service,limits:mediaConfig});
 const mediaRouter = createMediaRouter({sessionMiddleware,users,config:mediaConfig,provider,ledger});
 const auctionModel=createAuctionModel({getPool,sql});
@@ -49,7 +56,7 @@ const auctionRouter=createAuctionRouter({sessionMiddleware,users,model:auctionMo
 const authRouter = createAuthRouter({ authConfig, sessionMiddleware, users, passwords,
   limiter: createAuthRateLimiter({ getRedis: requireRedis, secret: authConfig.secret }),
   ready: () => redis.isReady });
-const app = createApp({ config, authRouter, postRouter, mediaRouter, auctionRouter, deps: { sqlserver: databaseStatus, redis: redisStatus, worker: workerStatus },
+const app = createApp({ config, authRouter, postRouter, mediaRouter, auctionRouter, aiRouter, deps: { sqlserver: databaseStatus, redis: redisStatus, worker: workerStatus },
   probes: { enqueue: () => enqueueProbe(requireRedis()), get: async id => {
     const raw = await requireRedis().get(INFRA.resultPrefix + id); return raw ? JSON.parse(raw) : null;
   } }, log: logError });

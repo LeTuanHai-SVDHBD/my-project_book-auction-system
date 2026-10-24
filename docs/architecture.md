@@ -16,13 +16,13 @@ SQL Server giữ trạng thái nghiệp vụ có thẩm quyền; Redis hỗ tr�
 | Express API | Xác thực, phân quyền, đầu vào, nghiệp vụ HTTP và Socket.IO | SQL Server, Redis, Cloudinary |
 | SQL Server | Tài khoản, sách, bài, phiên, quyết định giá, kết quả, giao dịch và lịch sử | Thư viện `mssql`, truy vấn tham số hóa |
 | Redis | Session, vé media, admission đặt giá, khóa phiên, giới hạn thử, probe và heartbeat | Redis client; Lua khi cần thao tác nguyên tử |
-| Redis Streams | Stream probe và stream nghiệp vụ đấu giá độc lập | Consumer group tại worker |
-| Worker | Đọc/xử lý probe và đấu giá; job chốt hạn | Hai kết nối BLOCK riêng; transaction SQL nghiệp vụ |
+| Redis Streams | Stream probe, đấu giá và AI độc lập | Consumer group tại worker |
+| Worker | Đọc/xử lý probe, đấu giá và AI; chốt hạn và đối soát AI | Ba kết nối BLOCK riêng; transaction SQL nghiệp vụ |
 | Cloudinary | Lưu và phân phối ảnh/video | HTTPS REST từ Backend; SQL lưu URL/public_id |
 | Socket.IO | Room phiên/danh mục chỉ đọc, tín hiệu sau COMMIT và `system:hello` | Subscriber Redis riêng tại mỗi API; không phát dữ liệu riêng tư |
-| Gemini API | Phân tích sách dự kiến | Chưa tích hợp; Admin hiện kiểm duyệt thủ công |
+| Gemini API | Quan sát sách/media theo hợp đồng JSON; không quyết định duyệt | HTTPS chỉ từ worker; Backend kiểm tra/tính điểm rồi lưu SQL |
 
-Frontend không truy cập SQL hoặc Redis trực tiếp. Bí mật Cloudinary chỉ có ở Backend.
+Frontend không truy cập SQL hoặc Redis trực tiếp. Bí mật Cloudinary/Gemini chỉ có ở Backend.
 API, worker và React chạy riêng; SQL Server và Redis chạy trong Docker theo [README](../README.md).
 
 ## Phân lớp Backend
@@ -82,7 +82,15 @@ sau khi đăng ký lại room và mỗi 5 giây để bù sự kiện lỡ. Snap
 Quyết định của người đặt vẫn được đọc qua HTTP có xác thực, không đưa session vào Socket.
 Không có outbox hoặc cam kết giao mọi thông báo; phục hồi trạng thái hiện tại bằng SQL. Xem [realtime.md](realtime.md) và ADR-009.
 
+## Phân tích sách
+
+Sau khi đăng/gửi duyệt lại COMMIT, API xếp job AI riêng. Worker gửi thông tin sách đã lọc và media đủ điều kiện,
+kiểm tra JSON, áp dụng bộ điểm cố định, rồi lưu PhanTichAI/ChiTietPhanTichAI nguyên tử.
+Tác vụ đối soát tìm bài pending chưa có lần phân tích của phiên bản hiện tại, bù lỗi enqueue.
+Không gọi Gemini trong SQL transaction; không sửa trạng thái bài/phiên khi lưu AI.
+Chi tiết quy tắc, phục hồi và giới hạn tại [ai-analysis.md](ai-analysis.md).
+
 ## Phạm vi phát triển tiếp theo
 
-AI, xác nhận hoàn tất giao dịch, trò chuyện, bình luận, đánh giá và khiếu nại
+Xác nhận hoàn tất giao dịch, trò chuyện, bình luận, đánh giá và khiếu nại
 được theo dõi theo chức năng trong [tasks.md](tasks.md). Thiết kế tương lai được phân biệt với mã đã có tại [flows.md](flows.md).

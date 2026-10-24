@@ -75,7 +75,7 @@ Các đường dẫn bên dưới tương đối với `backend/`.
 | Schema | `migrations/001_schema.sql`, `002_cloudinary_metadata.sql`, `003_auction_decisions.sql`, `schema-manifest.json` | DDL nền, migration media/quyết định và cấu trúc dự kiến |
 | CLI | `scripts/initDatabase.js`, `migrateDatabase.js`, `createAdmin.js` | Tạo/nâng schema và tạo Admin qua terminal |
 
-`src/concurrency/`, `src/jobs/`, `src/ai/` được giữ cho chức năng tương ứng; không coi thư mục placeholder là nghiệp vụ đã có.
+`src/concurrency/`, `src/jobs/` và `src/ai/` có logic phối hợp, tác vụ và phân tích đang dùng.
 
 ## Frontend
 
@@ -123,3 +123,18 @@ Các đường dẫn bên dưới tương đối với `frontend/`.
 
 File mã nguồn viết tay có comment đầu file mô tả trách nhiệm. JSON chuẩn không chèn comment.
 Thư mục rỗng được giữ bằng `.gitkeep`; file này không chứng minh chức năng đã triển khai.
+
+## Phân tích AI
+
+| File/nhóm | Trách nhiệm |
+|---|---|
+| `backend/src/ai/criteria.js`, `scoring.js` | Tiêu chí, trọng số, quy đổi, NULL và audit hai điểm độc lập |
+| `backend/src/ai/input.js`, `gemini.js` | Whitelist/hash đầu vào, kiểm tra media, Gemini Interactions JSON |
+| `backend/src/config/ai.js` | Cờ bật, khóa, model và giới hạn tài nguyên |
+| `backend/src/ai/queue.js`, `consumer.js`, `processor.js`, `reconcile.js` | Admission, pending/reclaim, cache, SQL receipt và bù enqueue |
+| `backend/src/models/ai.model.js` | Lưu nguyên tử, version, lịch sử và truy vấn kết quả |
+| `backend/src/services/ai.service.js`, `routes/ai.routes.js` | Quyền chủ bài/Admin, yêu cầu phân tích và trạng thái |
+| `frontend/src/components/AiPanel.jsx` | Hai điểm, bằng chứng, cảnh báo, lịch sử và nút Admin |
+| `backend/test/ai*.test.js`, `fixtures/ai-observations.json` | Bộ quy tắc, hợp đồng provider, HTTP, pipeline, Redis/SQL opt-in và mẫu đối chiếu |
+| `scripts/setupAi.mjs`, `aiScoreExample.mjs`, `smokeAi.mjs` | Cấu hình, tính mẫu không gọi AI và smoke Gemini thật |
+| `docs/ai-analysis.md` | Cấu hình, tiêu chí, công thức, quyền và nghiệm thu |

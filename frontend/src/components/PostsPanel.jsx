@@ -3,6 +3,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {postApi} from '../services/postApi.js';
 import PostForm from './PostForm.jsx';
 import AuctionPanel from './AuctionPanel.jsx';
+import AiPanel from './AiPanel.jsx';
 import {useAuctionRealtime} from '../services/auctionRealtime.js';
 const states={cho_kiem_duyet:'Chờ kiểm duyệt',khong_dat_kiem_duyet:'Bị từ chối',da_qua_kiem_duyet:'Đã duyệt · chờ đặt lịch',da_kich_hoat:'Đã kích hoạt',da_ket_thuc:'Đã kết thúc'};
 const money=value=>value==null?'Chưa có':`${BigInt(value).toLocaleString('vi-VN')} đ`;
@@ -27,7 +28,7 @@ function Detail({post,mode,user,onRefresh,onForm,onClose,onAuctionChange}) {
       {mode!=='catalog'&&<><dt>Giá kết thúc sớm (riêng tư)</dt><dd>{money(post.gia_toi_thieu)}</dd></>}<dt>Chờ đặt lại</dt><dd>{post.thoi_gian_cho_dat_lai} giây</dd><dt>Bắt đầu / kết thúc</dt><dd>{date(post.thoi_gian_bat_dau)} / {date(post.thoi_gian_ket_thuc)}</dd></dl>
     {['da_kich_hoat','da_ket_thuc'].includes(post.trang_thai_phien)&&<AuctionPanel key={`${post.phien_dau_gia_id}-${user?.nguoi_dung_id||'guest'}`} auctionId={post.phien_dau_gia_id} user={user} onSnapshot={onAuctionChange}/>}
     {mode!=='catalog'&&<><h3>Kiểm duyệt và căn cứ</h3>
-      {!post.ai?<p className="notice">Chưa có phân tích AI. Admin kiểm tra bằng chứng và nguồn đối chiếu thủ công.</p>:<div className="notice">AI: {post.ai.trang_thai} · Độ hiếm: {post.ai.diem_do_hiem??'Chưa đủ dữ liệu'} · Tình trạng: {post.ai.diem_tinh_trang??'Chưa đủ dữ liệu'}{post.ai.chi_tiet?.map((item,index)=><p key={index}>{item.tieu_chi}: {item.trang_thai_danh_gia} — {item.bang_chung||item.canh_bao||'Cần xác minh'}</p>)}</div>}
+      <AiPanel post={post} user={user}/>
       {!post.kiem_duyet?.length&&<p>Chưa có quyết định kiểm duyệt.</p>}{post.kiem_duyet?.map(item=><blockquote key={item.kiem_duyet_id}><strong>{item.ket_qua}</strong> · {date(item.ngay_kiem_duyet)}<p className="preserve-lines">{item.phan_hoi_admin}</p></blockquote>)}
       {mode==='pending'&&post.trang_thai_phien==='cho_kiem_duyet'&&<form onSubmit={event=>act(event,'review')}><fieldset disabled={busy}><label>Căn cứ quý hiếm, kết quả đối chiếu và lý do quyết định<textarea name="ly_do" maxLength={8000} rows={5} required/></label><label className="check-label"><input name="xac_nhan_quy_hiem" type="checkbox"/>Tôi đã kiểm tra bằng chứng về yếu tố quý hiếm (bắt buộc khi phê duyệt)</label><p className="field-hint">Nếu chưa đủ bằng chứng, từ chối và ghi rõ nội dung cần bổ sung. Điểm AI không tự quyết định phê duyệt.</p><div className="actions"><button name="decision" value="phe_duyet" className="primary">Phê duyệt</button><button name="decision" value="tu_choi" className="secondary">Từ chối / yêu cầu bổ sung</button></div></fieldset></form>}
       {mode==='mine'&&post.trang_thai_phien==='da_qua_kiem_duyet'&&<form onSubmit={event=>act(event,'activate')}><fieldset disabled={busy}><h3>Đặt lịch phiên đã được duyệt</h3><div className="form-grid"><label>Bắt đầu (giờ trên máy bạn)<input type="datetime-local" name="start" required/></label><label>Kết thúc (giờ trên máy bạn)<input type="datetime-local" name="end" required/></label></div><p className="field-hint">Chọn giờ bắt đầu ở tương lai. Hệ thống lưu theo UTC và kiểm tra bằng đồng hồ SQL Server.</p><button className="primary">Đặt lịch và kích hoạt</button></fieldset></form>}

@@ -28,7 +28,11 @@
     "setup:media": "node scripts/setupMedia.mjs",
     "smoke:m4": "node scripts/smokeM4.mjs",
     "smoke:m5": "node scripts/smokeM5.mjs",
-    "smoke:m6": "node scripts/smokeM6.mjs"
+    "smoke:m6": "node scripts/smokeM6.mjs",
+    "setup:ai": "node scripts/setupAi.mjs",
+    "test:ai": "node --test backend/test/ai*.test.js",
+    "ai:example": "node scripts/aiScoreExample.mjs",
+    "smoke:ai": "node scripts/smokeAi.mjs"
   },
   "devDependencies": {
     "concurrently": "10.0.6"

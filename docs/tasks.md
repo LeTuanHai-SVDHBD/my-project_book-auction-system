@@ -28,12 +28,12 @@
 | Kết thúc | Hết hạn/ngưỡng, một kết quả, giao dịch chỉ khi có người thắng | Đã kiểm tra SQL/Redis thật và smoke tích hợp |
 | Giao diện đấu giá | Gửi giá, chờ/chấp nhận/từ chối, retry cùng mã và kết quả | Đã kiểm tra nhiều tab, mất phản hồi mạng và desktop/mobile |
 | Thời gian thực | Worker → Pub/Sub → Socket, room công khai, lịch sử, đồng hồ SQL và lấy lại snapshot | Đã kiểm tra HTTP/Redis/Socket và hai browser độc lập; chờ smoke dịch vụ SQL thật của nhóm |
+| AI hỗ trợ kiểm duyệt | Gemini JSON, hai điểm độc lập, bằng chứng/NULL/cảnh báo, lịch sử và phân tích lại | Đã kiểm tra tự động/Redis/trình duyệt; chờ SQL và Gemini thật |
 
 ## Công việc tiếp theo
 
 | Lĩnh vực | Công việc |
 |---|---|
-| AI | Tích hợp Gemini, trích xuất bằng chứng, bộ chấm điểm và trạng thái thiếu dữ liệu |
 | Hồ sơ | Cập nhật thông tin cá nhân theo phạm vi được thống nhất |
 | Sau phiên | Giao dịch, trò chuyện, bình luận, đánh giá uy tín, khiếu nại theo thiết kế |
 | Thực nghiệm | Kiểm thử đồng thời, tải lớn, phục hồi tiến trình và tổng hợp báo cáo |
@@ -52,6 +52,7 @@ Không triển khai thêm trạng thái nghiệp vụ, cổng thanh toán hay c�
 - [ ] Gửi giá đúng bước/cooldown; theo dõi quyết định và hai kiểu kết thúc trên SQL Server 2022/Redis Compose của nhóm.
 - [ ] Hai trình duyệt tự đồng bộ giá/lịch sử/kết quả; mất mạng rồi nối lại tự lấy đúng trạng thái.
 - [ ] `check`, `test`, `build`, `smoke`, `smoke:auth`, `smoke:m4`, `smoke:m5`, `smoke:m6` đạt sau cập nhật.
+- [ ] Bật Gemini trên máy nhóm; chạy `ai:example`, `test:ai`, `smoke:ai`, đối chiếu ảnh/video thật và kiểm tra Admin quyết định.
 - [ ] Lưu log/ảnh nghiệm thu phù hợp, đã loại thông tin nhạy cảm.
 
 Các xác nhận cũ không tự thay thế kiểm tra hồi quy cho bản cập nhật mới.

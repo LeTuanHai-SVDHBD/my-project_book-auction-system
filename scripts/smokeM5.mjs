@@ -166,13 +166,15 @@ try {
     const req=pool.request();accounts.forEach((user,i)=>req.input('u'+i,sql.Int,user.nguoi_dung_id));const ids=accounts.map((_,i)=>'@u'+i).join(',');
     await req.query(`SET XACT_ABORT ON;BEGIN TRANSACTION;
       DECLARE @p TABLE(id INT);DECLARE @a TABLE(id INT);DECLARE @b TABLE(id INT);
-      INSERT @p SELECT bai_dang_id FROM dbo.BaiDang WHERE nguoi_dung_id IN (${ids});
+      INSERT @p SELECT bai_dang_id FROM dbo.BaiDang WITH (UPDLOCK,HOLDLOCK) WHERE nguoi_dung_id IN (${ids});
       INSERT @a SELECT phien_dau_gia_id FROM dbo.PhienDauGia WHERE bai_dang_id IN(SELECT id FROM @p);
       INSERT @b SELECT sach_id FROM dbo.BaiDang WHERE bai_dang_id IN(SELECT id FROM @p);
       DELETE dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a));
       DELETE dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);DELETE dbo.YeuCauDatGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
       DELETE dbo.LuotDatGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);DELETE dbo.LichSuDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
       DELETE dbo.KiemDuyet WHERE bai_dang_id IN(SELECT id FROM @p);DELETE dbo.PhienDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
+      DELETE dbo.ChiTietPhanTichAI WHERE phan_tich_id IN(SELECT phan_tich_id FROM dbo.PhanTichAI WHERE bai_dang_id IN(SELECT id FROM @p));
+      DELETE dbo.PhanTichAI WHERE bai_dang_id IN(SELECT id FROM @p);
       DELETE dbo.BaiDang WHERE bai_dang_id IN(SELECT id FROM @p);DELETE dbo.Sach WHERE sach_id IN(SELECT id FROM @b);
       DELETE dbo.NguoiDung WHERE nguoi_dung_id IN (${ids});COMMIT TRANSACTION;`);
     const keys=[...requests].map(code=>AUCTION.admissionPrefix+code).concat(auctions.map(id=>AUCTION.closePrefix+id),await redis.keys(recoveryPrefix+'*'));

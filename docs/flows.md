@@ -44,8 +44,8 @@ Model lấy khóa rồi đối chiếu rowversion. SQL xuất BINARY(8), utility
 HTTP 409 yêu cầu client đọc lại dữ liệu. Không cấp version mặc định khi thiếu.
 
 Admin ghi căn cứ quý hiếm và nguồn đối chiếu. Tình trạng vật lý tốt không thay điều kiện quý hiếm;
-thiếu bằng chứng phải được ghi rõ. Chưa tích hợp AI thì kiểm tra thủ công, không sinh phân tích giả.
-Kết quả AI đã có chỉ để tham khảo, không tự phê duyệt/từ chối.
+thiếu bằng chứng phải được ghi rõ. Worker AI phân tích riêng sau COMMIT khi đã bật; khi tắt hoặc lỗi, Admin tiếp tục kiểm tra thủ công.
+Kết quả AI chỉ để tham khảo, không tự phê duyệt/từ chối. Hợp đồng và quy tắc tại [ai-analysis.md](ai-analysis.md).
 
 ## Đăng lại
 

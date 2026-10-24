@@ -151,7 +151,7 @@ Tham khảo: [Cloudinary Upload API](https://cloudinary.com/documentation/image_
 
 ## ADR-013 — Vòng đời bài đăng và kiểm duyệt
 
-**Trạng thái:** áp dụng; tích hợp AI chưa triển khai.
+**Trạng thái:** áp dụng; AI hỗ trợ theo ADR-017.
 
 Tạo sách/bài/phiên/media/lịch sử trong transaction SERIALIZABLE; cặp pending và chưa có lịch.
 UUID ánh xạ `BK` + 32 ký tự hex thành mã sản phẩm UNIQUE; cùng mã trả bài đã tạo của đúng chủ,
@@ -165,7 +165,7 @@ Kích hoạt chỉ cập nhật đúng phiên đã duyệt của chủ sách, l�
 Đăng lại khóa Sach, kiểm tra phiên cuối đã kết thúc và kết quả rõ không người thắng; tạo bài/phiên mới cùng Sach,
 không ghi đè lần trước. Thiếu kết quả không đủ điều kiện đăng lại.
 Public projection không có ngưỡng giá, owner/email, version hoặc nhận xét nội bộ.
-Chưa gọi Gemini thì trả `ai: null`, không tạo điểm/kết quả lỗi giả; kiểm duyệt thủ công vẫn hoạt động.
+Chưa có lần gọi Gemini thì trả `ai: null`, không tạo điểm/kết quả lỗi giả; kiểm duyệt thủ công vẫn hoạt động.
 
 ## ADR-014 — Hợp đồng phiên bản dữ liệu
 
@@ -214,3 +214,20 @@ Job mỗi giây tìm tối đa 50 phiên hết hạn theo SQL và xếp yêu c�
 Kết thúc có hai lý do đã chốt, lưu tại KetQuaDauGia.ly_do_ket_thuc; chỉ tạo GiaoDich khi có người thắng.
 Giao diện poll quyết định của mình; snapshot công khai đồng bộ qua tín hiệu Socket và HTTP theo ADR-009.
 Chi tiết: [Xử lý đấu giá](auction-processing.md).
+
+## ADR-017 — AI quan sát, Backend tính điểm, Admin quyết định
+
+**Trạng thái:** áp dụng; chờ nghiệm thu SQL Server và Gemini thật.
+
+Theo báo cáo tuần 7 và yêu cầu hiện tại, độ hiếm gồm bốn nhóm 25%; tình trạng gồm 20/25/30/15/10%.
+Giữ hai tổng độc lập; thiếu tiêu chí áp dụng giữ NULL, không áp dụng có căn cứ mới loại trọng số.
+Gemini chỉ trả quan sát có cấu trúc; Backend giữ bảng quy đổi/trọng số, không dùng điểm do mô hình tự chọn.
+Ảnh không thấy không chứng minh bộ phận bị mất; chữ ký quan sát được không có nghĩa chữ ký thật.
+Không dùng điểm cao hoặc sự cố AI để tự duyệt/từ chối bài.
+
+Hàng đợi AI và kết nối BLOCK riêng không chặn vòng đặt giá/chốt hạn. Đối soát SQL bù enqueue bị mất;
+lưu kết quả và chi tiết trong transaction kiểm tra lại version/pending. Receipt request trong metadata
+chống ghi trùng, cache kết quả đã kiểm tra hạn chế gọi lại Gemini khi SQL lỗi. Không cam kết gọi provider đúng một lần:
+crash trước cache có thể tốn thêm lượt gọi. Không thêm bảng/cột hoặc dependency.
+Metadata có phiên bản quy tắc, hash đầu vào, model, nguồn và cảnh báo; lịch sử cũ được giữ.
+Xem [Phân tích AI](ai-analysis.md) để tra công thức, hợp đồng, cấu hình và giới hạn media.

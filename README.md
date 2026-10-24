@@ -16,9 +16,10 @@ Hệ thống hướng tới xử lý tranh chấp đặt giá đồng thời và
 - Đặt giá qua Redis Streams; kiểm tra bước giá/cooldown, chống xử lý trùng và theo dõi quyết định.
 - Tự kết thúc khi hết giờ hoặc đạt ngưỡng; một kết quả mỗi phiên, tạo giao dịch khi có người thắng.
 - Cập nhật trực tiếp giá, trạng thái, lịch sử và kết quả giữa các trình duyệt; tự lấy lại dữ liệu khi nối mạng.
+- Phân tích sách bằng Gemini, kiểm tra bằng chứng và tính độc lập điểm độ hiếm/tình trạng; lưu lịch sử để Admin đối chiếu.
 - Kiểm tra hạ tầng, heartbeat của worker và probe qua Redis Streams.
 
-Tích hợp Gemini và các chức năng sau phiên đang chờ triển khai.
+AI hỗ trợ kiểm duyệt; Admin tiếp tục quyết định. Các chức năng sau phiên đang chờ triển khai.
 Socket.IO báo phiên có thay đổi sau SQL COMMIT; giao diện lấy snapshot Backend để đồng bộ.
 Quyết định đặt giá riêng của từng tài khoản tiếp tục được kiểm tra qua HTTP có xác thực.
 
@@ -47,6 +48,7 @@ npm.cmd ci
 npm.cmd run setup
 npm.cmd run setup:auth
 npm.cmd run setup:media
+npm.cmd run setup:ai
 docker compose up -d
 docker compose ps
 ```
@@ -73,6 +75,7 @@ git pull --ff-only origin feat/Hai
 npm.cmd ci
 npm.cmd run setup:auth
 npm.cmd run setup:media
+npm.cmd run setup:ai
 npm.cmd run db:migrate
 ```
 
@@ -94,6 +97,7 @@ Cấu hình riêng nằm ở `.env` tại thư mục gốc; tham khảo `.env.ex
 | SQL | `DB_SERVER`, `DB_PORT`, `DB_DATABASE`, `DB_USER`, `DB_PASSWORD` | Kết nối database |
 | Redis | `REDIS_URL` | Kết nối session, Streams và ledger media |
 | Xác thực | `SESSION_SECRET`, `SESSION_IDLE_SECONDS` | Khóa ký cookie và thời hạn không hoạt động; mặc định 7.200 giây |
+| Gemini | `AI_ENABLED`, `GEMINI_API_KEY`, `GEMINI_MODEL` | Tắt mặc định; khóa chỉ đặt ở Backend |
 | Chẩn đoán | `DEV_PROBE_TOKEN` | Khóa probe development, độc lập với đăng nhập |
 | Volume | `SQLSERVER_VOLUME_NAME`, `REDIS_VOLUME_NAME` | Tên volume cần tiếp tục sử dụng |
 | Cloudinary | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Credentials chỉ được Backend sử dụng |
@@ -187,8 +191,10 @@ cấp CSRF 60 lần/IP/phút. Bộ đếm tính cả lần thành công. Khi b�
 7. Sau khi được duyệt, chủ sách đặt giờ bắt đầu trong tương lai và giờ kết thúc sau đó, rồi kích hoạt đúng phiên hiện có.
 8. Phiên đã kích hoạt xuất hiện trong **Danh mục**. API công khai không trả `gia_toi_thieu`.
 
-Chưa có phân tích AI thì Admin kiểm tra thủ công; không tạo điểm 0 hoặc bản phân tích lỗi giả.
-Tình trạng đẹp không thay thế điều kiện quý hiếm. Nếu đã có kết quả AI trong database, giao diện hiển thị để tham khảo.
+Khi đã bật Gemini, worker tự phân tích bài mới/gửi duyệt lại, lưu hai điểm độc lập cùng bằng chứng, cảnh báo và lịch sử.
+Admin xem **AI hỗ trợ kiểm duyệt**, mở từng tiêu chí/phép tính hoặc yêu cầu phân tích lại.
+Thiếu dữ liệu giữ NULL; lỗi AI không từ chối bài. Khi AI tắt, kiểm duyệt thủ công vẫn hoạt động.
+Tình trạng đẹp không thay thế điều kiện quý hiếm. Cấu hình và nghiệm thu tại [Phân tích AI](docs/ai-analysis.md).
 Giờ được lưu theo UTC và kiểm tra bằng đồng hồ SQL Server.
 
 ### Đặt giá và xem kết quả
@@ -248,6 +254,9 @@ npm.cmd run smoke:m6
 | `check` | Kiểm tra cú pháp JavaScript máy chủ và script |
 | `test` | HTTP, xác thực, media, phiên tab, giá/cooldown; Redis/SQL thật bật bằng opt-in |
 | `build` | Build Frontend production |
+| `ai:example` | Mẫu đầu vào và phép tính 100 / 76,39; không gọi Gemini |
+| `test:ai` | Bộ điểm, JSON Gemini giả, quyền, pipeline, Redis/SQL opt-in |
+| `smoke:ai` | Một lượt Gemini thật, lưu SQL, NULL khi thiếu ảnh và quyền xem riêng |
 | `smoke` | Hạ tầng thật, Socket.IO và probe qua Streams |
 | `smoke:auth` | Đăng ký/đăng nhập, CSRF, cookie, quyền và thu hồi phiên |
 | `smoke:m4` | Cloudinary, tạo/duyệt/kích hoạt bài, rollback SQL, retry và điều kiện đăng lại |
@@ -295,7 +304,8 @@ sau migration và khi API/worker đã khởi động; script tự tạo/dọn t�
 | HTTP 409 khi duyệt/kích hoạt | Tải lại chi tiết trước khi thao tác; không dùng `row_version` cũ |
 | Hai tab vẫn đổi tài khoản cùng nhau | Cập nhật cả Backend/Frontend, khởi động lại API/web và F5 từng tab |
 | Báo thiếu phiên bản dữ liệu | Khởi động API bản mới, F5 và mở lại chi tiết bài; token API phải có 16 ký tự hex |
-| Chưa có kết quả AI | Sử dụng kiểm duyệt thủ công; dịch vụ phân tích chưa được tích hợp |
+| Chưa có kết quả AI | Chạy `setup:ai`, kiểm tra `AI_ENABLED=true` và khóa Gemini, khởi động lại API/worker; xem hàng đợi/lịch sử ở chi tiết |
+| AI báo thất bại hoặc chưa đầy đủ | Xem cảnh báo và tiêu chí; kiểm tra quota/ảnh/video; Admin có thể thử lại hoặc kiểm duyệt thủ công |
 | Cập nhật trực tiếp đang kết nối lại | Kiểm tra API/Redis, mạng và origin; giao diện vẫn tự lấy lại trạng thái khi HTTP hoạt động |
 | Tưởng mất dữ liệu sau đổi Docker project | Kiểm tra mount thực tế và biến tên volume; xem hướng dẫn chuyển đổi |
 
@@ -308,6 +318,7 @@ và kiểm tra lại cookie Secure. Không commit thông tin kết nối hoặc 
 - [Luồng nghiệp vụ và hợp đồng API](docs/flows.md)
 - [Xử lý đặt giá và phục hồi](docs/auction-processing.md)
 - [Cập nhật thời gian thực và nối lại](docs/realtime.md)
+- [Phân tích AI và bộ chấm điểm](docs/ai-analysis.md)
 - [Quyết định kỹ thuật](docs/decisions.md)
 - [Bản đồ mã nguồn](docs/file-map.md)
 - [Trạng thái chức năng và công việc](docs/tasks.md)

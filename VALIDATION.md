@@ -5,6 +5,37 @@
 Cập nhật ngày 24/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
+## Phân tích AI và bộ chấm điểm
+
+Kiểm tra ngày 24/10/2026:
+
+- `ai:example`: PASS, đầu vào JSON mẫu cho độ hiếm 100 và tình trạng 76,39; audit `6875 / 90`.
+- Full test mặc định: **97 PASS, 9 SKIP** theo opt-in. Bật Redis thật: **104 PASS, 2 SKIP** dành cho SQL.
+- `test:ai`: **16 PASS, 2 SKIP** mặc định (Redis/SQL). `check`: **101 tệp PASS**; `build`: PASS.
+- Bộ quy tắc: tổng trọng số từng nhóm 100, hai điểm độc lập, quy đổi 100/75/50/25/0,
+  chọn hư hại nặng nhất, NULL khi thiếu, N/A có căn cứ loại mẫu số và làm tròn chính xác.
+- Gemini REST được giả lập: JSON Schema/Interactions, không gửi giá/tài khoản/ngưỡng, `store:false`,
+  chặn media ngoài Cloudinary dự án, thiếu/vượt media có cảnh báo, quota/phản hồi hỏng/chưa hoàn tất bị chặn.
+- Pipeline với SQL giả: replay receipt không gọi lại/ghi thêm, SQL lỗi dùng cache kết quả,
+  source version cũ không lưu, tự động không lặp cùng version, Admin vẫn yêu cầu phân tích lại được.
+- HTTP/session thật: chủ bài/Admin được xem, người khác không được xem; POST chỉ Admin + CSRF + version,
+  chặn điểm tự chèn và lần phân tích của bài khác; Redis lỗi vẫn đọc SQL, tắt AI không tạo phân tích giả.
+- Redis thật: admission đồng thời chỉ một job/version, xử lý lỗi giữ pending, reclaim/ACK và job version mới.
+- Chromium desktop 1440 px/mobile 390 px, Redis/HTTP/session/queue/consumer/processor/React thật:
+  tự phân tích sau enqueue; Admin/chủ bài cùng thấy 100/76,39 và phép tính; thiếu trang giữ riêng tình trạng NULL;
+  chọn lại lịch sử; quota lỗi hai điểm NULL; tắt AI vẫn phê duyệt thủ công. Không pageerror hoặc tràn ngang;
+  ảnh QA đã được xem. Gemini và SQL được giả lập trong kiểm tra trình duyệt.
+- `setup:ai` được kiểm tra trong thư mục tạm: giữ cấu hình/khóa đã có, chạy lại không nhân đôi và không in khóa.
+
+**Chưa gọi Gemini thật, chưa chạy SQL AI opt-in hoặc `smoke:ai` với SQL Server thật.**
+Lệnh smoke đã thử dừng ở kiểm tra cấu hình do môi trường chưa có DB_PASSWORD, chưa truy cập dịch vụ.
+Cần API key/quota của nhóm và môi trường SQL/Redis/API/worker thật để nghiệm thu.
+Test SQL opt-in đã thêm rollback trước COMMIT, lưu điểm/chi tiết, replay và version cũ;
+`smoke:ai` đã thêm cho một lượt provider thật với dữ liệu không ảnh, không thay nghiệm thu chất lượng ảnh/video.
+Không coi provider/SQL giả là bằng chứng COMMIT SQL hoặc tính chính xác thẩm định sách thật.
+Giữ nguyên 20 bảng/152 cột, lockfile/dependency, volume và xác thực theo tab.
+Xem [Phân tích AI](docs/ai-analysis.md) để bật Gemini, kiểm tra quota và đối chiếu tiêu chí.
+
 ## Đồng bộ thời gian thực
 
 Kiểm tra ngày 24/10/2026:
@@ -85,9 +116,9 @@ Bằng chứng SQL Server 2025/Redis 7 không thay nghiệm thu với đúng phi
 | Kiểm tra | Kết quả |
 |---|---|
 | Full test bật SQL/Redis thật | 87/87 PASS trước bản sửa giao diện; chưa chạy lại cho endpoint mới |
-| Test mặc định | 81 PASS, 7 SKIP theo opt-in, không FAIL |
-| Test bật Redis thật | 87 PASS, 1 SKIP dành cho SQL Server |
-| Check cú pháp | PASS 79 file |
+| Test mặc định | 97 PASS, 9 SKIP theo opt-in, không FAIL |
+| Test bật Redis thật | 104 PASS, 2 SKIP dành cho SQL Server |
+| Check cú pháp | PASS 101 file |
 | Build Frontend | Đã đạt; không thêm dependency |
 | db:init và db:migrate | PASS trên database kiểm tra, có chạy migration lặp lại |
 | smoke | PASS với SQL/Redis/API/worker thật, Socket.IO hello và probe |
@@ -95,6 +126,7 @@ Bằng chứng SQL Server 2025/Redis 7 không thay nghiệm thu với đúng phi
 | smoke:m5 | PASS toàn luồng thật, cleanup dữ liệu thử hoàn tất |
 | smoke:m6 | Đã thêm; chờ chạy SQL Server/Redis/API/worker thật trên máy nhóm |
 | Browser đấu giá | PASS nhiều tab cùng context, trạng thái chờ, lỗi mạng/retry, người thắng và mobile |
+| AI tự động và giao diện | PASS với Gemini/SQL giả và Redis thật; chờ `smoke:ai`/SQL AI thật |
 | Browser tài khoản/media trước đó | PASS tách tab và ba ô tiền; Redis thật, SQL/Cloudinary giả |
 
 ## SQL và phục hồi đấu giá
@@ -160,5 +192,5 @@ Chạy lại smoke:m4 để nghiệm thu media/đăng lại với Cloudinary th�
 Đối chiếu hai tab, nhập tiền, đặt giá và xem kết quả qua giao diện.
 
 Chưa có thực nghiệm tải lớn hoặc production HTTPS. Realtime đã triển khai, chờ smoke SQL thật cho bản mới;
-AI và xác nhận hoàn tất giao dịch chưa triển khai. Claim media chưa rõ COMMIT vẫn cần đối soát thủ công;
+AI đã triển khai, chờ Gemini/SQL thật; xác nhận hoàn tất giao dịch chưa triển khai. Claim media chưa rõ COMMIT vẫn cần đối soát thủ công;
 dead-letter đấu giá cũng cần đối soát riêng.

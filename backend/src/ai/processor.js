@@ -1,6 +1,7 @@
 /** Tính/lưu kết quả tách biệt vòng đời duyệt; replay dùng SQL receipt hoặc cache, không thay quyết định Admin. */
 import {scoreObservations} from './scoring.js';
 import {RULE_VERSION} from './criteria.js';
+import {aiFailureMessage,safeAiDiagnostics} from './errors.js';
 export function createAiProcessor({posts,model,queue,provider,locks,config,signal}) {
   return async job=>{
     const stored=await model.find(job);if(stored){await queue.update(job,{state:'done',analysisId:stored.phan_tich_id});return;}
@@ -18,7 +19,7 @@ export function createAiProcessor({posts,model,queue,provider,locks,config,signa
           result=scoreObservations(response.observations,{mediaIds:response.mediaIds,sourceUrls:response.sourceUrls});
           const warnings=[...result.canh_bao,...response.warnings];if(warnings.length)result.trang_thai='chua_day_du';
           metadata={...base,model:response.providerModel,media:response.manifest,warnings};
-        }catch(error){if(signal?.aborted)throw error;result={diem_do_hiem:null,diem_tinh_trang:null,trang_thai:'that_bai',chi_tiet:[]};metadata={...base,error_code:error.code||'AI_INVALID_RESPONSE',warnings:['Phân tích thất bại; không thay thế bằng điểm 0. Admin có thể thử lại hoặc kiểm duyệt thủ công.']};}
+        }catch(error){if(signal?.aborted)throw error;result={diem_do_hiem:null,diem_tinh_trang:null,trang_thai:'that_bai',chi_tiet:[]};metadata={...base,error_code:error.code||'AI_INVALID_RESPONSE',provider_error:safeAiDiagnostics(error.aiDiagnostics),warnings:[aiFailureMessage(error.code),'Phân tích thất bại; không thay thế bằng điểm 0. Admin có thể thử lại hoặc kiểm duyệt thủ công.']};}
         cached=await queue.update(job,{state:'running',result,metadata});
       }
       try{

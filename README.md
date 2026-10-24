@@ -254,6 +254,7 @@ npm.cmd run smoke:m6
 | `check` | Kiểm tra cú pháp JavaScript máy chủ và script |
 | `test` | HTTP, xác thực, media, phiên tab, giá/cooldown; Redis/SQL thật bật bằng opt-in |
 | `build` | Build Frontend production |
+| `ai:check` | Một lượt Gemini trực tiếp với văn bản mẫu; phân biệt HTTP/model/quota/khóa/mạng; không cần SQL/Redis/API |
 | `ai:example` | Mẫu đầu vào và phép tính 100 / 76,39; không gọi Gemini |
 | `test:ai` | Bộ điểm, JSON Gemini giả, quyền, pipeline, Redis/SQL opt-in |
 | `smoke:ai` | Một lượt Gemini thật, lưu SQL, NULL khi thiếu ảnh và quyền xem riêng |
@@ -305,7 +306,7 @@ sau migration và khi API/worker đã khởi động; script tự tạo/dọn t�
 | Hai tab vẫn đổi tài khoản cùng nhau | Cập nhật cả Backend/Frontend, khởi động lại API/web và F5 từng tab |
 | Báo thiếu phiên bản dữ liệu | Khởi động API bản mới, F5 và mở lại chi tiết bài; token API phải có 16 ký tự hex |
 | Chưa có kết quả AI | Chạy `setup:ai`, kiểm tra `AI_ENABLED=true` và khóa Gemini, khởi động lại API/worker; xem hàng đợi/lịch sử ở chi tiết |
-| AI báo thất bại hoặc chưa đầy đủ | Xem cảnh báo và tiêu chí; kiểm tra quota/ảnh/video; Admin có thể thử lại hoặc kiểm duyệt thủ công |
+| AI báo thất bại hoặc chưa đầy đủ | Xem mã HTTP/provider và cảnh báo; chạy `npm.cmd run ai:check` để chẩn đoán trực tiếp Gemini; xem [hướng dẫn](docs/ai-analysis.md) |
 | Cập nhật trực tiếp đang kết nối lại | Kiểm tra API/Redis, mạng và origin; giao diện vẫn tự lấy lại trạng thái khi HTTP hoạt động |
 | Tưởng mất dữ liệu sau đổi Docker project | Kiểm tra mount thực tế và biến tên volume; xem hướng dẫn chuyển đổi |
 

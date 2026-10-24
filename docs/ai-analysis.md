@@ -158,6 +158,46 @@ Redis mất dữ liệu được bù bài pending từ SQL; không tự khôi ph
 - Hai điểm, lý do NULL, trọng số, bằng chứng, nguồn, cảnh báo, manifest, model/quy tắc, phép tính và lịch sử có thể đối chiếu.
 - Nút duyệt/từ chối hiện tại tiếp tục hoạt động khi AI tắt, thiếu dữ liệu hoặc lỗi. Phê duyệt vẫn cần xác nhận bằng chứng quý hiếm.
 
+## Chẩn đoán khi smoke báo AI_PROVIDER_ERROR
+
+`Đang kiểm tra Gemini thật; dữ liệu mẫu thiếu ảnh nên điểm phải giữ NULL` là mô tả dữ liệu thử,
+không phải lỗi. Smoke cố ý gửi bài không ảnh để kiểm tra NULL. Nếu đã nhận bản ghi `that_bai`,
+worker đã lưu lần phân tích thất bại; mã chung cũ chưa phân biệt lỗi HTTP, mạng hoặc phản hồi JSON.
+Dòng dọn dữ liệu chỉ xác nhận đã dọn fixture SQL của lần smoke, không biến smoke thành PASS.
+
+Sau khi cập nhật mã, chạy tại thư mục gốc:
+
+```powershell
+npm.cmd run ai:check
+```
+
+Lệnh đọc `.env` gốc, dùng đúng model/client của worker, gọi Gemini **một lần** với văn bản mẫu không ảnh.
+Không cần API/worker/SQL/Redis đang chạy, không tạo tài khoản/bài thử và không đọc cache lỗi cũ.
+Lệnh dùng quota thật nếu đã bật AI/có khóa. Chỉ PASS xác nhận JSON dùng được và quy tắc NULL của mẫu;
+chưa xác nhận tích hợp SQL/hàng đợi hoặc chất lượng phân tích ảnh sách.
+
+Khi FAIL, in mã ứng dụng, HTTP, mã provider/transport thuộc allowlist nếu có.
+Riêng lệnh mẫu còn in tối đa 600 ký tự thông báo Google đã che khóa cấu hình/query key và bỏ control characters;
+không in toàn bộ response/headers. Worker không lưu thông báo/body provider vào SQL vì có thể phản chiếu dữ liệu bài.
+Giao diện và smoke lấy mã/hướng xử lý an toàn từ metadata; dữ liệu lỗi cũ vẫn thiếu thông tin HTTP đã bị bỏ.
+Có thể gửi kết quả lệnh để đối soát, không gửi `.env`, khóa hoặc headers riêng.
+
+| Mã ứng dụng mới | Hướng kiểm tra |
+|---|---|
+| `AI_KEY_INVALID` | Key thiếu/sai/hết hạn hoặc Google trả xác thực lỗi; sửa `.env`, khởi động lại API/worker |
+| `AI_ACCESS_DENIED` | Quyền key, API/project, hạn chế IP/referrer và quyền truy cập model |
+| `AI_BILLING_REQUIRED` | Billing/số dư project; không tự thử lại liên tục |
+| `AI_MODEL_NOT_FOUND` | Tên model hoặc tài nguyên/endpoint không khả dụng với tài khoản |
+| `AI_REQUEST_REJECTED` | Cấu trúc/giới hạn tham số hoặc điều kiện project; đọc thông báo lệnh mẫu để xác định |
+| `AI_QUOTA_EXCEEDED` | Quota hoặc giới hạn lượt/token |
+| `AI_NETWORK_ERROR` | DNS/proxy/TLS/kết nối máy chạy worker; có thể có `ENOTFOUND` hoặc mã TLS |
+| `AI_TIMEOUT` | Kết nối hoặc thời gian chờ provider |
+| `AI_INVALID_RESPONSE` / `AI_INCOMPLETE_RESPONSE` | JSON không hợp đồng hoặc chưa hoàn tất |
+
+Không kết luận key sai hoặc tự đổi model chỉ từ `AI_PROVIDER_ERROR` cũ.
+Sau khi sửa nguyên nhân/cấu hình, khởi động lại `dev:all`, chạy lại `smoke:ai` để nghiệm thu toàn luồng.
+Model mặc định, payload, schema, bộ điểm và nhà cung cấp vẫn là Gemini; bản sửa này bổ sung chẩn đoán.
+
 ## Kiểm tra và nghiệm thu
 
 ```powershell
@@ -196,3 +236,4 @@ Kiểm tra ngày 24/10/2026:
 - [Gemini models](https://ai.google.dev/gemini-api/docs/models)
 - [Image understanding](https://ai.google.dev/gemini-api/docs/image-understanding)
 - [Video understanding](https://ai.google.dev/gemini-api/docs/video-understanding)
+- [Gemini API errors](https://ai.google.dev/gemini-api/docs/api-errors)

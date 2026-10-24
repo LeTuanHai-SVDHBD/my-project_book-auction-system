@@ -7,6 +7,7 @@ import {parseAiConfig} from '../backend/src/config/ai.js';
 import {getPool,closeDatabase,sql} from '../backend/src/config/database.js';
 import {createUserModel} from '../backend/src/models/user.model.js';
 import {passwords} from '../backend/src/services/password.service.js';
+import {formatAiFailure} from '../backend/src/ai/errors.js';
 const runId=randomUUID(),secret=randomBytes(24).toString('base64url'),base=`http://${config.host}:${config.port}/api`,accounts=[];
 let pool,postId,stage='cấu hình',finished=false,cleanupSafe=true;
 class Client{cookie='';token='';async call(path,method='GET',body){const response=await fetch(base+path,{method,headers:{cookie:this.cookie,'x-csrf-token':this.token,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(15000)});for(const value of response.headers.getSetCookie())if(value.startsWith('bookauction.sid='))this.cookie=value.split(';')[0];const data=await response.json();if(data.csrfToken)this.token=data.csrfToken;assert(response.ok,`${stage}: HTTP ${response.status} (${data.error||''})`);return data;}}
@@ -20,7 +21,7 @@ try{
   stage='chờ Gemini/worker lưu SQL';console.log('Đang kiểm tra Gemini thật; dữ liệu mẫu thiếu ảnh nên điểm phải giữ NULL.');
   let data;const deadline=Date.now()+180000;
   while(Date.now()<deadline){data=await admin.call(`/ai/${postId}`);if(data.analysis&&(!data.job||data.job.state==='done')){cleanupSafe=true;break;}await delay(1000);}
-  assert(data?.analysis,'Hết thời gian chờ kết quả AI.');assert.notEqual(data.analysis.trang_thai,'that_bai',`Gemini chưa hoàn tất: ${data.analysis.thong_tin?.error_code||'AI_ERROR'}`);
+  assert(data?.analysis,'Hết thời gian chờ kết quả AI.');assert.notEqual(data.analysis.trang_thai,'that_bai',`Gemini chưa hoàn tất: ${formatAiFailure(data.analysis.thong_tin)}`);
   assert.equal(data.analysis.diem_do_hiem,null);assert.equal(data.analysis.diem_tinh_trang,null);assert.equal(data.analysis.chi_tiet.length,9);
   const owner=await seller.call(`/ai/${postId}`);assert.equal(owner.analysis.phan_tich_id,data.analysis.phan_tich_id);
   assert.equal((await admin.call(`/posts/${postId}`)).trang_thai_phien,'cho_kiem_duyet');assert(!JSON.stringify(data).includes(process.env.GEMINI_API_KEY));

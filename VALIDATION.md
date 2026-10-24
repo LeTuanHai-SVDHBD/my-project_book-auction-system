@@ -5,6 +5,25 @@
 Cập nhật ngày 24/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
+## Chẩn đoán lỗi Gemini
+
+Kiểm tra ngày 24/10/2026, giữ nguyên Gemini và không áp dụng thay đổi Groq đã hủy:
+
+- Mặc định **101 PASS, 9 SKIP**; bật Redis thật **108 PASS, 2 SKIP** dành cho SQL.
+- `test:ai`: **20 PASS, 2 SKIP** mặc định; `check`: **104 tệp PASS**; build PASS.
+- HTTP giả kiểm tra 400/401/402/403/404/429/503, API_KEY_INVALID trong lỗi Google kiểu cũ,
+  DNS/TLS code, timeout, JSON sai; không lưu body/message phản chiếu khóa hoặc dữ liệu sách vào metadata.
+- `ai:check` dùng đúng client/request với một mẫu không ảnh, không cần SQL/Redis; stub kiểm tra một lần gọi,
+  mã thoát PASS/FAIL, HTTP/provider code và thông báo đã che khóa. CLI thật không cấu hình dừng đúng
+  `AI_NOT_CONFIGURED`, chưa truy cập provider. Import script kiểm thử không tự gọi mạng.
+- Pipeline lưu chẩn đoán allowlist, hai điểm vẫn NULL khi thất bại. Smoke và UI hiện mã chi tiết/hướng kiểm tra.
+- Chromium/HTTP/session/Redis/queue/consumer/processor/React thật, Gemini và SQL giả: điểm/historic/NULL vẫn đúng,
+  lỗi quota hiện `AI_QUOTA_EXCEEDED · HTTP 429`, AI tắt vẫn duyệt thủ công; desktop/mobile không pageerror/tràn ngang.
+
+Chưa xác định nguyên nhân thực tế của log `AI_PROVIDER_ERROR` trên máy nhóm vì phiên bản cũ đã bỏ chi tiết.
+Chưa gọi API key Gemini thật hoặc chạy smoke SQL thật trong bản sửa. Cần kết quả `ai:check` trên máy nhóm
+để phân biệt key/quyền/model/payload/quota/mạng; không coi stub PASS là Gemini thật đã hoạt động.
+
 ## Phân tích AI và bộ chấm điểm
 
 Kiểm tra ngày 24/10/2026:
@@ -116,9 +135,9 @@ Bằng chứng SQL Server 2025/Redis 7 không thay nghiệm thu với đúng phi
 | Kiểm tra | Kết quả |
 |---|---|
 | Full test bật SQL/Redis thật | 87/87 PASS trước bản sửa giao diện; chưa chạy lại cho endpoint mới |
-| Test mặc định | 97 PASS, 9 SKIP theo opt-in, không FAIL |
-| Test bật Redis thật | 104 PASS, 2 SKIP dành cho SQL Server |
-| Check cú pháp | PASS 101 file |
+| Test mặc định | 101 PASS, 9 SKIP theo opt-in, không FAIL |
+| Test bật Redis thật | 108 PASS, 2 SKIP dành cho SQL Server |
+| Check cú pháp | PASS 104 file |
 | Build Frontend | Đã đạt; không thêm dependency |
 | db:init và db:migrate | PASS trên database kiểm tra, có chạy migration lặp lại |
 | smoke | PASS với SQL/Redis/API/worker thật, Socket.IO hello và probe |

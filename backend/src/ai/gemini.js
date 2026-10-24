@@ -3,7 +3,8 @@ import {HttpError} from '../middlewares/errorHandler.js';
 import {verifyMedia} from '../services/cloudinary.service.js';
 import {CRITERIA} from './criteria.js';
 import {analysisInput} from './input.js';
-const fail=code=>new HttpError(502,code,'Chưa phân tích được bằng Gemini. Admin có thể thử lại hoặc kiểm duyệt thủ công.');
+import {geminiFailure,geminiHttpFailure} from './errors.js';
+const fail=geminiFailure;
 export async function boundedBytes(response,limit) {
   if(!response.body||Number(response.headers.get('content-length'))>limit){await response.body?.cancel();throw Error('AI_RESPONSE_TOO_LARGE');}
   const parts=[];let size=0;
@@ -18,8 +19,13 @@ export const OUTPUT_SCHEMA={type:'object',additionalProperties:false,required:['
       evidence:{type:['string','null']},media_refs:{type:'array',items:{type:'string'}},sources:{type:'array',items:{type:'string'}},
       confidence:{type:['number','null'],minimum:0,maximum:100},warning:{type:['string','null']}
     }}}}};
-export function createGemini({config,fetchImpl=fetch}) {
-  return {async analyze(row,signal) {
+function diagnosticMessage(value,key){
+  if(typeof value!=='string')return '';
+  let text=value;for(const secret of [key,encodeURIComponent(key)].filter(Boolean))text=text.replaceAll(secret,'[REDACTED]');
+  return text.replace(/([?&](?:key|api_key)=)[^&\s]+/gi,'$1[REDACTED]').replace(/[\x00-\x1f\x7f]+/g,' ').slice(0,600);
+}
+export function createGemini({config,fetchImpl=fetch,onHttpError}) {
+  return {async analyze(row,signal=AbortSignal.timeout(config.jobTimeout)) {
     if(!config.configured)throw new HttpError(503,'AI_NOT_CONFIGURED','Gemini chưa được bật hoặc cấu hình.');
     const input=analysisInput(row),parts=[],mediaIds=[],warnings=[],manifest=[];let used=0;
     for(const media of input.media){
@@ -48,11 +54,18 @@ Không có công cụ tìm web; không nói đã truy cập nguồn. sources ch�
       const response=await fetchImpl('https://generativelanguage.googleapis.com/v1beta/interactions',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':config.key},
         signal:AbortSignal.any([signal,AbortSignal.timeout(config.providerTimeout)]),body:JSON.stringify({model:config.model,input:parts,system_instruction:instruction,store:false,
           response_format:{type:'text',mime_type:'application/json',schema:OUTPUT_SCHEMA},generation_config:{max_output_tokens:8192}})});
-      if(!response.ok)throw fail(response.status===429?'AI_QUOTA_EXCEEDED':'AI_PROVIDER_ERROR');
+      if(!response.ok){let body=null;try{body=JSON.parse((await boundedBytes(response,65536)).toString('utf8'));}catch{/* HTTP status vẫn đủ để phân loại, không lưu body không hợp lệ. */}if(onHttpError)try{onHttpError({http_status:response.status,message:diagnosticMessage(body?.error?.message,config.key)});}catch{/* Chẩn đoán không được che lỗi provider. */}
+        throw geminiHttpFailure(response.status,body);}
       const data=JSON.parse((await boundedBytes(response,1048576)).toString('utf8'));
       if(data.status!=='completed')throw fail('AI_INCOMPLETE_RESPONSE');
-      const text=(data.steps||[]).filter(step=>step.type==='model_output').flatMap(step=>step.content||[]).filter(x=>x.type==='text').map(x=>x.text).join('');
+      if(!Array.isArray(data.steps))throw fail('AI_INVALID_RESPONSE');
+      const text=data.steps.filter(step=>step?.type==='model_output').flatMap(step=>Array.isArray(step.content)?step.content:[]).filter(x=>x?.type==='text'&&typeof x.text==='string').map(x=>x.text).join('');
       return {observations:JSON.parse(text),mediaIds,sourceUrls,warnings,manifest,providerModel:data.model||config.model};
-    }catch(error){if(error instanceof HttpError)throw error;throw fail('AI_PROVIDER_ERROR');}
+    }catch(error){if(error instanceof HttpError)throw error;
+      if(signal.aborted||['TimeoutError','AbortError'].includes(error.name))throw fail('AI_TIMEOUT');
+      if(error.message==='AI_RESPONSE_TOO_LARGE')throw fail('AI_RESPONSE_TOO_LARGE');
+      if(error instanceof SyntaxError)throw fail('AI_INVALID_RESPONSE');
+      if(error instanceof TypeError)throw geminiFailure('AI_NETWORK_ERROR',{transport_code:error.cause?.code});
+      throw fail('AI_PROVIDER_ERROR');}
   }};
 }

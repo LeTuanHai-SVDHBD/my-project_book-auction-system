@@ -25,8 +25,8 @@ test('SQL lỗi sau nhận kết quả: retry dùng cache, không gọi provider
   const handle=createAiProcessor(f.options),input=job();await assert.rejects(handle(input),/SQL unavailable/);fail=false;await handle(input);assert.equal(f.calls(),1);assert.equal(f.writes(),1);
 });
 test('lỗi Gemini lưu thất bại với hai điểm NULL; dữ liệu đã thay đổi không lưu nhầm',async()=>{
-  const f=fixture();f.provider.analyze=async()=>{throw Object.assign(Error('provider refused'),{code:'AI_QUOTA_EXCEEDED'});};await createAiProcessor(f.options)(job());
-  assert.equal(f.output().result.trang_thai,'that_bai');assert.equal(f.output().result.diem_do_hiem,null);assert.equal(f.output().metadata.error_code,'AI_QUOTA_EXCEEDED');
+  const f=fixture();f.provider.analyze=async()=>{throw Object.assign(Error('provider refused'),{code:'AI_QUOTA_EXCEEDED',aiDiagnostics:{http_status:429,provider_code:'QUOTA_EXCEEDED',body:'private-provider-body'}});};await createAiProcessor(f.options)(job());
+  assert.equal(f.output().result.trang_thai,'that_bai');assert.equal(f.output().result.diem_do_hiem,null);assert.equal(f.output().metadata.error_code,'AI_QUOTA_EXCEEDED');assert.deepEqual(f.output().metadata.provider_error,{http_status:429,provider_code:'QUOTA_EXCEEDED'});assert(!JSON.stringify(f.output()).includes('private-provider-body'));
   assert.equal(analysisView({...f.output().result,chi_tiet:[{tieu_chi:META_CRITERION,bang_chung:JSON.stringify(f.output().metadata)}]},f.row).tinh_diem,null);
   const stale=fixture();stale.row.row_version='0000000000000002';await createAiProcessor(stale.options)(job());assert.equal(stale.calls(),0);assert.equal(stale.writes(),0);assert.equal(stale.cached().state,'skipped');
 });

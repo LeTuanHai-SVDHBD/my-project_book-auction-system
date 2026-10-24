@@ -129,6 +129,7 @@ Thư mục rỗng được giữ bằng `.gitkeep`; file này không chứng min
 | File/nhóm | Trách nhiệm |
 |---|---|
 | `backend/src/ai/criteria.js`, `scoring.js` | Tiêu chí, trọng số, quy đổi, NULL và audit hai điểm độc lập |
+| `backend/src/ai/errors.js`, `scripts/checkAi.mjs` | Phân loại lỗi an toàn, HTTP/provider/DNS/TLS và chẩn đoán mẫu không cần SQL/Redis |
 | `backend/src/ai/input.js`, `gemini.js` | Whitelist/hash đầu vào, kiểm tra media, Gemini Interactions JSON |
 | `backend/src/config/ai.js` | Cờ bật, khóa, model và giới hạn tài nguyên |
 | `backend/src/ai/queue.js`, `consumer.js`, `processor.js`, `reconcile.js` | Admission, pending/reclaim, cache, SQL receipt và bù enqueue |

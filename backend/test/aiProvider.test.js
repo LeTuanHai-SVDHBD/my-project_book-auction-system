@@ -26,3 +26,29 @@ test('quota, kết quả chưa hoàn tất và JSON hỏng đều thành lỗi p
   }
   assert.equal(parseAiConfig({}).configured,false);
 });
+
+test('Giữ HTTP/provider code có ích, không giữ body hoặc phản chiếu khóa và dữ liệu sách',async()=>{
+  for(const [status,body,code,providerCode] of [
+    [400,{error:{code:'invalid_request',message:'fixture-only-key-123 private-book',param:'response_format.schema'}},'AI_REQUEST_REJECTED','INVALID_REQUEST'],
+    [400,{error:{code:400,status:'INVALID_ARGUMENT',details:[{reason:'API_KEY_INVALID'}]}},'AI_KEY_INVALID','API_KEY_INVALID'],
+    [401,{error:{code:'authentication'}},'AI_KEY_INVALID','AUTHENTICATION'],
+    [402,{error:{code:'payment_required'}},'AI_BILLING_REQUIRED','PAYMENT_REQUIRED'],
+    [403,{error:{code:'permission_denied'}},'AI_ACCESS_DENIED','PERMISSION_DENIED'],
+    [404,{error:{code:'model_not_found'}},'AI_MODEL_NOT_FOUND','MODEL_NOT_FOUND'],
+    [429,{error:{code:'quota_exceeded'}},'AI_QUOTA_EXCEEDED','QUOTA_EXCEEDED'],
+    [503,{error:{code:'service_unavailable'}},'AI_PROVIDER_UNAVAILABLE','SERVICE_UNAVAILABLE']
+  ]){
+    const provider=createGemini({config,fetchImpl:async()=>Response.json(body,{status})});
+    await assert.rejects(provider.analyze({},AbortSignal.timeout(1000)),error=>{assert.equal(error.code,code);assert.equal(error.aiDiagnostics.http_status,status);assert.equal(error.aiDiagnostics.provider_code,providerCode);assert(!JSON.stringify(error).includes('fixture-only-key-123'));assert(!JSON.stringify(error).includes('private-book'));return true;});
+  }
+  const invalid=createGemini({config,fetchImpl:async()=>Response.json({error:{code:'fixture-only-key-123',param:'fixture-only-key-123'}},{status:400})});
+  await assert.rejects(invalid.analyze({},AbortSignal.timeout(1000)),error=>{assert.deepEqual(error.aiDiagnostics,{http_status:400});return true;});
+});
+test('Tách DNS/TLS, timeout và JSON lỗi, không ghi raw fetch message',async()=>{
+  const network=createGemini({config,fetchImpl:async()=>{throw new TypeError('fixture-only-key-123',{cause:{code:'ENOTFOUND'}});}});
+  await assert.rejects(network.analyze({},AbortSignal.timeout(1000)),error=>error.code==='AI_NETWORK_ERROR'&&error.aiDiagnostics.transport_code==='ENOTFOUND'&&!error.message.includes(config.key));
+  const timeout=createGemini({config,fetchImpl:async()=>{throw new DOMException('secret','TimeoutError');}});
+  await assert.rejects(timeout.analyze({},AbortSignal.timeout(1000)),{code:'AI_TIMEOUT'});
+  const malformed=createGemini({config,fetchImpl:async()=>new Response('not json')});
+  await assert.rejects(malformed.analyze({},AbortSignal.timeout(1000)),{code:'AI_INVALID_RESPONSE'});
+});

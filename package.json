@@ -32,7 +32,8 @@
     "setup:ai": "node scripts/setupAi.mjs",
     "test:ai": "node --test backend/test/ai*.test.js",
     "ai:example": "node scripts/aiScoreExample.mjs",
-    "smoke:ai": "node scripts/smokeAi.mjs"
+    "smoke:ai": "node scripts/smokeAi.mjs",
+    "ai:check": "node scripts/checkAi.mjs"
   },
   "devDependencies": {
     "concurrently": "10.0.6"

@@ -126,6 +126,8 @@ test('SQL/Redis thật: migration, tranh chấp, quyết định bền vững, k
       const id=await fixture({price:'999999999999999991',step:'2'}),input=event(id,a,'999999999999999999');
       assert.equal((await model.processBid(input)).muc_gia,'999999999999999999');
       const snapshot=await model.publicAuction(id);assert.equal(snapshot.trang_thai,'da_ket_thuc');assert.equal(snapshot.ket_qua.muc_gia_thang,'999999999999999999');assert.equal(snapshot.ket_qua.ly_do_ket_thuc,'dat_gia_toi_thieu');assert(!('gia_toi_thieu' in snapshot));
+      assert.equal(snapshot.lich_su[0].muc_gia,snapshot.ket_qua.muc_gia_thang);
+      assert.deepEqual((await model.publicHistory(id)).items,snapshot.lich_su);
       await model.processBid(input);await Promise.all([retry(()=>model.closeExpired(id)),retry(()=>model.closeExpired(id))]);
       assert.deepEqual(await counts(id),{bids:1,decisions:1,results:1,trades:1});
       const amount=(await pool.request().input('id',sql.Int,id).query('SELECT CONVERT(VARCHAR(18),g.so_tien) AS amount FROM dbo.GiaoDich g JOIN dbo.KetQuaDauGia k ON g.ket_qua_id=k.ket_qua_id WHERE k.phien_dau_gia_id=@id')).recordset[0].amount;assert.equal(amount,'999999999999999999');

@@ -5,7 +5,30 @@
 Cập nhật ngày 24/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
-## Giao diện đặt giá và thời gian chờ
+## Đồng bộ thời gian thực
+
+Kiểm tra ngày 24/10/2026:
+
+- Test mặc định: **81 PASS, 7 SKIP** theo opt-in; bật Redis thật: **87 PASS, 1 SKIP** (test SQL Server riêng).
+- `check`: **79 tệp PASS**. `build`: PASS. Import bộ smoke dùng chung không tự khởi động hoặc truy cập SQL.
+- HTTP/Socket thật và model giả: chỉ thông báo sau khi model COMMIT, không thông báo khi SQL lỗi;
+  publish lỗi sau COMMIT được retry mà không ghi lại lượt; chặn room chưa công bố, ID/room tự chèn và sự kiện giả.
+- Redis thật: hai subscriber cùng nhận ID phiên; payload có trường riêng bị bỏ qua.
+  Lỗi publish sau COMMIT giữ thông điệp pending; reclaim phát lại, ACK thành công và chỉ một lần ghi trong model giả.
+- Chromium hai tiến trình trình duyệt độc lập, session Redis/HTTP/Socket/React thật: đang chờ không báo chấp nhận;
+  từ chối không tạo lịch sử; người mua, chủ sách và danh mục tự cập nhật giá/lịch sử/kết quả.
+- Browser đang chờ bị ngắt mạng vẫn đọc lại đúng quyết định khi nối mạng. Browser lỡ lượt giá lúc offline tự bắt kịp,
+  không cần bấm tải lại. Bỏ tín hiệu Pub/Sub khi Socket vẫn kết nối cũng được bù bằng đọc snapshot định kỳ.
+- Dồn 100 tín hiệu không làm mất giá đang nhập. Đồng hồ có test biên bắt đầu/hết hạn, không tự chọn người thắng.
+  Public HTTP/Socket không có trường ngưỡng ẩn; desktop/mobile đã xem ảnh, không có pageerror hoặc tràn ngang.
+
+SQL và worker model trong kiểm tra trình duyệt được giả lập; không dùng các kiểm tra đó làm bằng chứng COMMIT SQL thật.
+Đã mở rộng test SQL opt-in cho snapshot/lịch sử, thêm `smoke:m6` dùng SQL/Redis/API/worker thật,
+nhưng **chưa chạy smoke mới hoặc test SQL mới với SQL Server thật** trong bản cập nhật này.
+Schema vẫn 20 bảng/152 cột; dependency, volume và xác thực theo tab giữ nguyên.
+Các kết quả SQL Server thật ở phần dưới là bằng chứng của lần triển khai lõi trước đó.
+
+## Giao diện đặt giá và thời gian chờ (lần kiểm tra trước)
 
 Kiểm tra ngày 24/10/2026 cho giao diện chủ sách/người mua:
 
@@ -62,13 +85,15 @@ Bằng chứng SQL Server 2025/Redis 7 không thay nghiệm thu với đúng phi
 | Kiểm tra | Kết quả |
 |---|---|
 | Full test bật SQL/Redis thật | 87/87 PASS trước bản sửa giao diện; chưa chạy lại cho endpoint mới |
-| Test mặc định | 75 PASS, 6 SKIP theo opt-in, không FAIL |
-| Check cú pháp | PASS 74 file |
+| Test mặc định | 81 PASS, 7 SKIP theo opt-in, không FAIL |
+| Test bật Redis thật | 87 PASS, 1 SKIP dành cho SQL Server |
+| Check cú pháp | PASS 79 file |
 | Build Frontend | Đã đạt; không thêm dependency |
 | db:init và db:migrate | PASS trên database kiểm tra, có chạy migration lặp lại |
 | smoke | PASS với SQL/Redis/API/worker thật, Socket.IO hello và probe |
 | smoke:auth | PASS qua API và SQL/Redis thật, cleanup tài khoản thử hoàn tất |
 | smoke:m5 | PASS toàn luồng thật, cleanup dữ liệu thử hoàn tất |
+| smoke:m6 | Đã thêm; chờ chạy SQL Server/Redis/API/worker thật trên máy nhóm |
 | Browser đấu giá | PASS nhiều tab cùng context, trạng thái chờ, lỗi mạng/retry, người thắng và mobile |
 | Browser tài khoản/media trước đó | PASS tách tab và ba ô tiền; Redis thật, SQL/Cloudinary giả |
 
@@ -130,9 +155,10 @@ Nhóm đã xác nhận hạ tầng healthy/probe completed, smoke tài khoản v
 Chưa có xác nhận smoke bài đăng toàn luồng sau bản sửa mới nhất; không tự coi đó là PASS Cloudinary thật.
 
 Trên Windows của nhóm: dừng các tiến trình, pull, chạy db:migrate, khởi động lại API/worker/web,
-kiểm tra readiness 20 bảng/152 cột và chạy smoke:m5 trên SQL Server 2022/Redis Compose.
+kiểm tra readiness 20 bảng/152 cột và chạy smoke:m5, smoke:m6 trên SQL Server 2022/Redis Compose.
 Chạy lại smoke:m4 để nghiệm thu media/đăng lại với Cloudinary thật.
 Đối chiếu hai tab, nhập tiền, đặt giá và xem kết quả qua giao diện.
 
-Chưa có thực nghiệm tải lớn hoặc production HTTPS. Realtime nghiệp vụ, AI và xác nhận hoàn tất giao dịch
-chưa triển khai. Claim media chưa rõ COMMIT vẫn cần đối soát thủ công; dead-letter đấu giá cũng cần đối soát riêng.
+Chưa có thực nghiệm tải lớn hoặc production HTTPS. Realtime đã triển khai, chờ smoke SQL thật cho bản mới;
+AI và xác nhận hoàn tất giao dịch chưa triển khai. Claim media chưa rõ COMMIT vẫn cần đối soát thủ công;
+dead-letter đấu giá cũng cần đối soát riêng.

@@ -70,11 +70,14 @@ Thêm dependency hoặc thay kiến trúc cần được thống nhất trước
 
 ## ADR-009 — Phát thông báo sau COMMIT
 
-**Trạng thái:** nguyên tắc đã chốt; cơ chế phục hồi chưa triển khai.
+**Trạng thái:** áp dụng cho cập nhật trực tiếp.
 
-API và worker là tiến trình riêng. Cần chọn kênh chuyển thông báo, cơ chế phát lại sau COMMIT
-và loại trùng trước khi triển khai realtime nghiệp vụ. Transactional outbox là lựa chọn cần đánh giá,
-chưa phải thành phần đã có. Socket.IO hiện chỉ phát lời chào hạ tầng công khai.
+API và worker là tiến trình riêng; Redis Pub/Sub chuyển tín hiệu ID phiên sau COMMIT tới các API.
+Processor phát lỗi thì giữ pending để đọc quyết định SQL và phát lại trước ACK; tín hiệu trùng chỉ gây đọc lại.
+Socket chỉ có room phiên/danh mục công khai được server kiểm tra, không thay cơ chế xác thực HTTP theo tab.
+Client lấy lại snapshot sau join/reconnect và mỗi 5 giây để bù thông báo lỡ, kể cả Pub/Sub lỡ khi không có subscriber.
+Chọn phục hồi trạng thái hiện tại từ SQL; không cam kết giao mọi sự kiện, không bổ sung outbox/bảng hoặc Redis Adapter.
+Chi tiết quyền, đồng hồ và giới hạn tại [realtime.md](realtime.md).
 
 ## ADR-010 — Session Redis và phân tách theo tab
 
@@ -209,5 +212,5 @@ Không tự cắt stream theo MAXLEN để tránh xóa mất pending. Dead-lette
 
 Job mỗi giây tìm tối đa 50 phiên hết hạn theo SQL và xếp yêu cầu chốt, chống xếp lặp trong 10 giây.
 Kết thúc có hai lý do đã chốt, lưu tại KetQuaDauGia.ly_do_ket_thuc; chỉ tạo GiaoDich khi có người thắng.
-Giao diện poll quyết định của mình, tải lại snapshot phiên khi cần; realtime nghiệp vụ chưa triển khai.
+Giao diện poll quyết định của mình; snapshot công khai đồng bộ qua tín hiệu Socket và HTTP theo ADR-009.
 Chi tiết: [Xử lý đấu giá](auction-processing.md).

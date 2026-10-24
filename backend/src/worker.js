@@ -16,12 +16,13 @@ import {createAuctionProcessor} from './processors/auction.processor.js';
 import {createAuctionPublisher} from './events/auctionPublisher.js';
 import {ensureAuctionGroup,consumeAuctions} from './events/auctionConsumer.js';
 import {runAuctionExpiry} from './jobs/auctionExpiry.js';
+import {createAuctionNotifier} from './events/auctionUpdates.js';
 const consumer = `${hostname()}-${process.pid}`;
 const reader = makeRedisClient('redis-blocking-reader');
 const auctionReader=makeRedisClient('redis-auction-reader');
 const auctionModel=createAuctionModel({getPool,sql});
 const publisher=createAuctionPublisher({getRedis:()=>redis});
-const processAuction=createAuctionProcessor({model:auctionModel,locks:createAuctionLock({getRedis:()=>redis,leaseMs:AUCTION.leaseMs}),log:logError});
+const processAuction=createAuctionProcessor({model:auctionModel,locks:createAuctionLock({getRedis:()=>redis,leaseMs:AUCTION.leaseMs}),notify:createAuctionNotifier({getRedis:()=>redis}),log:logError});
 const controller = new AbortController();
 let heartbeatTimer; let heartbeatTask; let loops=[]; let stopping = false;
 async function pulse() {

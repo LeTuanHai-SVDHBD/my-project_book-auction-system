@@ -15,11 +15,12 @@ Hệ thống hướng tới xử lý tranh chấp đặt giá đồng thời và
 - Danh mục công khai; giữ ẩn giá kết thúc sớm đối với người mua.
 - Đặt giá qua Redis Streams; kiểm tra bước giá/cooldown, chống xử lý trùng và theo dõi quyết định.
 - Tự kết thúc khi hết giờ hoặc đạt ngưỡng; một kết quả mỗi phiên, tạo giao dịch khi có người thắng.
+- Cập nhật trực tiếp giá, trạng thái, lịch sử và kết quả giữa các trình duyệt; tự lấy lại dữ liệu khi nối mạng.
 - Kiểm tra hạ tầng, heartbeat của worker và probe qua Redis Streams.
 
-Cập nhật nghiệp vụ qua Socket.IO, tích hợp Gemini và các chức năng sau phiên đang chờ triển khai.
-Socket.IO hiện phục vụ kiểm tra kết nối; giao diện theo dõi quyết định đặt giá qua HTTP,
-các phiên ở tab khác cần bấm tải lại để xem giá/trạng thái mới nhất.
+Tích hợp Gemini và các chức năng sau phiên đang chờ triển khai.
+Socket.IO báo phiên có thay đổi sau SQL COMMIT; giao diện lấy snapshot Backend để đồng bộ.
+Quyết định đặt giá riêng của từng tài khoản tiếp tục được kiểm tra qua HTTP có xác thực.
 
 ## Yêu cầu môi trường
 
@@ -200,13 +201,16 @@ Giờ được lưu theo UTC và kiểm tra bằng đồng hồ SQL Server.
    ẩn ô nhập và nút đặt tiếp. Hết chờ, giao diện kiểm tra lại SQL, báo sẵn sàng và mở thao tác đặt giá.
    F5 hoặc mở lại chi tiết vẫn giữ thời gian chờ; lượt bị từ chối không tạo thêm thời gian chờ.
 6. Phiên tự kết thúc khi hết giờ hoặc một giá hợp lệ đạt/vượt ngưỡng ẩn. Không có nút kết thúc thủ công.
-7. **Tải lại phiên và kết quả** lấy trạng thái SQL mới nhất. Danh mục giữ phiên đã kết thúc để xem kết quả.
+7. Giá, lịch sử hợp lệ và kết quả tự cập nhật ở các trình duyệt đang theo dõi. Danh mục giữ phiên đã kết thúc để xem kết quả.
+8. Mất mạng rồi nối lại: giao diện đăng ký theo dõi lại và tự lấy trạng thái mới nhất; vẫn có nút tải lại thủ công.
+   Đồng hồ dùng giờ máy chủ; hết giờ trên trình duyệt chỉ báo đang chờ xác nhận, không tự công bố người thắng.
 
 Hết giờ có lượt hợp lệ thì người có giá cao nhất thắng dù chưa đạt ngưỡng. Không có lượt hợp lệ thì
 không có người thắng và không tạo giao dịch. Chủ sách chỉ xem thông tin phiên/kết quả, không có ô nhập hoặc nút đặt giá;
 Admin chỉ xem. Backend vẫn chặn chủ sách tự gửi giá và kiểm tra lại cooldown trước khi ghi nhận.
 Giao dịch được tạo ở trạng thái chờ xác nhận; trao đổi/xác nhận hoàn tất chưa được triển khai.
 Chi tiết xử lý và phục hồi tại [Xử lý đấu giá](docs/auction-processing.md).
+Hợp đồng Socket, lịch sử phân trang và bù thông báo bị mất tại [Cập nhật thời gian thực](docs/realtime.md).
 
 ### Đăng lại và quản lý media
 
@@ -236,6 +240,7 @@ npm.cmd run smoke
 npm.cmd run smoke:auth
 npm.cmd run smoke:m4
 npm.cmd run smoke:m5
+npm.cmd run smoke:m6
 ```
 
 | Lệnh | Phạm vi |
@@ -247,6 +252,7 @@ npm.cmd run smoke:m5
 | `smoke:auth` | Đăng ký/đăng nhập, CSRF, cookie, quyền và thu hồi phiên |
 | `smoke:m4` | Cloudinary, tạo/duyệt/kích hoạt bài, rollback SQL, retry và điều kiện đăng lại |
 | `smoke:m5` | API/worker thật, tranh giá, replay, hai kiểu kết thúc, kết quả/giao dịch và phục hồi sau COMMIT trước ACK; không cần Cloudinary |
+| `smoke:m6` | Các kiểm tra đấu giá cùng Socket.IO: tín hiệu kích hoạt, hai kết nối, lịch sử/kết quả giống SQL và lấy lại snapshot sau nối lại |
 
 Smoke tạo dữ liệu UUID riêng, dọn đúng dữ liệu thử và trả FAIL nếu không dọn hoàn tất.
 Kiểm thử đăng lại dùng fixture chỉ thay đổi phiên của tài khoản smoke trong development.
@@ -290,6 +296,7 @@ sau migration và khi API/worker đã khởi động; script tự tạo/dọn t�
 | Hai tab vẫn đổi tài khoản cùng nhau | Cập nhật cả Backend/Frontend, khởi động lại API/web và F5 từng tab |
 | Báo thiếu phiên bản dữ liệu | Khởi động API bản mới, F5 và mở lại chi tiết bài; token API phải có 16 ký tự hex |
 | Chưa có kết quả AI | Sử dụng kiểm duyệt thủ công; dịch vụ phân tích chưa được tích hợp |
+| Cập nhật trực tiếp đang kết nối lại | Kiểm tra API/Redis, mạng và origin; giao diện vẫn tự lấy lại trạng thái khi HTTP hoạt động |
 | Tưởng mất dữ liệu sau đổi Docker project | Kiểm tra mount thực tế và biến tên volume; xem hướng dẫn chuyển đổi |
 
 Cấu hình hiện tại phục vụ phát triển cục bộ. Triển khai production cần HTTPS, cấu hình origin/proxy phù hợp
@@ -300,6 +307,7 @@ và kiểm tra lại cookie Secure. Không commit thông tin kết nối hoặc 
 - [Kiến trúc hệ thống](docs/architecture.md)
 - [Luồng nghiệp vụ và hợp đồng API](docs/flows.md)
 - [Xử lý đặt giá và phục hồi](docs/auction-processing.md)
+- [Cập nhật thời gian thực và nối lại](docs/realtime.md)
 - [Quyết định kỹ thuật](docs/decisions.md)
 - [Bản đồ mã nguồn](docs/file-map.md)
 - [Trạng thái chức năng và công việc](docs/tasks.md)

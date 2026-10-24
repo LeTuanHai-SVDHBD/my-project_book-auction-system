@@ -22,6 +22,12 @@
 | `frontend/src/utils/bidAvailability.js`, `backend/test/bidAvailability.test.js` | Đếm chờ từ giờ SQL, xử lý biên thời gian và dữ liệu thiếu/sai |
 | `scripts/smokeM5.mjs` | Smoke API/worker/SQL/Redis thật và cleanup fixture riêng |
 | `docs/auction-processing.md` | Hợp đồng, lưu quyết định, kết thúc và phục hồi |
+| `backend/src/events/auctionUpdates.js` | Pub/Sub chỉ ID phiên, sau COMMIT; subscriber riêng tại API |
+| `backend/src/realtime/auctionSockets.js` | Kiểm tra quyền xem công khai, room phiên/danh mục và tín hiệu thay đổi |
+| `frontend/src/services/auctionRealtime.js` | Join/rejoin, gộp tín hiệu và đọc lại định kỳ |
+| `frontend/src/components/BidHistory.jsx`, `frontend/src/utils/auctionClock.js` | Lịch sử phân trang và đồng hồ dựa trên SQL |
+| `backend/test/auctionRealtime.test.js`, `auctionClock.test.js` | Ranh giới COMMIT, room, Pub/Sub/Streams thật theo opt-in và biên thời gian |
+| `scripts/smokeM6.mjs`, `docs/realtime.md` | Nghiệm thu và hợp đồng thời gian thực; dùng chung fixture với smokeM5 |
 
 ## Cấu trúc chung
 

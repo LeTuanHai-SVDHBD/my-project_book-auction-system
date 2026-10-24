@@ -161,7 +161,7 @@ export function createPostModel({ getPool, sql }) {
           .query("UPDATE dbo.PhienDauGia SET thoi_gian_bat_dau=@start,thoi_gian_ket_thuc=@end,trang_thai='da_kich_hoat' OUTPUT INSERTED.phien_dau_gia_id WHERE phien_dau_gia_id=@id AND @start>SYSUTCDATETIME() AND @end>@start");
         if (!result.recordset.length) conflict('Giờ bắt đầu phải ở tương lai theo đồng hồ SQL Server; kết thúc phải sau bắt đầu.');
         await history(tx,row.phien_dau_gia_id,owner,'Chủ sách đặt lịch và kích hoạt phiên đã được kiểm duyệt');
-        return {id:postId};
+        return {id:postId,auctionId:row.phien_dau_gia_id};
       });
     },
   };

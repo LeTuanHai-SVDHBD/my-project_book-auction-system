@@ -20,6 +20,7 @@ async function fixture(t) {
   const users={findById:async id=>rows.find(x=>x.nguoi_dung_id===id),findByEmail:async email=>rows.find(x=>x.email===email)};
   const decisions=new Map(),pending=new Map();let writes=0;
   const model={findRequest:async id=>decisions.get(id)||null,
+    publicHistory:async(id,before)=>id===7?{items:before===null?[{luot_dat_gia_id:51,nguoi_dung_id:1,muc_gia:'999999999999999999',thoi_gian_dat:'2026-10-24T01:00:00Z',gia_toi_thieu:'hidden-secret',email:'private'}]:[],nextBefore:before===null?51:null}:null,
     bidStatus:async(id,userId)=>id===7?{la_chu_sach:userId===2,duoc_dat_lai_luc:userId===1?'2026-10-24T01:00:20.000Z':null,server_time:'2026-10-24T01:00:05.000Z',nguoi_dung_id:userId,gia_toi_thieu:'hidden-secret'}:null,
     publicAuction:async id=>id===7?{phien_dau_gia_id:7,trang_thai:'da_kich_hoat',gia_khoi_diem:'100000',gia_toi_thieu:'hidden-secret',email:'private',row_version:'0000000000000001',gia_hien_tai:null,buoc_gia:'1000',ket_qua:null}:null};
   const publisher={async bid(input){const old=pending.get(input.requestId);if(old)assertSameBid({ma_yeu_cau:old.requestId,phien_dau_gia_id:old.auctionId,nguoi_dung_id:old.userId,muc_gia:old.amount},input);else{writes++;pending.set(input.requestId,input);}return old||input;},pending:async id=>pending.get(id)||null};
@@ -36,6 +37,15 @@ async function fixture(t) {
   },async login(id){await this.call('/auth/csrf');assert.equal((await this.call('/auth/login','POST',{email:`u${id}@example.test`,mat_khau:'test password'})).status,200);}};}
   return {client,model,publisher,decisions,pending,writes:()=>writes,rows};
 }
+test('lịch sử chỉ công khai lượt hợp lệ với phân trang; không trả dữ liệu ngưỡng/email/model tự chèn',async t=>{
+  const f=await fixture(t),guest=f.client();
+  const page=await guest.call('/auctions/7/history');assert.equal(page.status,200);assert.equal(page.data.items[0].muc_gia,'999999999999999999');
+  assert.deepEqual(Object.keys(page.data.items[0]),['luot_dat_gia_id','nguoi_dung_id','muc_gia','thoi_gian_dat']);
+  assert.deepEqual((await guest.call('/auctions/7/history?before=51')).data,{items:[],nextBefore:null});
+  assert.equal((await guest.call('/auctions/8/history')).status,404);assert.equal((await guest.call('/auctions/7/history?before=-1')).status,400);
+  f.model.publicAuction=async()=>({lich_su:page.data.items.map(x=>({...x,gia_toi_thieu:'hidden-secret'}))});
+  assert(!JSON.stringify((await guest.call('/auctions/7')).data).includes('hidden-secret'));
+});
 test('HTTP điều kiện đặt giá: lấy người xem từ session, không công khai cooldown cá nhân hoặc dữ liệu SQL khác',async t=>{
   const f=await fixture(t),guest=f.client(),buyer=f.client(),seller=f.client();
   assert.equal((await guest.call('/auctions/7/bid-status')).status,401);

@@ -27,12 +27,12 @@
 | Khóa và phục hồi | Lease/token, rowversion, UNIQUE, pending/XAUTOCLAIM | Đã kiểm tra mất lease và crash sau COMMIT/trước ACK |
 | Kết thúc | Hết hạn/ngưỡng, một kết quả, giao dịch chỉ khi có người thắng | Đã kiểm tra SQL/Redis thật và smoke tích hợp |
 | Giao diện đấu giá | Gửi giá, chờ/chấp nhận/từ chối, retry cùng mã và kết quả | Đã kiểm tra nhiều tab, mất phản hồi mạng và desktop/mobile |
+| Thời gian thực | Worker → Pub/Sub → Socket, room công khai, lịch sử, đồng hồ SQL và lấy lại snapshot | Đã kiểm tra HTTP/Redis/Socket và hai browser độc lập; chờ smoke dịch vụ SQL thật của nhóm |
 
 ## Công việc tiếp theo
 
 | Lĩnh vực | Công việc |
 |---|---|
-| Realtime | Xác thực socket, room, worker → API, phục hồi sau COMMIT |
 | AI | Tích hợp Gemini, trích xuất bằng chứng, bộ chấm điểm và trạng thái thiếu dữ liệu |
 | Hồ sơ | Cập nhật thông tin cá nhân theo phạm vi được thống nhất |
 | Sau phiên | Giao dịch, trò chuyện, bình luận, đánh giá uy tín, khiếu nại theo thiết kế |
@@ -50,7 +50,8 @@ Không triển khai thêm trạng thái nghiệp vụ, cổng thanh toán hay c�
 - [ ] Đăng sách với ảnh và video thật; Admin từ chối, bổ sung, duyệt và chủ sách kích hoạt đúng phiên.
 - [ ] API danh mục/đấu giá không có `gia_toi_thieu`.
 - [ ] Gửi giá đúng bước/cooldown; theo dõi quyết định và hai kiểu kết thúc trên SQL Server 2022/Redis Compose của nhóm.
-- [ ] `check`, `test`, `build`, `smoke`, `smoke:auth`, `smoke:m4`, `smoke:m5` đạt sau cập nhật.
+- [ ] Hai trình duyệt tự đồng bộ giá/lịch sử/kết quả; mất mạng rồi nối lại tự lấy đúng trạng thái.
+- [ ] `check`, `test`, `build`, `smoke`, `smoke:auth`, `smoke:m4`, `smoke:m5`, `smoke:m6` đạt sau cập nhật.
 - [ ] Lưu log/ảnh nghiệm thu phù hợp, đã loại thông tin nhạy cảm.
 
 Các xác nhận cũ không tự thay thế kiểm tra hồi quy cho bản cập nhật mới.

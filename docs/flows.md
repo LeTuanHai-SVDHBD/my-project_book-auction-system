@@ -104,7 +104,8 @@ Header chọn tab phải có 32 ký tự hex viết thường; header này khôn
 
 `React → API → Redis Streams → Worker → SQL SELECT → Redis result → React`.
 API trả 202 queued; worker chỉ xác nhận completed sau truy vấn kiểm tra thành công.
-Kết quả probe được lấy qua HTTP; Socket.IO chỉ gửi lời chào kết nối.
+Kết quả probe được lấy qua HTTP; kênh hạ tầng Socket.IO vẫn gửi `system:hello`.
+Namespace `/auctions` cập nhật nghiệp vụ theo [realtime.md](realtime.md).
 Endpoint development cần `DEV_PROBE_TOKEN`, không dùng khóa này thay tài khoản.
 
 ## Đặt giá và kết thúc phiên
@@ -115,6 +116,7 @@ Các endpoint đã triển khai:
 | Phương thức | Endpoint | Điều kiện |
 |---|---|---|
 | GET | `/api/auctions/:id` | Công khai, chỉ phiên đã công bố; không có ngưỡng giá ẩn |
+| GET | `/api/auctions/:id/history` | Lượt hợp lệ công khai, 50 lượt/trang; `before` lấy trang cũ hơn |
 | GET | `/api/auctions/:id/bid-status` | Đăng nhập; trạng thái chủ sách, thời điểm đặt lại của chính session và giờ SQL |
 | POST | `/api/auctions/:id/bids` | Người dùng + CSRF; body chỉ `ma_yeu_cau` UUID v4 và `muc_gia` chuỗi nguyên |
 | GET | `/api/auctions/:id/requests/:requestId` | Chỉ chủ yêu cầu; đọc SQL trước admission Redis |

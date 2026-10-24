@@ -6,6 +6,7 @@ export function createAuctionRouter({sessionMiddleware,users,model,service}) {
   const router=Router(),c=createAuctionController({model,service});
   router.use((req,res,next)=>{res.set('Cache-Control','no-store');next();});
   router.get('/:id',c.detail);
+  router.get('/:id/history',c.history);
   router.use(sessionMiddleware,requireUser(users));
   router.get('/:id/bid-status',c.bidStatus);
   router.post('/:id/bids',requireRole('nguoi_dung'),requireCsrf,c.submit);

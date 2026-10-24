@@ -13,10 +13,21 @@ import {createAuctionPublisher} from '../backend/src/events/auctionPublisher.js'
 import {createAuctionProcessor} from '../backend/src/processors/auction.processor.js';
 import {ensureAuctionGroup,processAuctionMessage} from '../backend/src/events/auctionConsumer.js';
 import {AUCTION} from '../backend/src/constants/auction.js';
+import {pathToFileURL} from 'node:url';
+import {io} from 'socket.io-client';
 
+export async function runAuctionSmoke({realtime=false}={}) {
 const base=`http://${config.host}:${config.port}/api`,runId=randomUUID(),secret=randomBytes(24).toString('base64url');
 const accounts=[],auctions=[],requests=new Set(),recoveryPrefix=`bookauction:smoke:auction:${runId}:`;
+const sockets=[],socketErrors=[];
 let pool,redis,stage='readiness',passed=false;
+async function watch(input) {
+  const socket=io(`http://${config.host}:${config.port}/auctions`,{forceNew:true,timeout:6000,reconnection:false});sockets.push(socket);
+  const changes=[];socket.on('auction:changed',value=>{if(!value||Object.keys(value).length!==1||!Number.isInteger(value.auctionId))socketErrors.push('Payload Socket không đúng hợp đồng.');else changes.push(value.auctionId);});
+  await new Promise((resolve,reject)=>{socket.once('connect',resolve);socket.once('connect_error',reject);});
+  const join=async()=>assert.equal((await socket.timeout(6000).emitWithAck('auction:watch',input)).ok,true);
+  await join();return {socket,changes,join};
+}
 class Client {
   cookie='';token='';
   async call(path,method='GET',body,csrf=true) {
@@ -71,7 +82,10 @@ try {
     await waitFor(async()=>{const row=check(await a.call(`/auctions/${detail.phien_dau_gia_id}`),200);assert(!('gia_toi_thieu' in row));return new Date(row.server_time)>=start;},'Phiên chưa bắt đầu.',15000);
     return detail.phien_dau_gia_id;
   }
+  const catalog=realtime?await watch({catalog:true}):null;
   const id=await createAuction();
+  const watchers=realtime?[await watch({auctionId:id}),await watch({auctionId:id})]:[];
+  if(realtime)await waitFor(()=>catalog.changes.includes(id),'Chưa nhận được cập nhật kích hoạt qua Socket.IO.');
   progress('điều kiện đặt giá riêng theo tài khoản');
   assert.equal(check(await seller.call(`/auctions/${id}/bid-status`),200).la_chu_sach,true);
   assert.deepEqual(Object.keys(check(await a.call(`/auctions/${id}/bid-status`),200)).sort(),['duoc_dat_lai_luc','la_chu_sach','server_time']);
@@ -83,6 +97,14 @@ try {
   progress('hai yêu cầu cùng giá và replay cùng mã');
   const first=moneyInput(),second=moneyInput();const results=await Promise.all([submit(a,id,first),submit(b,id,second)]);
   assert.deepEqual(results.map(x=>x.trang_thai).sort(),['bi_tu_choi','da_chap_nhan']);assert.equal((await counts(id)).bids,1);
+  if(realtime){
+    progress('hai kết nối nhận tín hiệu và cùng snapshot/lịch sử SQL');
+    await waitFor(()=>watchers.every(w=>w.changes.includes(id)),'Chưa nhận được tín hiệu sau ghi SQL.');
+    const snapshots=await Promise.all([a,b].map(async client=>check(await client.call(`/auctions/${id}`),200)));
+    assert.equal(snapshots[0].gia_hien_tai,snapshots[1].gia_hien_tai);assert.deepEqual(snapshots[0].lich_su,snapshots[1].lich_su);
+    assert.equal(snapshots[0].lich_su.length,1);assert(!JSON.stringify(snapshots).includes('"gia_toi_thieu":'));
+    watchers[1].socket.disconnect();
+  }
   const accepted=results[0].trang_thai==='da_chap_nhan'?{client:a,input:first,other:b}:{client:b,input:second,other:a};
   const personal=check(await accepted.client.call(`/auctions/${id}/bid-status`),200);
   assert.equal(new Date(personal.duoc_dat_lai_luc).getTime()-new Date(results.find(x=>x.trang_thai==='da_chap_nhan').thoi_gian_xu_ly).getTime(),10000);
@@ -92,20 +114,32 @@ try {
   check(await accepted.other.call(`/auctions/${id}/requests/${accepted.input.ma_yeu_cau}`),404);
   assert.equal((await submit(accepted.client,id,moneyInput('101000'))).ly_do,'BID_COOLDOWN');
   assert.equal((await submit(accepted.other,id,moneyInput('101000'))).trang_thai,'da_chap_nhan');
+  if(realtime){
+    progress('mất kết nối: vào lại room và lấy trạng thái SQL hiện tại');
+    const watcher=watchers[1];watcher.socket.connect();
+    await new Promise((resolve,reject)=>{watcher.socket.once('connect',resolve);watcher.socket.once('connect_error',reject);});await watcher.join();
+    const snapshot=check(await accepted.other.call(`/auctions/${id}`),200);
+    assert.equal(snapshot.gia_hien_tai,'101000');assert.equal(snapshot.lich_su.length,2);
+    assert.deepEqual(check(await a.call(`/auctions/${id}/history`),200).items,snapshot.lich_su);
+  }
   progress('tiền 18 chữ số, đạt/vượt ngưỡng và ngưỡng bằng giá khởi điểm');
   const exact=await createAuction({price:'999999999999999991',step:'2'}),big=moneyInput('999999999999999999');
   assert.equal((await submit(a,exact,big)).muc_gia,'999999999999999999');
   const outcome=check(await a.call(`/auctions/${exact}`),200);assert.equal(outcome.trang_thai,'da_ket_thuc');assert.equal(outcome.ket_qua.ly_do_ket_thuc,'dat_gia_toi_thieu');assert.equal(outcome.ket_qua.muc_gia_thang,big.muc_gia);
   await submit(a,exact,big);assert.deepEqual(await counts(exact),{bids:1,results:1,trades:1});
-  const equal=await createAuction({threshold:'100000'});await submit(a,equal,moneyInput());assert.equal(check(await a.call(`/auctions/${equal}`),200).trang_thai,'da_ket_thuc');
+  const equal=await createAuction({threshold:'100000'}),endedWatcher=realtime?await watch({auctionId:equal}):null;
+  await submit(a,equal,moneyInput());assert.equal(check(await a.call(`/auctions/${equal}`),200).trang_thai,'da_ket_thuc');
+  if(realtime){await waitFor(()=>endedWatcher.changes.includes(equal),'Chưa nhận được cập nhật kết thúc.');const views=await Promise.all([a,b].map(async client=>check(await client.call(`/auctions/${equal}`),200)));assert.deepEqual(views[0].ket_qua,views[1].ket_qua);}
   const over=await createAuction({threshold:'100500'});await submit(a,over,moneyInput('101000'));assert.equal(check(await a.call(`/auctions/${over}`),200).ket_qua.muc_gia_thang,'101000');
   progress('hết hạn có giá dưới ngưỡng và hết hạn không người thắng');
-  const timed=await createAuction({duration:1800});await submit(a,timed,moneyInput());
+  const timed=await createAuction({duration:realtime?6000:1800}),timedWatcher=realtime?await watch({auctionId:timed}):null;await submit(a,timed,moneyInput());
   const timedResult=await waitFor(async()=>{const row=check(await a.call(`/auctions/${timed}`),200);return row.ket_qua;},'Job chưa chốt phiên hết hạn.');
   assert.equal(timedResult.ly_do_ket_thuc,'het_thoi_gian');assert.equal(timedResult.muc_gia_thang,'100000');assert.deepEqual(await counts(timed),{bids:1,results:1,trades:1});
-  const empty=await createAuction({duration:1000});
+  if(realtime)await waitFor(()=>timedWatcher.changes.length>=2,'Chưa nhận đủ cập nhật lượt giá và chốt hết hạn.');
+  const empty=await createAuction({duration:realtime?3000:1000}),emptyWatcher=realtime?await watch({auctionId:empty}):null;
   const emptyResult=await waitFor(async()=>check(await a.call(`/auctions/${empty}`),200).ket_qua,'Job chưa chốt phiên không có lượt giá.');
   assert.equal(emptyResult.trang_thai,'khong_co_nguoi_thang');assert.deepEqual(await counts(empty),{bids:0,results:1,trades:0});
+  if(realtime)await waitFor(()=>emptyWatcher.changes.includes(empty),'Chưa nhận cập nhật hết hạn không người thắng.');
   assert.equal((await submit(a,empty,moneyInput())).trang_thai,'bi_tu_choi');
   progress('phục hồi sau COMMIT trước ACK với stream UUID riêng');
   const recovery=await createAuction(),settings={...AUCTION,stream:recoveryPrefix+'events',group:recoveryPrefix+'workers',deadLetter:recoveryPrefix+'dead',admissionPrefix:recoveryPrefix+'requests:',closePrefix:recoveryPrefix+'close:'};
@@ -120,10 +154,11 @@ try {
   await processAuctionMessage({client:redis,message:claimed.messages[0],handle,settings});
   assert.equal((await redis.xPending(settings.stream,settings.group)).pending,0);assert.equal((await counts(recovery)).bids,1);
   assert.equal(check(await a.call(`/auctions/${recovery}/requests/${recoveryId}`),200).trang_thai,'da_chap_nhan');
-  passed=true;
+  assert.deepEqual(socketErrors,[]);passed=true;
 } catch(error) {
   console.error(`FAIL đấu giá tại ${stage}; run=${runId}.`,error.name==='AssertionError'?error.message:'Kiểm tra terminal API/worker, migration SQL và kết nối Redis.');process.exitCode=1;
 } finally {
+  sockets.forEach(socket=>socket.disconnect());
   if(accounts.length)try {
     pool ||= await getPool();
     // Stop deleting if an API-admitted request is still pending; keep its SQL references for the worker.
@@ -146,3 +181,6 @@ try {
   if(redis?.isOpen)redis.destroy();await closeDatabase();
 }
 if(passed&&!process.exitCode)console.log('PASS đấu giá: quyền/CSRF, Streams → worker → SQL, giá/cooldown, tranh chấp, replay, 18 chữ số, hai kiểu kết thúc, một kết quả/giao dịch và phục hồi sau COMMIT trước ACK.');
+if(passed&&realtime&&!process.exitCode)console.log('PASS thời gian thực: kích hoạt, hai kết nối, lịch sử/kết quả SQL, đăng ký lại room và lấy lại snapshot sau mất kết nối; không lộ ngưỡng giá.');
+}
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)await runAuctionSmoke();

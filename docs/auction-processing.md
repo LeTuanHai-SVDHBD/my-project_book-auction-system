@@ -7,7 +7,7 @@
 Đã triển khai API, Redis admission/Streams, processor có khóa phiên, transaction SQL,
 job hết hạn và giao diện gửi giá/theo dõi quyết định qua HTTP.
 Schema sau migration 003 có 20 bảng/152 cột. Không thay dependency hoặc cơ chế xác thực theo tab.
-Socket.IO nghiệp vụ, AI và xác nhận hoàn tất giao dịch chưa triển khai.
+Socket.IO nghiệp vụ đã có theo [hợp đồng thời gian thực](realtime.md); AI và xác nhận hoàn tất giao dịch chưa triển khai.
 
 ## Hợp đồng HTTP
 
@@ -42,7 +42,7 @@ API không trả giá ngưỡng ẩn, email hay version nội bộ qua projectio
 HTTP 202 không đồng nghĩa đặt giá thành công. Giao diện poll yêu cầu của mình;
 khi mất phản hồi, nút thử lại giữ nguyên UUID và mức giá. Sau kết quả cuối mới tạo yêu cầu mới.
 Giá/trạng thái mới của phiên được phản ánh trong chi tiết sau khi lấy snapshot;
-các tab khác bấm tải lại, chưa có đồng bộ giá qua Socket.IO.
+các tab khác tự lấy lại khi có tín hiệu Socket, khi nối lại hoặc qua đồng bộ định kỳ.
 
 Giao diện lấy `la_chu_sach`, `duoc_dat_lai_luc` và `server_time` qua `bid-status`; không gửi ID người mua.
 SQL tính thời điểm đặt lại từ lượt hợp lệ cuối của chính người xem trong phiên và thời gian chờ của phiên.
@@ -68,7 +68,8 @@ Từ chối `BID_COOLDOWN` do trạng thái tab cũ được thay bằng hướn
 7. Nếu đạt/vượt ngưỡng, kết thúc ngay trong cùng transaction. Nếu yêu cầu đã muộn,
    từ chối giá và chốt hạn nếu phiên vẫn đang hoạt động.
 8. Ghi quyết định cuối vào YeuCauDatGia, kiểm tra lease rồi COMMIT.
-9. Chỉ sau COMMIT, consumer XACK/XDEL; client đọc quyết định SQL để biết kết quả.
+9. Chỉ sau COMMIT, processor publish tín hiệu ID phiên. Publish lỗi thì giữ pending; consumer XACK/XDEL sau khi processor hoàn tất.
+   Client đọc quyết định/snapshot SQL để biết kết quả, không suy ra quyết định từ tín hiệu Socket.
 
 Quyết định, giá, lịch sử, kết quả và giao dịch liên quan cùng rollback nếu chưa COMMIT.
 Kết quả COMMIT chưa rõ được retry và đối chiếu receipt; không gửi thông báo từ chối giả.

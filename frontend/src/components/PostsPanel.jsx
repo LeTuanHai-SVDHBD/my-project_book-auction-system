@@ -1,8 +1,9 @@
 /** Danh mục, bài của tôi, kiểm duyệt thủ công và luồng đặt giá/kết quả phiên. */
-import {useCallback,useEffect,useState} from 'react';
+import {useCallback,useEffect,useRef,useState} from 'react';
 import {postApi} from '../services/postApi.js';
 import PostForm from './PostForm.jsx';
 import AuctionPanel from './AuctionPanel.jsx';
+import {useAuctionRealtime} from '../services/auctionRealtime.js';
 const states={cho_kiem_duyet:'Chờ kiểm duyệt',khong_dat_kiem_duyet:'Bị từ chối',da_qua_kiem_duyet:'Đã duyệt · chờ đặt lịch',da_kich_hoat:'Đã kích hoạt',da_ket_thuc:'Đã kết thúc'};
 const money=value=>value==null?'Chưa có':`${BigInt(value).toLocaleString('vi-VN')} đ`;
 const date=value=>value?new Date(value).toLocaleString('vi-VN'):'Chưa đặt lịch';
@@ -38,6 +39,7 @@ function Detail({post,mode,user,onRefresh,onForm,onClose,onAuctionChange}) {
 export default function PostsPanel({mode,user}) {
   const [items,setItems]=useState([]);const [next,setNext]=useState(null);const [post,setPost]=useState(null);const [form,setForm]=useState(null);
   const [loading,setLoading]=useState(false);const [error,setError]=useState('');const [message,setMessage]=useState('');
+  const listSequence=useRef(0);
   const auctionChanged=useCallback(snapshot=>{
     const update=row=>!row||row.phien_dau_gia_id!==snapshot.phien_dau_gia_id||
       row.trang_thai_phien===snapshot.trang_thai&&row.gia_hien_tai===snapshot.gia_hien_tai?row:
@@ -45,8 +47,9 @@ export default function PostsPanel({mode,user}) {
     setPost(update);setItems(old=>old.map(update));
   },[]);
   const title=mode==='mine'?'Bài đăng của tôi':mode==='pending'?'Kiểm duyệt bài đăng':'Danh mục đấu giá';
-  async function load(append=false){setLoading(true);setError('');try{const result=await postApi.list(mode,append?next:null);setItems(old=>append?[...old,...result.items]:result.items);setNext(result.nextBefore);}catch(failure){setError(failure.message);}finally{setLoading(false);}}
-  useEffect(()=>{void load();},[mode]);
+  async function load(append=false){const sequence=++listSequence.current;setLoading(true);setError('');try{const result=await postApi.list(mode,append?next:null);if(sequence===listSequence.current){setError('');setItems(old=>append?[...old,...result.items]:result.items);setNext(result.nextBefore);}}catch(failure){if(sequence===listSequence.current)setError(failure.status?failure.message:'Chưa kết nối được máy chủ. Vui lòng kiểm tra mạng.');}finally{if(sequence===listSequence.current)setLoading(false);}}
+  useEffect(()=>{void load();return()=>{++listSequence.current;};},[mode]);
+  useAuctionRealtime({enabled:mode!=='pending',onChange:()=>load()});
   async function open(id){setLoading(true);setError('');try{setPost(await postApi.detail(id,mode==='catalog'));}catch(failure){setError(failure.message);}finally{setLoading(false);}}
   async function refresh(){await open(post.bai_dang_id);await load();}
   async function saved(id){setForm(null);setMessage('Đã gửi kiểm duyệt. Sau khi Admin duyệt, bạn có thể đặt lịch cho phiên.');await load();await open(id);}
@@ -54,7 +57,7 @@ export default function PostsPanel({mode,user}) {
     {error&&<p className="error" role="alert">{error}</p>}{message&&<p className="account-success" role="status">{message}</p>}{loading&&<p role="status">Đang tải…</p>}
     {form?<PostForm key={`${form}-${post?.bai_dang_id||'new'}`} source={form==='create'?null:post} mode={form} onSaved={saved} onCancel={()=>setForm(null)}/>:post?<Detail key={post.bai_dang_id} post={post} mode={mode} user={user} onRefresh={refresh} onClose={()=>setPost(null)} onForm={setForm} onAuctionChange={auctionChanged}/>:<>
       {!items.length&&!loading&&<div className="empty-state"><h2>Chưa có bài đăng</h2><p>{mode==='mine'?'Bắt đầu bằng cách đăng bản sách bạn muốn đấu giá.':'Bài phù hợp sẽ xuất hiện tại đây.'}</p></div>}
-      <div className="post-list">{items.map(item=><article className="post-card" key={item.bai_dang_id}><span className="status-pill">{states[item.trang_thai_phien]}</span><h2>{item.tieu_de}</h2><p>{item.ten_sach} · {item.tac_gia||'Chưa rõ tác giả'}</p><p>Khởi điểm <strong>{money(item.gia_khoi_diem)}</strong> · Bước {money(item.buoc_gia)}</p><p className="field-hint">Bài #{item.bai_dang_id} · Phiên #{item.phien_dau_gia_id}</p><button className="secondary" onClick={()=>open(item.bai_dang_id)}>Xem chi tiết</button></article>)}</div>{next&&<button disabled={loading} onClick={()=>load(true)}>Xem thêm</button>}
+      <div className="post-list">{items.map(item=><article className="post-card" key={item.bai_dang_id}><span className="status-pill">{states[item.trang_thai_phien]}</span><h2>{item.tieu_de}</h2><p>{item.ten_sach} · {item.tac_gia||'Chưa rõ tác giả'}</p><p>Khởi điểm <strong>{money(item.gia_khoi_diem)}</strong> · Bước {money(item.buoc_gia)}</p><p>Giá hiện tại: <strong>{money(item.gia_hien_tai)}</strong></p><p className="field-hint">Bài #{item.bai_dang_id} · Phiên #{item.phien_dau_gia_id}</p><button className="secondary" onClick={()=>open(item.bai_dang_id)}>Xem chi tiết</button></article>)}</div>{next&&<button disabled={loading} onClick={()=>load(true)}>Xem thêm</button>}
     </>}
   </main>;
 }

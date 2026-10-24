@@ -12,14 +12,14 @@ SQL Server giữ trạng thái nghiệp vụ có thẩm quyền; Redis hỗ tr�
 
 | Thành phần | Trách nhiệm | Kết nối |
 |---|---|---|
-| React | Tài khoản, bài đăng, kiểm duyệt, đặt lịch, đặt giá và kết quả | HTTP/JSON và upload nhị phân qua API |
+| React | Tài khoản, bài đăng, đặt giá, lịch sử, đồng hồ và kết quả | HTTP/JSON, upload và tín hiệu Socket.IO |
 | Express API | Xác thực, phân quyền, đầu vào, nghiệp vụ HTTP và Socket.IO | SQL Server, Redis, Cloudinary |
 | SQL Server | Tài khoản, sách, bài, phiên, quyết định giá, kết quả, giao dịch và lịch sử | Thư viện `mssql`, truy vấn tham số hóa |
 | Redis | Session, vé media, admission đặt giá, khóa phiên, giới hạn thử, probe và heartbeat | Redis client; Lua khi cần thao tác nguyên tử |
 | Redis Streams | Stream probe và stream nghiệp vụ đấu giá độc lập | Consumer group tại worker |
 | Worker | Đọc/xử lý probe và đấu giá; job chốt hạn | Hai kết nối BLOCK riêng; transaction SQL nghiệp vụ |
 | Cloudinary | Lưu và phân phối ảnh/video | HTTPS REST từ Backend; SQL lưu URL/public_id |
-| Socket.IO | Kiểm tra kết nối bằng `system:hello` | Cùng HTTP server; chưa có sự kiện nghiệp vụ riêng tư |
+| Socket.IO | Room phiên/danh mục chỉ đọc, tín hiệu sau COMMIT và `system:hello` | Subscriber Redis riêng tại mỗi API; không phát dữ liệu riêng tư |
 | Gemini API | Phân tích sách dự kiến | Chưa tích hợp; Admin hiện kiểm duyệt thủ công |
 
 Frontend không truy cập SQL hoặc Redis trực tiếp. Bí mật Cloudinary chỉ có ở Backend.
@@ -74,14 +74,15 @@ claim chưa rõ commit được giữ để đối soát thủ công. Không có
 
 ## Cập nhật thời gian thực và phục hồi
 
-Socket.IO mới cung cấp lời chào hạ tầng; giao diện đọc trạng thái bài/phiên qua HTTP.
 Worker đặt giá và tác vụ hết hạn dùng cùng khóa phiên và transaction/rowversion SQL.
-Pending được nhận lại bằng XAUTOCLAIM; ACK chỉ sau COMMIT. Quyết định SQL giúp phục hồi khi crash trước ACK.
-Giao diện poll yêu cầu đang chờ, còn giá/trạng thái giữa các tab lấy lại bằng nút tải lại.
-Realtime sau này chỉ phát thông báo sau COMMIT và kiểm tra quyền trước khi vào room riêng tư.
-Kênh worker → API cùng cơ chế phát lại sau sự cố chưa được triển khai; xem ADR-009.
+Sau COMMIT, processor publish tín hiệu ID phiên qua Redis Pub/Sub; API chuyển vào room công khai đã kiểm tra quyền xem.
+Publish lỗi giữ thông điệp pending; XAUTOCLAIM xử lý lại và đọc quyết định đã lưu trước khi phát lại/ACK.
+Không gửi ngưỡng, giá hoặc quyết định riêng trong tín hiệu Socket. Giao diện lấy snapshot SQL sau thông báo,
+sau khi đăng ký lại room và mỗi 5 giây để bù sự kiện lỡ. Snapshot chứa lịch sử mới nhất cùng giá/kết quả.
+Quyết định của người đặt vẫn được đọc qua HTTP có xác thực, không đưa session vào Socket.
+Không có outbox hoặc cam kết giao mọi thông báo; phục hồi trạng thái hiện tại bằng SQL. Xem [realtime.md](realtime.md) và ADR-009.
 
 ## Phạm vi phát triển tiếp theo
 
-Realtime nghiệp vụ, AI, xác nhận hoàn tất giao dịch, trò chuyện, bình luận, đánh giá và khiếu nại
+AI, xác nhận hoàn tất giao dịch, trò chuyện, bình luận, đánh giá và khiếu nại
 được theo dõi theo chức năng trong [tasks.md](tasks.md). Thiết kế tương lai được phân biệt với mã đã có tại [flows.md](flows.md).

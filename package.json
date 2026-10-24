@@ -19,6 +19,7 @@
     "dev:api": "npm run dev:api --workspace backend",
     "dev:worker": "npm run dev:worker --workspace backend",
     "dev:web": "npm run dev --workspace frontend",
+    "dev:all": "concurrently --kill-others --names API,WORKER,WEB --prefix-colors bgBlue,bgGreen,bgMagenta \"npm run dev:api\" \"npm run dev:worker\" \"npm run dev:web\"",
     "check": "node scripts/check.mjs",
     "test": "npm test --workspace backend",
     "build": "npm run build --workspace frontend",
@@ -27,5 +28,8 @@
     "setup:media": "node scripts/setupMedia.mjs",
     "smoke:m4": "node scripts/smokeM4.mjs",
     "smoke:m5": "node scripts/smokeM5.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "10.0.6"
   }
 }

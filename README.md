@@ -123,7 +123,20 @@ API kiểm tra MIME, magic bytes và kích thước; tối đa hai upload đang 
 
 ## Khởi động
 
-Mở ba terminal riêng:
+Khi SQL Server và Redis đã healthy, chạy API, worker và React trong một terminal tại thư mục gốc:
+
+```powershell
+npm.cmd run dev:all
+```
+
+Log được gắn nhãn màu `[API]`, `[WORKER]` và `[WEB]`. Nhấn `Ctrl+C` để dừng cả ba.
+Nếu một lệnh kết thúc, `concurrently` gửi lệnh dừng các lệnh còn lại.
+Lệnh này không khởi động Docker hoặc chạy migration; hoàn thành các bước cài đặt trước khi sử dụng.
+
+Sau khi pull bản có dependency mới, chạy `npm.cmd ci` một lần trước khi khởi động.
+`concurrently` được cài trong dự án, không cần cài toàn cục.
+
+Khi cần kiểm tra riêng từng tiến trình, có thể dùng các lệnh sau ở terminal riêng:
 
 | Tiến trình | Lệnh |
 |---|---|
@@ -208,7 +221,8 @@ Script smoke bài đăng có quy trình dọn riêng cả SQL và Cloudinary cho
 
 ## Kiểm tra
 
-Giữ API, worker, SQL Server và Redis chạy khi thực hiện smoke; kiểm thử bài đăng cần Cloudinary thật.
+Giữ `npm.cmd run dev:all`, SQL Server và Redis chạy; mở terminal thứ hai để thực hiện các lệnh kiểm tra.
+Kiểm thử bài đăng cần Cloudinary thật.
 
 ```powershell
 npm.cmd run check

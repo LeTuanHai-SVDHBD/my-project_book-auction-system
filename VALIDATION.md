@@ -2,8 +2,24 @@
 
 # Kết quả kiểm tra
 
-Cập nhật ngày 23/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
+Cập nhật ngày 24/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
+
+## Chạy chung các tiến trình phát triển
+
+Kiểm tra ngày 24/10/2026 cho `npm.cmd run dev:all` dùng `concurrently` 10.0.6:
+
+- `npm ci` thành công với lockfile mới; phiên bản dependency đã có được giữ nguyên.
+- `npm run check`: PASS 73 tệp; `npm run build`: PASS.
+- Lệnh thực khởi chạy API, worker và Vite, log có nhãn `[API]`, `[WORKER]`, `[WEB]` và mã màu ANSI.
+- API và giao diện nhận HTTP; gửi SIGINT cho nhóm tiến trình để mô phỏng `Ctrl+C` dừng nhóm thành công.
+- SQL/Redis được cố ý cấu hình không khả dụng trong kiểm tra launcher; không kiểm tra readiness hoặc nghiệp vụ.
+
+Kiểm tra tự dừng khi cổng web bị chiếm chưa đạt trong môi trường Linux có PID namespace:
+`tree-kill` không tra cứu được cây PID của lệnh con qua `ps`. Đây là giới hạn kiểm chứng của môi trường này;
+không coi đó là bằng chứng tự dừng thành công. Cần thử `Ctrl+C` và lỗi cổng trên Windows của nhóm.
+Không chạy lại bộ kiểm thử nghiệp vụ hoặc smoke SQL/Cloudinary cho thay đổi lệnh khởi động này.
+Các kết quả nghiệp vụ bên dưới là bằng chứng của lần kiểm tra trước.
 
 ## Môi trường
 

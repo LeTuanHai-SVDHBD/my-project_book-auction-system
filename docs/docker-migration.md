@@ -79,7 +79,13 @@ docker compose ps
 
 Compose có thể cảnh báo volume được tạo bởi project cũ. Kiểm tra mount trước khi tiếp tục; không xóa volume để làm mất cảnh báo.
 
-Sau khi healthy, chạy lại API, worker và React theo README. Kiểm tra database cùng dữ liệu trước đó, sau đó chạy:
+Sau khi healthy, chạy API, worker và React trong một terminal:
+
+```powershell
+npm.cmd run dev:all
+```
+
+Kiểm tra database cùng dữ liệu trước đó, rồi mở terminal thứ hai và chạy:
 
 ```powershell
 npm.cmd run smoke

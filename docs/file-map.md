@@ -41,6 +41,10 @@
 Cài dependency từ gốc bằng `npm.cmd ci`. Không chỉnh thủ công node_modules, frontend/dist hoặc lockfile;
 lockfile được cập nhật bằng npm khi dependency thay đổi.
 
+`npm.cmd run dev:all` dùng devDependency `concurrently` ở gốc để chạy API, worker và React cùng lúc,
+gắn nhãn màu cho log và dừng cả nhóm bằng `Ctrl+C`. Các lệnh `dev:api`, `dev:worker`, `dev:web`
+vẫn dùng được khi cần kiểm tra riêng. SQL Server và Redis được khởi động bằng Docker Compose trước đó.
+
 ## Backend
 
 Các đường dẫn bên dưới tương đối với `backend/`.

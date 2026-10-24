@@ -11,6 +11,11 @@ export function publicAuctionView(row) {
 }
 export function createAuctionController({model,service}) {
   return {
+    async bidStatus(req,res) {
+      const row=await model.bidStatus(parseAuctionId(req.params.id),req.user.nguoi_dung_id);
+      if(!row)throw new HttpError(404,'AUCTION_NOT_FOUND','Không tìm thấy phiên đã được công bố.');
+      res.json({la_chu_sach:row.la_chu_sach,duoc_dat_lai_luc:row.duoc_dat_lai_luc,server_time:row.server_time});
+    },
     async detail(req,res) {
       const row=await model.publicAuction(parseAuctionId(req.params.id));
       if(!row)throw new HttpError(404,'AUCTION_NOT_FOUND','Không tìm thấy phiên đã được công bố.');

@@ -72,6 +72,10 @@ try {
     return detail.phien_dau_gia_id;
   }
   const id=await createAuction();
+  progress('điều kiện đặt giá riêng theo tài khoản');
+  assert.equal(check(await seller.call(`/auctions/${id}/bid-status`),200).la_chu_sach,true);
+  assert.deepEqual(Object.keys(check(await a.call(`/auctions/${id}/bid-status`),200)).sort(),['duoc_dat_lai_luc','la_chu_sach','server_time']);
+  assert.equal(check(await a.call(`/auctions/${id}/bid-status`),200).duoc_dat_lai_luc,null);
   progress('quyền, CSRF và bước giá');
   check(await admin.call(`/auctions/${id}/bids`,'POST',moneyInput()),403);check(await a.call(`/auctions/${id}/bids`,'POST',moneyInput(),false),403);
   assert.equal((await submit(seller,id,moneyInput())).ly_do,'SELLER_CANNOT_BID');
@@ -80,6 +84,9 @@ try {
   const first=moneyInput(),second=moneyInput();const results=await Promise.all([submit(a,id,first),submit(b,id,second)]);
   assert.deepEqual(results.map(x=>x.trang_thai).sort(),['bi_tu_choi','da_chap_nhan']);assert.equal((await counts(id)).bids,1);
   const accepted=results[0].trang_thai==='da_chap_nhan'?{client:a,input:first,other:b}:{client:b,input:second,other:a};
+  const personal=check(await accepted.client.call(`/auctions/${id}/bid-status`),200);
+  assert.equal(new Date(personal.duoc_dat_lai_luc).getTime()-new Date(results.find(x=>x.trang_thai==='da_chap_nhan').thoi_gian_xu_ly).getTime(),10000);
+  assert.equal(check(await accepted.other.call(`/auctions/${id}/bid-status`),200).duoc_dat_lai_luc,null);
   assert.equal(check(await accepted.client.call(`/auctions/${id}/bids`,'POST',accepted.input),200).trang_thai,'da_chap_nhan');
   check(await accepted.client.call(`/auctions/${id}/bids`,'POST',{...accepted.input,muc_gia:'101000'}),409);
   check(await accepted.other.call(`/auctions/${id}/requests/${accepted.input.ma_yeu_cau}`),404);

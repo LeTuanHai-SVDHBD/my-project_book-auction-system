@@ -108,10 +108,16 @@ test('SQL/Redis thật: migration, tranh chấp, quyết định bền vững, k
     });
     await t.test('SQL kiểm tra chủ sách, vai trò mới nhất, bước giá và cooldown của cùng người',async()=>{
       const id=await fixture();
+      assert.equal((await model.bidStatus(id,seller)).la_chu_sach,true);
+      assert.equal((await model.bidStatus(id,a)).duoc_dat_lai_luc,null);
       assert.equal((await model.processBid(event(id,seller))).ly_do,'SELLER_CANNOT_BID');
       assert.equal((await model.processBid(event(id,admin))).ly_do,'BIDDER_NOT_ALLOWED');
       assert.equal((await model.processBid(event(id,a,'100001'))).ly_do,'INVALID_BID_STEP');
-      assert.equal((await model.processBid(event(id))).trang_thai,'da_chap_nhan');
+      const accepted=await model.processBid(event(id));assert.equal(accepted.trang_thai,'da_chap_nhan');
+      const personal=await model.bidStatus(id,a);
+      assert.equal(personal.la_chu_sach,false);
+      assert.equal(personal.duoc_dat_lai_luc.getTime()-accepted.thoi_gian_xu_ly.getTime(),20000);
+      assert.equal((await model.bidStatus(id,b)).duoc_dat_lai_luc,null);
       assert.equal((await model.processBid(event(id,a,'101000'))).ly_do,'BID_COOLDOWN');
       assert.equal((await model.processBid(event(id,b,'101000'))).trang_thai,'da_chap_nhan');
       assert.equal((await counts(id)).bids,2);

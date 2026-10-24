@@ -19,6 +19,7 @@
 | `backend/test/auctionHttp.test.js`, `auctionStream.test.js`, `auctionSql.test.js` | HTTP, Redis thật, SQL thật opt-in và phục hồi |
 | `backend/test/bidPolicy.test.js`, `auctionLock.test.js` | Biên nghiệp vụ/tiền và quyền sở hữu khóa |
 | `frontend/src/components/AuctionPanel.jsx`, `frontend/src/services/auctionApi.js` | Gửi giá, theo dõi quyết định, retry cùng mã và snapshot |
+| `frontend/src/utils/bidAvailability.js`, `backend/test/bidAvailability.test.js` | Đếm chờ từ giờ SQL, xử lý biên thời gian và dữ liệu thiếu/sai |
 | `scripts/smokeM5.mjs` | Smoke API/worker/SQL/Redis thật và cleanup fixture riêng |
 | `docs/auction-processing.md` | Hợp đồng, lưu quyết định, kết thúc và phục hồi |
 

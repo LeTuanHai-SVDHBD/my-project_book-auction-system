@@ -178,6 +178,7 @@ cấp CSRF 60 lần/IP/phút. Bộ đếm tính cả lần thành công. Khi b�
 2. Chọn ảnh/video, chờ upload hoàn tất; nhập giá khởi điểm, giá kết thúc sớm và bước giá.
 3. Các ô tiền chỉ nhận chữ số, thêm dấu chấm hàng nghìn tự động, ví dụ `1.500.000`.
    API nhận chuỗi nguyên `1500000`, giữ chính xác đến 18 chữ số. Giá hiện tại là dữ liệu từ lượt đặt giá, không phải ô chủ sách tự nhập.
+   Ô **Chờ đặt lại** chỉ nhận chữ số khi gõ hoặc dán; nhập số nguyên từ 10 đến 30 giây, mặc định 20 giây.
 4. Gửi kiểm duyệt: bài và phiên cùng chờ duyệt, chưa có lịch.
 5. Admin mở **Kiểm duyệt**, xem thông tin/media và nguồn đối chiếu. Ghi lý do;
    phê duyệt yêu cầu xác nhận đã kiểm tra bằng chứng quý hiếm. Có thể từ chối và chỉ rõ phần cần bổ sung.
@@ -195,12 +196,15 @@ Giờ được lưu theo UTC và kiểm tra bằng đồng hồ SQL Server.
 2. Nhập mức giá; giao diện tự thêm dấu chấm. Lượt đầu từ giá khởi điểm, lượt sau tăng ít nhất một bước.
 3. Bấm **Gửi mức giá**; “đang chờ” chỉ xác nhận đã tiếp nhận. Chỉ thông báo chấp nhận sau khi SQL COMMIT.
 4. Nếu mất phản hồi mạng, **Thử lại cùng yêu cầu** giữ nguyên mã và mức giá, không tạo lượt trùng.
-5. Sau mỗi lượt hợp lệ của cùng người trong cùng phiên, chờ đủ thời gian cấu hình (10–30 giây).
+5. Sau mỗi lượt hợp lệ của cùng người trong cùng phiên, giao diện đếm chờ theo thời gian máy chủ (10–30 giây),
+   ẩn ô nhập và nút đặt tiếp. Hết chờ, giao diện kiểm tra lại SQL, báo sẵn sàng và mở thao tác đặt giá.
+   F5 hoặc mở lại chi tiết vẫn giữ thời gian chờ; lượt bị từ chối không tạo thêm thời gian chờ.
 6. Phiên tự kết thúc khi hết giờ hoặc một giá hợp lệ đạt/vượt ngưỡng ẩn. Không có nút kết thúc thủ công.
 7. **Tải lại phiên và kết quả** lấy trạng thái SQL mới nhất. Danh mục giữ phiên đã kết thúc để xem kết quả.
 
 Hết giờ có lượt hợp lệ thì người có giá cao nhất thắng dù chưa đạt ngưỡng. Không có lượt hợp lệ thì
-không có người thắng và không tạo giao dịch. Người bán không tự đặt giá vào sách của mình; Admin chỉ xem.
+không có người thắng và không tạo giao dịch. Chủ sách chỉ xem thông tin phiên/kết quả, không có ô nhập hoặc nút đặt giá;
+Admin chỉ xem. Backend vẫn chặn chủ sách tự gửi giá và kiểm tra lại cooldown trước khi ghi nhận.
 Giao dịch được tạo ở trạng thái chờ xác nhận; trao đổi/xác nhận hoàn tất chưa được triển khai.
 Chi tiết xử lý và phục hồi tại [Xử lý đấu giá](docs/auction-processing.md).
 

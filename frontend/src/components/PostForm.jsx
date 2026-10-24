@@ -5,6 +5,7 @@ import MoneyInput from './MoneyInput.jsx';
 export default function PostForm({source,mode='create',onSaved,onCancel}) {
   const [config,setConfig]=useState(null); const [media,setMedia]=useState([]); const [busy,setBusy]=useState(false);
   const [error,setError]=useState(''); const [progress,setProgress]=useState('');
+  const [cooldown,setCooldown]=useState(()=>String(source?.thoi_gian_cho_dat_lai??20));
   const [requestId]=useState(()=>crypto.randomUUID()); const tickets=useRef([]); const submitted=useRef(false);
   useEffect(()=>{let canceled=false;postApi.config().then(value=>{if(!canceled)setConfig(value);}).catch(failure=>{if(!canceled)setError(failure.message);});
     return()=>{canceled=true;if(!submitted.current)for(const item of tickets.current)void postApi.discard(item.upload_id).catch(()=>{});};},[]);
@@ -48,7 +49,7 @@ export default function PostForm({source,mode='create',onSaved,onCancel}) {
       {config&&!config.configured&&<p className="notice">Chức năng tải tệp chưa sẵn sàng. Vui lòng liên hệ quản trị viên.</p>}
       <label>Chọn tệp<input type="file" multiple accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" disabled={!config?.configured||busy} onChange={upload}/></label>
       <div className="media-grid">{media.map(item=><figure key={item.upload_id}>{item.kind==='image'?<img src={item.url} alt={item.tieu_de}/>:<video src={item.url} controls preload="metadata"/>}<figcaption>{item.tieu_de}</figcaption><button type="button" onClick={()=>remove(item)}>Bỏ tệp</button></figure>)}</div>
-      <h3>Thông số đấu giá</h3><div className="form-grid"><MoneyInput name="gia_khoi_diem" label="Giá khởi điểm (VND)" initialValue={source?.gia_khoi_diem}/><MoneyInput name="gia_toi_thieu" label="Giá kết thúc sớm — chỉ chủ sách/Admin thấy (VND)" initialValue={source?.gia_toi_thieu}/><MoneyInput name="buoc_gia" label="Bước giá (VND)" initialValue={source?.buoc_gia}/>{input('thoi_gian_cho_dat_lai','Chờ đặt lại (10–30 giây)',2,true,'number',source?.thoi_gian_cho_dat_lai??20)}</div>
+      <h3>Thông số đấu giá</h3><div className="form-grid"><MoneyInput name="gia_khoi_diem" label="Giá khởi điểm (VND)" initialValue={source?.gia_khoi_diem}/><MoneyInput name="gia_toi_thieu" label="Giá kết thúc sớm — chỉ chủ sách/Admin thấy (VND)" initialValue={source?.gia_toi_thieu}/><MoneyInput name="buoc_gia" label="Bước giá (VND)" initialValue={source?.buoc_gia}/><label>Chờ đặt lại (10–30 giây)<input name="thoi_gian_cho_dat_lai" type="text" inputMode="numeric" pattern="(?:1[0-9]|2[0-9]|30)" title="Nhập số nguyên từ 10 đến 30 giây." required value={cooldown} onChange={event=>setCooldown(event.target.value.replace(/[^0-9]/g,'').slice(0,2))}/></label></div>
       <p className="field-hint">Nhập số tiền VND nguyên; dấu chấm phân cách hàng nghìn được thêm tự động. Chỉ đặt lịch sau khi được Admin phê duyệt.</p>
       <div className="actions"><button className="primary">{busy?'Đang xử lý…':'Gửi kiểm duyệt'}</button><button type="button" className="secondary" onClick={onCancel}>Đóng biểu mẫu</button></div>
     </fieldset></form>{progress&&<p role="status">{progress}</p>}{error&&<p className="error" role="alert">{error}</p>}

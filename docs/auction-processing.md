@@ -14,6 +14,7 @@ Socket.IO nghiệp vụ, AI và xác nhận hoàn tất giao dịch chưa triể
 | Phương thức | Endpoint | Quyền và phản hồi |
 |---|---|---|
 | GET | `/api/auctions/:id` | Công khai với phiên đã duyệt và kích hoạt/kết thúc; snapshot và kết quả |
+| GET | `/api/auctions/:id/bid-status` | Đã đăng nhập; chỉ trạng thái chủ sách và thời điểm đặt lại của chính tài khoản trong session |
 | POST | `/api/auctions/:id/bids` | Người dùng, cookie và CSRF; 202 đang chờ hoặc 200 quyết định đã có |
 | GET | `/api/auctions/:id/requests/:requestId` | Chủ yêu cầu; SQL trước Redis, người khác nhận 404 |
 
@@ -42,6 +43,17 @@ HTTP 202 không đồng nghĩa đặt giá thành công. Giao diện poll yêu c
 khi mất phản hồi, nút thử lại giữ nguyên UUID và mức giá. Sau kết quả cuối mới tạo yêu cầu mới.
 Giá/trạng thái mới của phiên được phản ánh trong chi tiết sau khi lấy snapshot;
 các tab khác bấm tải lại, chưa có đồng bộ giá qua Socket.IO.
+
+Giao diện lấy `la_chu_sach`, `duoc_dat_lai_luc` và `server_time` qua `bid-status`; không gửi ID người mua.
+SQL tính thời điểm đặt lại từ lượt hợp lệ cuối của chính người xem trong phiên và thời gian chờ của phiên.
+Endpoint không trả lịch sử đặt giá của người khác hoặc ngưỡng kết thúc sớm, không ghi dữ liệu và không cần migration.
+Snapshot công khai không chứa dữ liệu cooldown cá nhân.
+
+Chủ sách không có thao tác đặt giá. Người mua đang chờ chỉ thấy đếm ngược; ô nhập và nút đặt tiếp được ẩn.
+Giao diện dùng đồng hồ SQL và `performance.now()` để đếm, kiểm tra lại khi hết chờ, tải lại hoặc quay lại tab.
+Nếu chưa lấy được điều kiện đặt giá, thao tác tiếp tục bị ẩn và có thể tải lại để thử.
+Từ chối `BID_COOLDOWN` do trạng thái tab cũ được thay bằng hướng dẫn chờ, không lặp cảnh báo từ chối.
+Đây là hỗ trợ giao diện; worker vẫn kiểm tra quyền và cooldown trên SQL trước khi COMMIT.
 
 ## Quyết định trong SQL
 

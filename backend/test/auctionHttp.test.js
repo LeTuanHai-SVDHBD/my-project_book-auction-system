@@ -19,7 +19,9 @@ async function fixture(t) {
   const rows=[1,2,3].map(id=>({nguoi_dung_id:id,ho_ten:'Test',email:`u${id}@example.test`,vai_tro:id===3?'admin':'nguoi_dung'}));
   const users={findById:async id=>rows.find(x=>x.nguoi_dung_id===id),findByEmail:async email=>rows.find(x=>x.email===email)};
   const decisions=new Map(),pending=new Map();let writes=0;
-  const model={findRequest:async id=>decisions.get(id)||null,publicAuction:async id=>id===7?{phien_dau_gia_id:7,trang_thai:'da_kich_hoat',gia_khoi_diem:'100000',gia_toi_thieu:'hidden-secret',email:'private',row_version:'0000000000000001',gia_hien_tai:null,buoc_gia:'1000',ket_qua:null}:null};
+  const model={findRequest:async id=>decisions.get(id)||null,
+    bidStatus:async(id,userId)=>id===7?{la_chu_sach:userId===2,duoc_dat_lai_luc:userId===1?'2026-10-24T01:00:20.000Z':null,server_time:'2026-10-24T01:00:05.000Z',nguoi_dung_id:userId,gia_toi_thieu:'hidden-secret'}:null,
+    publicAuction:async id=>id===7?{phien_dau_gia_id:7,trang_thai:'da_kich_hoat',gia_khoi_diem:'100000',gia_toi_thieu:'hidden-secret',email:'private',row_version:'0000000000000001',gia_hien_tai:null,buoc_gia:'1000',ket_qua:null}:null};
   const publisher={async bid(input){const old=pending.get(input.requestId);if(old)assertSameBid({ma_yeu_cau:old.requestId,phien_dau_gia_id:old.auctionId,nguoi_dung_id:old.userId,muc_gia:old.amount},input);else{writes++;pending.set(input.requestId,input);}return old||input;},pending:async id=>pending.get(id)||null};
   const service=createAuctionService({model,publisher});
   const authRouter=createAuthRouter({authConfig,sessionMiddleware,users,passwords:{verify:async()=>true},limiter:{consume:async()=>0}});
@@ -34,6 +36,19 @@ async function fixture(t) {
   },async login(id){await this.call('/auth/csrf');assert.equal((await this.call('/auth/login','POST',{email:`u${id}@example.test`,mat_khau:'test password'})).status,200);}};}
   return {client,model,publisher,decisions,pending,writes:()=>writes,rows};
 }
+test('HTTP điều kiện đặt giá: lấy người xem từ session, không công khai cooldown cá nhân hoặc dữ liệu SQL khác',async t=>{
+  const f=await fixture(t),guest=f.client(),buyer=f.client(),seller=f.client();
+  assert.equal((await guest.call('/auctions/7/bid-status')).status,401);
+  const publicView=(await guest.call('/auctions/7')).data;
+  assert(!('duoc_dat_lai_luc' in publicView));assert(!('la_chu_sach' in publicView));
+  await buyer.login(1);await seller.login(2);
+  assert.deepEqual((await buyer.call('/auctions/7/bid-status?nguoi_dung_id=2')).data,
+    {la_chu_sach:false,duoc_dat_lai_luc:'2026-10-24T01:00:20.000Z',server_time:'2026-10-24T01:00:05.000Z'});
+  assert.deepEqual((await seller.call('/auctions/7/bid-status?nguoi_dung_id=1')).data,
+    {la_chu_sach:true,duoc_dat_lai_luc:null,server_time:'2026-10-24T01:00:05.000Z'});
+  assert.equal((await buyer.call('/auctions/0/bid-status')).status,400);
+  assert.equal((await buyer.call('/auctions/8/bid-status')).status,404);
+});
 test('HTTP đấu giá: công khai lọc giá ẩn; gửi giá cần login, vai trò hiện tại và CSRF',async t=>{
   const f=await fixture(t),guest=f.client(),body={ma_yeu_cau:randomUUID(),muc_gia:'100000'};
   const snapshot=await guest.call('/auctions/7');assert.equal(snapshot.status,200);assert(!JSON.stringify(snapshot.data).includes('hidden-secret'));assert(!('row_version' in snapshot.data));

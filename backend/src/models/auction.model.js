@@ -105,6 +105,17 @@ export function createAuctionModel({getPool,sql}) {
   }
   return {
     findRequest,
+    async bidStatus(auctionId,userId) {
+      const result=await request(await getPool()).input('id',sql.Int,auctionId).input('user',sql.Int,userId)
+        .query(`SELECT CAST(CASE WHEN b.nguoi_dung_id=@user THEN 1 ELSE 0 END AS BIT) AS la_chu_sach,
+          DATEADD(SECOND,p.thoi_gian_cho_dat_lai,personal.last_at) AS duoc_dat_lai_luc,
+          SYSUTCDATETIME() AS server_time
+          FROM dbo.PhienDauGia p JOIN dbo.BaiDang b ON b.bai_dang_id=p.bai_dang_id
+          OUTER APPLY (SELECT MAX(l.thoi_gian_dat) AS last_at FROM dbo.LuotDatGia l
+            WHERE l.phien_dau_gia_id=p.phien_dau_gia_id AND l.nguoi_dung_id=@user) personal
+          WHERE p.phien_dau_gia_id=@id AND b.trang_thai='da_duyet' AND p.trang_thai IN ('da_kich_hoat','da_ket_thuc')`);
+      return result.recordset[0]||null;
+    },
     async publicAuction(auctionId) {
       return transaction(async tx=>{
       const result=await request(tx).input('id',sql.Int,auctionId).query(`SELECT p.phien_dau_gia_id,p.bai_dang_id,p.trang_thai,

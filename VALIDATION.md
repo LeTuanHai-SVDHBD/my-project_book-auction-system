@@ -5,6 +5,26 @@
 Cập nhật ngày 24/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
+## Giao diện đặt giá và thời gian chờ
+
+Kiểm tra ngày 24/10/2026 cho giao diện chủ sách/người mua:
+
+- Test mặc định: **75 PASS, 6 SKIP** theo opt-in SQL/Redis; không FAIL. Check cú pháp: **74 tệp PASS**; build PASS.
+- HTTP thật kiểm tra `bid-status` cần đăng nhập, lấy ID từ session, bỏ qua ID tự chèn trong query;
+  chỉ trả trạng thái chủ sách, mốc đặt lại của chính người xem và giờ máy chủ. Snapshot công khai không có dữ liệu này.
+- Unit test kiểm tra đếm chờ dựa trên giờ SQL, làm tròn lên, biên hết hạn và phản hồi không hợp lệ.
+- Chromium cùng browser context: chủ sách không có ô/nút đặt giá; người mua đang chờ không có ô/nút đặt tiếp;
+  hết chờ tự kiểm tra lại rồi hiện thông báo và nút. F5/mở lại chi tiết giữ chờ; người mua khác vẫn đặt được.
+- Trạng thái tab cũ dẫn tới `BID_COOLDOWN` được thay bằng đếm chờ, không hiển thị cảnh báo từ chối cũ.
+  Không tải được điều kiện đặt giá thì không mở thao tác; phiên kết thúc không cho đặt tiếp.
+- Gõ/dán chữ vào ô chờ được lọc; số ngoài 10–30 không gửi được, giá trị hợp lệ gửi API dạng số.
+  Đã xem ảnh desktop/mobile, không tràn ngang hoặc có pageerror.
+
+Trình duyệt dùng React, HTTP và session thật; SQL, hàng đợi xử lý giá và media được giả lập.
+Đã bổ sung kiểm tra mốc cooldown vào test SQL opt-in và `smoke:m5`, chưa chạy hai phần này với dịch vụ thật
+cho bản sửa hiện tại. Không thay schema, dependency hoặc quy tắc cooldown 10–30 giây.
+Các bằng chứng SQL/Redis thật bên dưới thuộc lần triển khai lõi trước đó.
+
 ## Chạy chung các tiến trình phát triển
 
 Kiểm tra ngày 24/10/2026 cho `npm.cmd run dev:all` dùng `concurrently` 10.0.6:
@@ -41,9 +61,9 @@ Bằng chứng SQL Server 2025/Redis 7 không thay nghiệm thu với đúng phi
 
 | Kiểm tra | Kết quả |
 |---|---|
-| Full test bật SQL/Redis thật | 87/87 PASS, không SKIP |
-| Test mặc định | 71 PASS, 6 SKIP theo opt-in, không FAIL |
-| Check cú pháp | PASS 73 file |
+| Full test bật SQL/Redis thật | 87/87 PASS trước bản sửa giao diện; chưa chạy lại cho endpoint mới |
+| Test mặc định | 75 PASS, 6 SKIP theo opt-in, không FAIL |
+| Check cú pháp | PASS 74 file |
 | Build Frontend | Đã đạt; không thêm dependency |
 | db:init và db:migrate | PASS trên database kiểm tra, có chạy migration lặp lại |
 | smoke | PASS với SQL/Redis/API/worker thật, Socket.IO hello và probe |

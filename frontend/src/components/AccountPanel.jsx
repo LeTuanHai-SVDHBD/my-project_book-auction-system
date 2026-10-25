@@ -21,6 +21,7 @@ export default function AccountPanel({ onUserChange }) {
       .finally(() => { if (!canceled) setLoading(false); });
     return () => { canceled = true; };
   }, [reload]);
+  useEffect(()=>{const signedOut=event=>{setUser(null);setMode('login');setPassword('');setError('');setBusy(false);setLoading(false);setMessage(event.detail?.message||'Bạn đã được đăng xuất.');};window.addEventListener('account:signed-out',signedOut);return()=>window.removeEventListener('account:signed-out',signedOut);},[]);
   async function submit(event) {
     event.preventDefault(); setBusy(true); setError(''); setMessage('');
     try {

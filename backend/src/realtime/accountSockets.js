@@ -15,7 +15,7 @@ export function attachAccountSockets({io,sessionMiddleware,users,control,log=()=
       socket.data.userId=req.user.nguoi_dung_id;socket.data.owner=control.owner(req);next();
     }catch(error){const failure=Error('Không xác minh được phiên tài khoản.');failure.data={code:['INVALID_CONTROL_ID','INVALID_TAB_ID','UNAUTHENTICATED','ACCOUNT_REPLACED'].includes(error.code)?error.code:'ACCOUNT_UNAVAILABLE'};next(failure);}
   });
-  function stop(socket,code){socket.emit(code==='ACCOUNT_REPLACED'?'account:replaced':'account:expired',{message:code==='ACCOUNT_REPLACED'?ACCOUNT_REPLACED_MESSAGE:'Phiên tài khoản cần được xác minh lại. Vui lòng F5.'});socket.disconnect(true);}
+  function stop(socket,code){socket.emit(code==='ACCOUNT_REPLACED'?'account:replaced':'account:expired',{message:code==='ACCOUNT_REPLACED'?ACCOUNT_REPLACED_MESSAGE:'Phiên đăng nhập không còn hợp lệ. Vui lòng đăng nhập lại.'});socket.disconnect(true);}
   namespace.on('connection',socket=>{
     let timer,ended=false;
     async function pulse(){

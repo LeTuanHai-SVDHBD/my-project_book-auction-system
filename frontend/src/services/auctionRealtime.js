@@ -33,8 +33,8 @@ export function useAuctionRealtime({auctionId=null,onChange,enabled=true}) {
     window.addEventListener('focus',focus);document.addEventListener('visibilitychange',visible);
     const fallback=setInterval(()=>{if(!watching)watch();sync();},5000);socket.connect();sync();
     const stop=()=>{disposed=true;clearTimeout(timer);clearInterval(fallback);socket.removeAllListeners();socket.disconnect();};
-    window.addEventListener('account:replaced',stop);
-    return()=>{stop();window.removeEventListener('account:replaced',stop);window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',visible);};
+    window.addEventListener('account:signed-out',stop);
+    return()=>{stop();window.removeEventListener('account:signed-out',stop);window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',visible);};
   },[auctionId,enabled]);
   return state;
 }

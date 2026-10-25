@@ -182,9 +182,10 @@ Tham khảo: [Microsoft rowversion](https://learn.microsoft.com/en-us/sql/t-sql/
 
 **Trạng thái:** áp dụng.
 
-Ba ô giá khởi điểm/ngưỡng kết thúc sớm/bước giá chỉ hiển thị chữ số và dấu chấm nhóm nghìn.
+Ba ô giá khởi điểm/ngưỡng kết thúc sớm/bước giá nhập số thuần; dòng Giá trị bên dưới hiển thị nhóm nghìn.
+Không đổi định dạng trong ô khi gõ/focus/blur để tránh can thiệp IME hoặc làm lặp chữ số.
 Input hiển thị tách khỏi hidden input mang chuỗi nguyên gửi API. Không chuyển tiền sang Number,
-không làm tròn và không âm thầm cắt bớt khi vượt 18 chữ số. Chỉnh sửa/xóa ở giữa chuỗi giữ con trỏ theo chữ số.
+không làm tròn và không âm thầm cắt bớt khi vượt 18 chữ số. Chỉnh sửa/xóa chuỗi số dùng hành vi bàn phím thông thường; chỉ hiệu chỉnh khi lọc ký tự không phải số.
 Giá hiện tại thuộc nghiệp vụ đặt giá, không cho chủ sách tự nhập.
 Backend tiếp tục kiểm tra chuỗi nguyên dương, ngưỡng không nhỏ hơn giá khởi điểm và các ràng buộc SQL.
 
@@ -256,15 +257,15 @@ Xem [Giao dịch và tương tác sau đấu giá](after-sales.md).
 
 **Trạng thái:** áp dụng theo yêu cầu ngày 25/10/2026; không đổi schema hoặc dependency.
 
-Cùng tài khoản dùng một khóa chủ Redis, claim nguyên tử bằng Lua/Pub/Sub khi login hoặc nạp/F5 tài liệu.
-Cookie/CSRF vẫn xác thực, selector tab và mã tài liệu không cấp quyền độc lập. GET me chỉ nhận diện phiên;
-POST control có CSRF mới claim. HTTP riêng assert quyền trước nghiệp vụ; reconnect Socket chỉ assert.
-Namespace /account xác thực, server disconnect chủ cũ, heartbeat và HTTP bù Pub/Sub bị mất. Khác tài khoản vẫn độc lập.
-Yêu cầu đã qua kiểm tra trước khi chuyển chủ có thể hoàn tất, không sửa kết quả SQL/lượt đã tiếp nhận.
+Cùng tài khoản chỉ một phiên đăng nhập. Theo yêu cầu xác nhận lại, chỉ login bằng mật khẩu mới đổi owner,
+xóa session cũ và publish trong Lua; owner theo session ID giữ ổn định khi F5. GET me/control-status và POST control
+chỉ kiểm tra, không được khôi phục quyền từ cookie cũ. Namespace /account ngắt phiên cũ; giao diện xóa user/CSRF,
+trở về đăng nhập. Không còn lớp phủ yêu cầu F5 để tiếp tục. Khác tài khoản vẫn độc lập.
 Hợp đồng và giới hạn tại [account-control.md](account-control.md).
 
-Ô tiền để React cập nhật value và chỉ đặt con trỏ sau render; bỏ ghi trực tiếp DOM value trong onChange để tránh
-lặp chữ số khi gõ liên tục. Giữ chuỗi nguyên/18 chữ số, nhóm nghìn và thao tác giữa chuỗi, không chuyển qua Number.
+Ô tiền luôn nhập số thuần, kể cả khi focus hoặc rời ô; định dạng có dấu chấm chỉ hiện ở dòng Giá trị riêng.
+Không ghi DOM value hoặc đổi mask trong khi gõ. Trong composition giữ draft, chốt và kiểm tra số sau compositionend;
+giữ chuỗi nguyên/18 chữ số, không chuyển Number hoặc tự cắt phần vượt giới hạn.
 
 Thể loại là một lựa chọn từ danh mục dùng chung ở shared/bookGenres.js, căn cứ tài liệu thể loại người dùng gửi,
 bổ sung nhóm sách cổ/tư liệu. Gõ có/không dấu chỉ lọc danh sách; API sách mới chặn tên ngoài danh mục.

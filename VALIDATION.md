@@ -5,7 +5,29 @@
 Cập nhật ngày 25/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
-## Quyền cửa sổ, ô tiền, đánh giá và thể loại
+## Thu hồi session cũ và nhập tiền không đổi định dạng
+
+Bản sửa theo phản hồi của Hải: chính sách F5 lấy lại quyền của lượt trước đã bị bỏ. Chỉ login bằng mật khẩu mới đổi phiên.
+
+- Redis/HTTP/Socket thật qua hai API: **126 PASS, 3 SKIP SQL**; session cũ thực sự bị DEL khỏi RedisStore khi login mới.
+  Cookie cũ, GET me, gửi giá, POST control nhận 401; F5 đổi mã tài liệu không thu hồi phiên hợp lệ của tab mới.
+  Sai mật khẩu không thay owner; login đúng mới thay phiên. Logout cũ không xóa owner mới; mất key buộc login lại.
+  Kiểm tra heartbeat khi không nhận Pub/Sub và thông báo đến trễ không ngắt nhầm phiên hiện tại.
+- Chromium với HTTP/session/Redis/Socket thật, SQL/provider giả: tab mới login thì tab cũ tự về biểu mẫu đăng nhập,
+  không còn profile/logout hoặc lớp phủ. F5 xen kẽ hai tab ba vòng không hồi sinh tab cũ hoặc làm tab mới mất phiên.
+  Nhập mật khẩu/login lại ở tab cũ mới thu hồi tab mới; thử thêm cookie context riêng và nối lại mạng.
+- Đã tái hiện lặp giá trị khi input đổi mask lúc focus trong QA. Bỏ hẳn mask trong ô nhập, chỉ nhóm nghìn ở dòng Giá trị.
+  Cả ba ô đã gõ từng phím số 0 liên tục, sửa đầu/giữa, xóa, fill/dán lẫn chữ, 18 chữ số và chặn số thứ 19.
+  Mô phỏng compositionstart/input/compositionend không nhóm nghìn trong ô; hidden và payload HTTP vẫn đúng.
+- Giao diện desktop/mobile 390 px được kiểm tra cùng luồng thể loại và đánh giá; không page error trong lượt đạt.
+  Chưa chạy bàn phím Windows/UniKey thật hoặc SQL Server/Cloudinary thật ở lượt sửa này.
+
+## Bằng chứng bản a1cbd7f trước khi sửa chính sách phiên
+
+Các kết quả bên dưới ghi lại lượt cũ. Chính sách F5 lấy lại quyền, lớp phủ giữ đăng nhập và định dạng tiền trong ô
+đã được thay thế bằng hành vi thu hồi session/nhập số thuần ở mục trên.
+
+
 
 - Đã xem video LoiNhapSo.mp4: chữ số đầu bị lặp khi gõ liên tục. Bỏ ghi trực tiếp DOM value trong onChange,
   chỉ để React cập nhật và phục hồi con trỏ sau render; giữ nguyên hợp đồng tiền chuỗi 18 chữ số.

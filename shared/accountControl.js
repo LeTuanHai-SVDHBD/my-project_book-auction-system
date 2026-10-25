@@ -1,2 +1,2 @@
-/** Thông báo thống nhất khi tài khoản được chuyển sang một tài liệu/thiết bị khác. */
-export const ACCOUNT_REPLACED_MESSAGE='Tài khoản đang được dùng ở cửa sổ/thiết bị khác. Vui lòng F5 (tải lại trang) nếu muốn tiếp tục đấu giá tại đây.';
+/** Thông báo khi phiên cũ bị thu hồi do tài khoản đăng nhập ở tab/thiết bị khác. */
+export const ACCOUNT_REPLACED_MESSAGE='Tài khoản đã được đăng nhập ở cửa sổ/thiết bị khác. Bạn đã được đăng xuất khỏi cửa sổ này.';

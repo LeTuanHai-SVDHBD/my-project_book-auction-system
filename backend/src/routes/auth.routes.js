@@ -21,9 +21,9 @@ export function createAuthRouter({ authConfig, store, users, passwords, limiter,
   router.post('/register', requireCsrf, validate(true), rateLimit(limiter, 'register'), controller.register);
   router.post('/login', requireCsrf, validate(false), rateLimit(limiter, 'login'), controller.login);
   router.post('/logout', requireCsrf, controller.logout);
-  // Bootstrap may identify a valid inactive session; only explicit CSRF-protected control can reclaim it.
-  router.get('/me', requireUser(users,{allowInactive:true}), controller.me);
-  router.post('/control',requireCsrf,requireUser(users,{allowInactive:true}),controller.control);
+  // Refresh and legacy /control never reclaim a superseded login.
+  router.get('/me', requireUser(users), controller.me);
+  router.post('/control',requireCsrf,requireUser(users),controller.control);
   router.get('/control-status',requireUser(users),(req,res)=>res.json({ok:true}));
   router.get('/admin-check', requireUser(users), requireRole('admin'), controller.admin);
   // Redis store callbacks đôi khi chỉ trả Error, chuẩn hóa thành 503 thay vì lộ lỗi nội bộ.

@@ -1,36 +1,25 @@
-/** Ô nhập VND: chỉ hiển thị số và dấu nhóm nghìn, hidden input giữ chuỗi gốc gửi API. */
+/** Tiền VND nhập số thuần, không đổi định dạng/caret khi focus; giá có phân cách hiển thị ở dòng xem trước. */
 import {useLayoutEffect,useRef,useState} from 'react';
-import {editMoneyInput,formatMoneyInput,moneyDigits,positionAfterDigits} from '../utils/moneyInput.js';
+import {formatMoneyInput,moneyDigits} from '../utils/moneyInput.js';
 export default function MoneyInput({name,label,initialValue='',required=true,followSuggestion=false}){
-  const [digits,setDigits]=useState(()=>moneyDigits(initialValue));const [error,setError]=useState('');
-  const input=useRef(null);const pendingCaret=useRef(null);
-  const [,renderEdit]=useState(0);
-  const edited=useRef(false);
-  useLayoutEffect(()=>{if(followSuggestion&&!edited.current)setDigits(moneyDigits(initialValue));},[followSuggestion,initialValue]);
-  useLayoutEffect(()=>{if(pendingCaret.current!==null&&input.current){input.current.setSelectionRange(pendingCaret.current,pendingCaret.current);pendingCaret.current=null;}});
-  function update(event){
-    edited.current=true;
-    const element=event.target;const next=editMoneyInput(element.value,element.selectionStart??element.value.length);
-    if(next.digits.length>18){pendingCaret.current=Math.min(element.selectionStart??0,formatMoneyInput(digits).length);setError('Tối đa 18 chữ số. Giá trị vượt giới hạn chưa được nhập.');renderEdit(value=>value+1);return;}
-    element.setCustomValidity('');setError('');pendingCaret.current=next.caret;setDigits(next.digits);
-    // React owns the value. Writing element.value here desynchronizes its input tracker while typing.
-    renderEdit(value=>value+1);
+  const [digits,setDigits]=useState(()=>moneyDigits(initialValue)),[draft,setDraft]=useState(()=>moneyDigits(initialValue));
+  const [error,setError]=useState('');
+  const input=useRef(null),accepted=useRef(digits),composing=useRef(false),edited=useRef(false),selection=useRef(null);
+  useLayoutEffect(()=>{if(followSuggestion&&!edited.current){const next=moneyDigits(initialValue);accepted.current=next;setDigits(next);setDraft(next);}},[followSuggestion,initialValue]);
+  useLayoutEffect(()=>{if(selection.current&&input.current){input.current.setSelectionRange(...selection.current);selection.current=null;}});
+  function accept(element){
+    const value=element.value,next=moneyDigits(value);
+    if(next.length>18){setDraft(accepted.current);setError('Tối đa 18 chữ số. Giá trị vượt giới hạn chưa được nhập.');return;}
+    if(next!==value){const all=value.replace(/[^0-9]/g,''),before=value.slice(0,element.selectionStart??value.length).replace(/[^0-9]/g,'').length;const caret=Math.max(0,before-(all.length-next.length));selection.current=[caret,caret];}
+    accepted.current=next;setDigits(next);setDraft(next);setError('');
   }
-  function removeSeparator(event){
-    if(event.ctrlKey||event.metaKey||event.altKey)return;
-    const element=event.target;const start=element.selectionStart,end=element.selectionEnd;
-    if(start===null||start!==end||!['Backspace','Delete'].includes(event.key))return;
-    const dot=event.key==='Backspace'?start-1:start;
-    if(element.value[dot]!=='.')return;
-    event.preventDefault();element.setCustomValidity('');
-    edited.current=true;
-    const left=element.value.slice(0,dot).replace(/[^0-9]/g,'').length;
-    const removeAt=event.key==='Backspace'?left-1:left;
-    const next=moneyDigits(digits.slice(0,removeAt)+digits.slice(removeAt+1));
-    pendingCaret.current=positionAfterDigits(formatMoneyInput(next),Math.max(0,removeAt));setDigits(next);setError('');
-  }
+  function update(event){edited.current=true;if(composing.current||event.nativeEvent.isComposing){setDraft(event.target.value);return;}accept(event.target);}
   return <label>{label}<input ref={input} type="text" aria-label={label} inputMode="numeric" autoComplete="off" required={required}
-    value={formatMoneyInput(digits)} onChange={update} onKeyDown={removeSeparator} aria-describedby={error?`${name}-hint`:undefined}/>
-    <input type="hidden" name={name} value={digits}/>{error&&<span id={`${name}-hint`} className="error" role="status">{error}</span>}
+    value={draft} onChange={update}
+    onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={event=>{composing.current=false;edited.current=true;accept(event.target);}}
+    onBlur={event=>{if(composing.current){composing.current=false;accept(event.target);}selection.current=null;}}
+    aria-describedby={error?`${name}-hint`:undefined}/>
+    <input type="hidden" name={name} value={digits}/>{digits&&<small className="field-hint">Giá trị: {formatMoneyInput(digits)} đ</small>}
+    {error&&<span id={`${name}-hint`} className="error" role="status">{error}</span>}
   </label>;
 }

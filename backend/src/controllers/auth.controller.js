@@ -32,7 +32,7 @@ export function createAuthController({ service, authConfig }) {
     me(req, res) { res.json({ user: req.user }); },
     async control(req,res){
       if(!req.body||typeof req.body!=='object'||Array.isArray(req.body)||Object.keys(req.body).length)throw new HttpError(400,'INVALID_CONTROL_INPUT','Thao tác điều khiển chỉ nhận body rỗng.');
-      await req.accountControl?.claim(req);res.json({ok:true});
+      await req.accountControl?.assert(req);res.json({ok:true});
     },
     admin(req, res) { res.json({ ok: true, message: 'Bạn có quyền quản trị.', user: req.user }); },
   };

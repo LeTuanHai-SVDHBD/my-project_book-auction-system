@@ -1,65 +1,70 @@
-<!-- Mục đích: Chính sách một cửa sổ điều khiển/tài khoản, xác thực Socket và phục hồi sau đổi cửa sổ. -->
+<!-- Mục đích: Một phiên đăng nhập/tài khoản, thu hồi session cũ và đồng bộ đăng xuất qua Socket/HTTP. -->
 
-# Cửa sổ điều khiển tài khoản
+# Phiên đăng nhập duy nhất cho mỗi tài khoản
 
-Mỗi tài khoản chỉ có một tài liệu trình duyệt hoặc phiên client đang điều khiển. Đăng nhập ở cửa sổ mới
-lấy quyền từ cửa sổ cũ; hai tài khoản khác nhau vẫn dùng độc lập trong cùng trình duyệt.
-Cookie HttpOnly riêng theo tab, CSRF và kiểm tra vai trò SQL tiếp tục được giữ.
-Không thêm dependency, biến cấu hình hoặc migration.
+Đăng nhập thành công ở tab hoặc thiết bị mới thu hồi phiên đăng nhập cũ. Tab cũ tự chuyển về biểu mẫu đăng nhập,
+không giữ tài khoản sau một lớp phủ và không dùng F5 để lấy lại quyền. Các tài khoản khác nhau vẫn hoạt động độc lập.
+Cookie HttpOnly riêng theo tab, CSRF, kiểm tra mật khẩu và vai trò SQL được giữ nguyên. Không thêm migration/dependency.
 
-## Hành vi người dùng
+## Hành vi
 
-1. Tab 1 đăng nhập, xem hoặc đặt giá bình thường.
-2. Tab 2 đăng nhập cùng tài khoản: server chuyển quyền, phát thông báo và chủ động ngắt Socket tài khoản ở Tab 1.
-3. Tab 1 mờ màn hình, phần nền inert không nhận phím/click, hiện thông báo:
+1. Tab 1 đăng nhập tài khoản A và hoạt động bình thường.
+2. Tab 2 đăng nhập A bằng mật khẩu hợp lệ: Redis ghi phiên mới, xóa session cũ và phát tín hiệu trong cùng Lua.
+3. Server ngắt Socket tài khoản của Tab 1. Frontend xóa tài khoản đang hiển thị, về màn hình đăng nhập và thông báo:
 
-> Tài khoản đang được dùng ở cửa sổ/thiết bị khác. Vui lòng F5 (tải lại trang) nếu muốn tiếp tục đấu giá tại đây.
+> Tài khoản đã được đăng nhập ở cửa sổ/thiết bị khác. Bạn đã được đăng xuất khỏi cửa sổ này.
 
-4. Tab 2 tiếp tục hoạt động. Tab 1 bấm F5 hoặc nút tải lại sẽ lấy lại quyền nếu cookie còn hợp lệ;
-   khi đó Tab 2 cũng bị ngắt. Không tự giành quyền khi kết nối mạng hoặc Socket nối lại.
+4. F5 ở Tab 1 vẫn là chưa đăng nhập; không ảnh hưởng Tab 2. F5 ở Tab 2 giữ phiên hợp lệ của Tab 2.
+5. Chỉ khi Tab 1 nhập đúng mật khẩu và đăng nhập lại thì Tab 2 mới bị đăng xuất. Sai mật khẩu không đổi phiên đang hoạt động.
 
-Tab mới vẫn cần đăng nhập; không kế thừa cookie của một selector tab khác. F5 giữ selector/cookie hiện tại,
-nhưng tạo mã tài liệu mới trong bộ nhớ. Hai tab không tự đẩy nhau qua lại bằng vòng reconnect.
-Phiên hết hạn có thông báo tải lại/đăng nhập lại riêng, không coi hết hạn là bằng chứng có người khác sử dụng.
+Không còn thao tác nạp trang/F5 tự claim hoặc lớp phủ yêu cầu F5 để tiếp tục. Session hết hạn cũng đưa người dùng về
+biểu mẫu đăng nhập với thông báo riêng. Tab mới vẫn dùng selector mới, không tự chọn cookie của tab khác.
 
-## Quyền Backend và Socket
+## Backend và Redis
 
-Redis giữ một khóa `bookauction:auth:control:<user-id>` có TTL bằng session idle. Giá trị là SHA-256
-của session ID và mã tài liệu; không gửi session ID tới JavaScript hoặc Socket auth.
-Claim SET/EX và PUBLISH chạy trong cùng Lua. Kiểm tra quyền dùng Lua compare/EXPIRE;
-logout chỉ xóa khi đúng chủ hiện tại, nên logout của phiên cũ không xóa quyền mới.
+Khóa `bookauction:auth:control:<user-id>` lưu JSON chứa SHA-256 của session ID và tên khóa RedisStore của session đó.
+TTL theo session idle. Login regenerate/save session rồi Lua kiểm tra bản ghi cũ, xóa khóa session cũ trong đúng prefix,
+SET phiên mới và PUBLISH. Session ID chỉ tồn tại ở cookie HttpOnly và dữ liệu nội bộ server/Redis, không gửi qua Socket auth.
+Owner dựa trên session ID, không phụ thuộc mã tài liệu thay đổi khi F5. Mã X-Control-ID vẫn được kiểm tra định dạng để tương thích,
+không cấp quyền đăng nhập hoặc làm căn cứ để đổi phiên.
 
-HTTP gửi `X-Tab-ID` chọn cookie và `X-Control-ID` nhận diện tài liệu; cả hai không thay xác thực cookie/CSRF.
-Các API riêng kiểm tra quyền điều khiển sau khi kiểm tra session/tài khoản. Chủ cũ nhận HTTP 409 ACCOUNT_REPLACED
-trước khi đi vào controller nghiệp vụ, kể cả gọi API trực tiếp để gửi giá. Đầu vào người dùng không chọn user ID điều khiển.
-Yêu cầu đã qua kiểm tra quyền và đang xử lý trước lúc chuyển chủ có thể hoàn tất; không hủy lượt đã tiếp nhận hoặc ghi SQL.
+Các API riêng, kể cả GET me, kiểm tra cookie, tài khoản và phiên hiện tại. Session cũ bị xóa trả 401 UNAUTHENTICATED;
+cookie còn tồn tại nhưng không khớp owner trả 401 ACCOUNT_REPLACED. Không đi tới controller nghiệp vụ hoặc enqueue giá.
+Yêu cầu đã qua kiểm tra và đang xử lý trước lần login mới có thể hoàn tất; không hủy lượt đã tiếp nhận/ghi SQL.
+Logout chỉ xóa owner nếu khớp phiên; một yêu cầu cũ không được xóa owner của phiên mới.
 
-| HTTP | Mục đích |
+| HTTP | Hành vi |
 |---|---|
-| POST `/api/auth/login` | Mật khẩu hợp lệ, regenerate/save session rồi claim quyền |
-| GET `/api/auth/me` | Nhận diện cookie còn hợp lệ khi bootstrap, kể cả phiên không điều khiển; không tự claim |
-| POST `/api/auth/control` | Cookie hợp lệ + CSRF, body `{}`; claim tường minh một lần khi nạp/F5 trang |
-| GET `/api/auth/control-status` | Kiểm tra chủ hiện tại, không claim; Frontend đọc mỗi 5 giây |
-| POST `/api/auth/logout` | CSRF; compare-delete quyền của chính phiên rồi destroy session |
+| POST `/api/auth/login` | CSRF + mật khẩu hợp lệ; regenerate/save rồi đổi phiên, thu hồi phiên cũ |
+| GET `/api/auth/me` | Chỉ trả tài khoản khi session còn tồn tại và là phiên hiện tại; không tạo owner |
+| POST `/api/auth/control` | Endpoint tương thích, body `{}` và CSRF; chỉ kiểm tra phiên hiện tại, không claim |
+| GET `/api/auth/control-status` | Kiểm tra phiên hiện tại để bù tín hiệu lỡ; không claim |
+| POST `/api/auth/logout` | CSRF, compare-delete owner của chính phiên rồi destroy session |
 
-Namespace `/account` yêu cầu cookie hợp lệ, selector tab, mã tài liệu và đúng quyền Redis khi handshake.
-Socket cũ bị ngắt bằng server disconnect; handshake/reconnect chỉ assert, không claim. Subscriber riêng trên mỗi API
-nhận Pub/Sub để ngắt đúng chủ cũ dù hai client tới hai tiến trình API khác nhau.
-Heartbeat Socket tải lại session/kiểm tra quyền mỗi 5 giây; HTTP định kỳ bù thông báo bị lỡ.
-Không cam kết Pub/Sub giao mọi thông báo. Mất quyền Redis hoặc session thì chặn và yêu cầu F5, không tự giành lại.
+Không có endpoint khôi phục quyền bằng cookie cũ hoặc ID người dùng trong body. Nếu mất owner ở Redis,
+phải đăng nhập lại bằng mật khẩu; không tự tái tạo owner qua F5/control-status/control.
+Session/control từ bản trước có thể yêu cầu đăng nhập lại sau cập nhật; không cần xóa Redis, database hoặc volume.
 
-Namespace `/auctions` vẫn chỉ có dữ liệu phiên công khai. Khi bị thay, Frontend dừng Socket công khai,
-chặn request tiếp theo và khóa thao tác; quyền gửi giá luôn ở HTTP Backend, không dựa riêng vào lớp phủ.
-Client terminal không có hai header giữ cookie chung, login claim theo session; dùng cùng tài khoản với trình duyệt
-cũng tuân theo quy tắc chủ mới. Smoke tạo tài khoản UUID riêng nên không lấy quyền tài khoản thật.
+## Socket và giao diện
+
+Namespace `/account` xác thực cookie/tab và session hiện tại khi handshake. Subscriber ở mỗi API nhận Pub/Sub,
+đọc lại Redis rồi ngắt session không còn hợp lệ, tránh thông báo đến trễ ngắt nhầm phiên mới.
+Heartbeat tải lại session/kiểm tra owner và HTTP control-status mỗi 5 giây bù Pub/Sub bị lỡ.
+Reconnect/F5/focus không thay owner. Namespace `/auctions` vẫn chỉ chứa dữ liệu công khai.
+
+Khi nhận sự kiện thu hồi hoặc HTTP 401 từ API riêng, Frontend xóa user/CSRF, dừng Socket của tài khoản/đấu giá cũ
+và chuyển về đăng nhập. Không gọi logout từ tab cũ để tránh tác động lên phiên mới. Đăng nhập mới trong tab này
+mở lại các thao tác sau khi server xác thực mật khẩu. Phản hồi 401 cũ đến sau lần đăng nhập mới không xóa trạng thái mới.
+
+Client terminal dùng cookie chung vẫn theo chính sách một phiên; smoke dùng tài khoản UUID riêng.
 
 ## Kiểm tra
 
-`backend/test/accountControl.test.js` chạy khi có `AUTH_TEST_REDIS_URL`: hai HTTP API/Socket thật,
-Redis/RedisStore/Lua thật, model tài khoản/đấu giá giả. Kiểm tra ngắt chủ cũ, không enqueue qua HTTP cũ,
-CSRF, giả cookie/selector, F5, reconnect không reclaim, logout cũ, mất khóa và heartbeat khi bỏ lỡ Pub/Sub.
-Không thay bài này bằng MemoryStore hoặc mock Lua rồi gọi là tích hợp Redis.
+`accountControl.test.js` bật qua AUTH_TEST_REDIS_URL: hai API/Socket.IO/RedisStore/Lua thật,
+model tài khoản/đấu giá giả. Kiểm tra session cũ thực sự bị xóa, replay cookie và /me/bids/control nhận 401,
+F5 không hồi sinh, login sai mật khẩu không thay phiên mới, login đúng mới thu hồi phiên hiện tại,
+logout cũ không xóa owner mới, mất key buộc login, heartbeat bù Pub/Sub và thông báo trễ không ngắt sai.
 
-Nghiệm thu: cập nhật mã, dừng/khởi động lại `dev:all`, F5 các tab. Đăng nhập cùng một tài khoản ở hai tab
-và hai trình duyệt; tab mới dùng được, tab cũ mờ và chỉ F5 mới lấy lại. Thử mất mạng ở tab cũ rồi nối lại,
-xác nhận không tự giành quyền. Admin/người mua khác tài khoản phải giữ phiên độc lập.
+Nghiệm thu trên máy nhóm: restart dev:all, F5 và đăng nhập lại tab muốn dùng. Login cùng tài khoản ở tab khác,
+xác nhận tab đầu về màn hình đăng nhập. F5 xen kẽ hai tab nhiều lần: tab cũ vẫn chưa đăng nhập, tab mới vẫn dùng được.
+Chỉ đăng nhập lại bằng mật khẩu ở tab cũ mới thay phiên. Tài khoản khác phải không bị ảnh hưởng.

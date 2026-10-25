@@ -8,7 +8,7 @@
 2. `GET /api/auth/csrf` tạo session ẩn danh và CSRF token gắn với session Redis.
 3. Đăng ký kiểm tra dữ liệu, CSRF và giới hạn thử, băm Argon2id rồi ghi NguoiDung.
 4. API công khai chỉ tạo `nguoi_dung`; UNIQUE email bảo vệ yêu cầu đăng ký đồng thời.
-5. Đăng nhập kiểm tra SQL/hash, đổi session ID và CSRF; lưu session và claim quyền điều khiển ở Redis trước khi trả thành công.
+5. Đăng nhập kiểm tra SQL/hash, đổi session ID và CSRF; lưu session, đổi owner và xóa session cũ ở Redis trước khi trả thành công.
 6. Yêu cầu bảo vệ đọc lại tài khoản/vai trò từ SQL và kiểm tra chủ điều khiển Redis. Không tin mã người dùng do client khai báo.
 7. Đăng xuất hủy session được chọn và xóa đúng cookie của tab; không thu hồi tab khác.
 
@@ -21,7 +21,7 @@ Client HTTP không gửi `X-Tab-ID` dùng cookie chung độc lập với các c
 1. Sau xác thực/quyền/CSRF, API kiểm tra MIME, magic bytes và kích thước của từng tệp.
 2. Tạo vé Redis trước khi gọi Cloudinary để theo dõi cả upload bị ngắt.
 3. Cloudinary trả URL/public_id; API trả vé UUID và URL xem trước cho đúng chủ sách.
-4. React gửi nội dung sách/bài/giá cùng vé; các ô tiền hiển thị dấu chấm nhưng gửi chuỗi nguyên.
+4. React gửi nội dung sách/bài/giá cùng vé; các ô tiền nhập số thuần, dòng xem trước nhóm nghìn; API nhận chuỗi nguyên.
 5. Service claim tất cả vé nguyên tử, xác nhận owner/trạng thái/tuổi vé; không tin URL do client khai báo.
 6. Transaction SQL tạo Sach, BaiDang, PhienDauGia pending, media và lịch sử; chưa có lịch đấu giá.
 7. Sau COMMIT, acknowledgement dọn vé. Cùng UUID yêu cầu trả lại bài đã tạo, không tạo trùng.
@@ -69,7 +69,7 @@ hoặc đã có người thắng không được đăng lại, kể cả giao d�
 | POST | `/api/auth/login` | CSRF; email, mật khẩu; đổi session/CSRF |
 | POST | `/api/auth/logout` | CSRF; hủy session được chọn |
 | GET | `/api/auth/me` | Tài khoản hợp lệ |
-| POST | `/api/auth/control` | Cookie hợp lệ + CSRF, body rỗng; claim một lần khi nạp/F5 |
+| POST | `/api/auth/control` | Cookie/owner hợp lệ + CSRF, body rỗng; chỉ kiểm tra, không claim |
 | GET | `/api/auth/control-status` | Tài khoản hợp lệ và đúng chủ; không tự claim |
 | GET | `/api/auth/admin-check` | Admin hợp lệ |
 
@@ -104,9 +104,9 @@ Header chọn tab phải có 32 ký tự hex viết thường; header này khôn
 
 ## Probe hạ tầng
 
-Quyền cửa sổ tài khoản: login hoặc POST `/api/auth/control` có CSRF claim quyền Redis; HTTP riêng kiểm tra chủ,
-Socket `/account` xác thực và ngắt chủ cũ. GET `/api/auth/control-status` chỉ kiểm tra, không giành lại quyền.
-Nối lại mạng không tự claim; F5 được claim một lần khi bootstrap. Chi tiết tại [account-control.md](account-control.md).
+Phiên tài khoản: chỉ login bằng mật khẩu mới đổi owner và thu hồi session cũ. HTTP/Socket chỉ kiểm tra phiên;
+GET me, control-status và POST control không khôi phục phiên cũ. Tab bị thu hồi tự về đăng nhập, F5 không đổi owner.
+Chi tiết tại [account-control.md](account-control.md).
 
 `React → API → Redis Streams → Worker → SQL SELECT → Redis result → React`.
 API trả 202 queued; worker chỉ xác nhận completed sau truy vấn kiểm tra thành công.

@@ -55,9 +55,9 @@ CSRF token giữ trong bộ nhớ, vai trò và tài khoản luôn đọc lại 
 F5 giữ mã tab; một tài liệu mới xoay mã kể cả khi trình duyệt sao chép storage từ tab mở nó.
 Vì vậy tab mới cần đăng nhập, đăng xuất chỉ thu hồi phiên được chọn.
 Client terminal không gửi mã tab tiếp tục dùng hợp đồng cookie chung cho smoke và tích hợp HTTP.
-Riêng quyền điều khiển tài khoản giữ một chủ trong Redis: login/F5 claim, HTTP nghiệp vụ assert,
-namespace /account xác thực cookie và chủ rồi ngắt chủ cũ qua Pub/Sub; heartbeat/HTTP bù tín hiệu lỡ.
-Hai tài khoản khác nhau vẫn độc lập; cùng tài khoản chuyển sang cửa sổ mới theo [account-control.md](account-control.md).
+Mỗi tài khoản chỉ có một phiên đăng nhập trong Redis: login bằng mật khẩu đổi owner và xóa session cũ nguyên tử.
+HTTP riêng, kể cả me, kiểm tra session hiện tại; namespace /account ngắt phiên bị thu hồi qua Pub/Sub và heartbeat.
+Tab cũ tự về đăng nhập, F5 không claim hoặc hồi sinh phiên. Khác tài khoản vẫn độc lập; xem [account-control.md](account-control.md).
 Đây là cách phân tách thao tác theo tab, không phải ranh giới an toàn giữa các trang cùng origin.
 
 ## Nhất quán dữ liệu

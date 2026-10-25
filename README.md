@@ -9,7 +9,7 @@ Hệ thống hướng tới xử lý tranh chấp đặt giá đồng thời và
 
 - Đăng ký, đăng nhập, đăng xuất; phân quyền người dùng và Admin.
 - Phiên đăng nhập riêng cho từng tab trình duyệt, lưu tại Redis và xác thực bằng cookie HttpOnly.
-- Cùng tài khoản chỉ có một cửa sổ điều khiển; đăng nhập mới ngắt cửa sổ cũ, F5 để lấy lại quyền.
+- Mỗi tài khoản chỉ có một phiên đăng nhập; đăng nhập mới thu hồi phiên cũ và tự đưa tab cũ về đăng nhập.
 - Đăng sách kèm ảnh/video Cloudinary; tạo bài đăng và phiên chờ kiểm duyệt trong cùng giao dịch SQL.
 - Admin phê duyệt hoặc từ chối có lý do; chủ sách bổ sung bài bị từ chối và gửi duyệt lại.
 - Chủ sách đặt lịch, kích hoạt phiên đã duyệt và đăng lại bản sách đủ điều kiện.
@@ -170,16 +170,15 @@ Trạng thái completed chỉ xác nhận đường đi hạ tầng đã hoạt 
 2. Sau khi đăng ký thành công, đăng nhập bằng tài khoản vừa tạo.
 3. Admin được tạo bằng `npm.cmd run admin:create`, không qua API đăng ký công khai.
 4. Có thể đăng nhập Admin ở tab thứ nhất và người dùng ở tab thứ hai trong cùng trình duyệt.
-5. F5 giữ phiên của tab hiện tại. Tab mới yêu cầu đăng nhập lại; đăng xuất chỉ thu hồi phiên của tab đó.
-6. Đăng nhập cùng tài khoản ở tab/thiết bị khác sẽ ngắt Socket và làm mờ cửa sổ cũ. Cửa sổ mới hoạt động bình thường.
-   F5 ở cửa sổ cũ lấy lại quyền nếu session còn hợp lệ, đồng thời ngắt cửa sổ đang điều khiển.
-   Nối lại mạng không tự lấy quyền; Backend chặn API nghiệp vụ từ cửa sổ đã bị thay.
+5. F5 chỉ giữ phiên còn hợp lệ. Tab mới yêu cầu đăng nhập lại; tab đã bị thu hồi vẫn ở màn hình đăng nhập sau F5.
+6. Đăng nhập cùng tài khoản ở tab/thiết bị khác sẽ xóa session cũ, ngắt Socket và tự đưa tab cũ về biểu mẫu đăng nhập.
+   F5 hoặc nối mạng lại không khôi phục phiên cũ và không đăng xuất tab mới. Chỉ đăng nhập lại bằng mật khẩu mới thay phiên hiện tại.
 
 Mật khẩu lưu bằng Argon2id; cookie HttpOnly, SameSite=Lax và Secure khi production.
 Session hết hạn sau hai giờ không hoạt động và được gia hạn khi sử dụng. CSRF token chỉ giữ trong bộ nhớ.
 `sessionStorage` chỉ chứa mã chọn tab ngẫu nhiên, không chứa mật khẩu, session ID hoặc token xác thực.
 Thông tin kỹ thuật và giới hạn vòng đời tab nằm trong [quyết định xác thực](docs/decisions.md).
-Hợp đồng quyền điều khiển, Socket riêng và phục hồi tại [Cửa sổ điều khiển tài khoản](docs/account-control.md).
+Hợp đồng quyền điều khiển, Socket riêng và phục hồi tại [Phiên đăng nhập duy nhất](docs/account-control.md).
 
 Giới hạn thử: đăng nhập 10 lần/email và 50 lần/IP trong 15 phút; đăng ký 10 lần/IP trong 15 phút;
 cấp CSRF 60 lần/IP/phút. Bộ đếm tính cả lần thành công. Khi bị giới hạn, chờ theo header `Retry-After`.
@@ -191,7 +190,8 @@ cấp CSRF 60 lần/IP/phút. Bộ đếm tính cả lần thành công. Khi b�
    Chữ nhập chỉ dùng để lọc, không lưu thành thể loại mới; có thể để trống. Danh mục có nhóm văn học,
    phi hư cấu, độc giả và tư liệu/sách cổ; dữ liệu sách đã lưu không bị đổi.
 2. Chọn ảnh/video, chờ upload hoàn tất; nhập giá khởi điểm, giá kết thúc sớm và bước giá.
-3. Các ô tiền chỉ nhận chữ số, thêm dấu chấm hàng nghìn tự động, ví dụ `1.500.000`.
+3. Các ô tiền chỉ nhập số thuần, ví dụ `1500000`; dòng **Giá trị** bên dưới hiển thị `1.500.000 đ`.
+   Không đổi định dạng trong ô khi gõ, nhận/rời focus hoặc dùng bộ gõ tiếng Việt.
    API nhận chuỗi nguyên `1500000`, giữ chính xác đến 18 chữ số. Giá hiện tại là dữ liệu từ lượt đặt giá, không phải ô chủ sách tự nhập.
    Ô **Chờ đặt lại** chỉ nhận chữ số khi gõ hoặc dán; nhập số nguyên từ 10 đến 30 giây, mặc định 20 giây.
 4. Gửi kiểm duyệt: bài và phiên cùng chờ duyệt, chưa có lịch.
@@ -210,7 +210,7 @@ Giờ được lưu theo UTC và kiểm tra bằng đồng hồ SQL Server.
 ### Đặt giá và xem kết quả
 
 1. Đăng nhập bằng tài khoản người dùng, mở **Danh mục → Xem chi tiết**.
-2. Nhập mức giá; giao diện tự thêm dấu chấm. Lượt đầu từ giá khởi điểm, lượt sau tăng ít nhất một bước.
+2. Nhập mức giá bằng chữ số, đối chiếu dòng Giá trị có dấu chấm bên dưới. Lượt đầu từ giá khởi điểm, lượt sau tăng ít nhất một bước.
 3. Bấm **Gửi mức giá**; “đang chờ” chỉ xác nhận đã tiếp nhận. Chỉ thông báo chấp nhận sau khi SQL COMMIT.
 4. Nếu mất phản hồi mạng, **Thử lại cùng yêu cầu** giữ nguyên mã và mức giá, không tạo lượt trùng.
 5. Sau mỗi lượt hợp lệ của cùng người trong cùng phiên, giao diện đếm chờ theo thời gian máy chủ (10–30 giây),
@@ -353,7 +353,7 @@ và kiểm tra lại cookie Secure. Không commit thông tin kết nối hoặc 
 - [Phân tích AI và bộ chấm điểm](docs/ai-analysis.md)
 - [Giao dịch và tương tác sau đấu giá](docs/after-sales.md)
 - [Quyết định kỹ thuật](docs/decisions.md)
-- [Cửa sổ điều khiển tài khoản](docs/account-control.md)
+- [Phiên đăng nhập duy nhất](docs/account-control.md)
 - [Bản đồ mã nguồn](docs/file-map.md)
 - [Trạng thái chức năng và công việc](docs/tasks.md)
 - [Bằng chứng kiểm thử](VALIDATION.md)

@@ -33,6 +33,8 @@ import {createAuctionService} from './services/auction.service.js';
 import {createAuctionRouter} from './routes/auction.routes.js';
 import {createAuctionNotifier,subscribeAuctionUpdates} from './events/auctionUpdates.js';
 import {attachAuctionSockets} from './realtime/auctionSockets.js';
+import {createAccountControl,ACCOUNT_CONTROL_CHANNEL} from './services/accountControl.service.js';
+import {attachAccountSockets} from './realtime/accountSockets.js';
 import {createCommunityModel} from './models/community.model.js';
 import {createCommunityService} from './services/community.service.js';
 import {createCommunityRouter} from './routes/community.routes.js';
@@ -43,7 +45,8 @@ import {createAiService} from './services/ai.service.js';
 import {createAiRouter} from './routes/ai.routes.js';
 const authConfig = parseAuthConfig(process.env);
 const users = createUserModel({ getPool, sql });
-const sessionMiddleware = createSessionMiddleware(authConfig, new RedisStore({ client: redis, prefix: 'bookauction:auth:session:' }));
+const accountControl=createAccountControl({getRedis:requireRedis,idleSeconds:authConfig.idleSeconds});
+const sessionMiddleware = createSessionMiddleware(authConfig, new RedisStore({ client: redis, prefix: 'bookauction:auth:session:' }),{control:accountControl});
 const mediaConfig = parseMediaConfig(process.env);
 const model = createPostModel({getPool,sql});
 const aiService=createAiService({posts:model,model:createAiModel({getPool,sql}),queue:createAiQueue({getRedis:requireRedis}),config:parseAiConfig(process.env)});
@@ -66,12 +69,13 @@ const app = createApp({ config, authRouter, postRouter, mediaRouter, auctionRout
     const raw = await requireRedis().get(INFRA.resultPrefix + id); return raw ? JSON.parse(raw) : null;
   } }, log: logError });
 const server = createServer(app);
-const io = new Server(server, { cors: { origin: config.origins },
+const io = new Server(server, { cors: { origin: config.origins, credentials:true },
   allowRequest: (req, callback) => callback(null, !req.headers.origin || config.origins.includes(req.headers.origin)) });
 io.on('connection', socket => socket.emit('system:hello', { message: 'Socket.IO sẵn sàng', serverTime: new Date().toISOString() }));
 const updates=attachAuctionSockets({io,model:auctionModel,log:logError});
+const accounts=attachAccountSockets({io,sessionMiddleware,users,control:accountControl,log:logError});
 const subscriber=makeRedisClient('redis-auction-updates');
-void subscriber.connect().then(()=>subscribeAuctionUpdates({subscriber,onChange:updates.changed,log:logError}))
+void subscriber.connect().then(async()=>{await subscribeAuctionUpdates({subscriber,onChange:updates.changed,log:logError});await subscriber.subscribe(ACCOUNT_CONTROL_CHANNEL,accounts.changed);})
   .catch(error=>logError(error,{component:'auction-updates-startup'}));
 server.listen(config.port, config.host, () => logger.info({ host: config.host, port: config.port }, 'API đã chạy'));
 server.on('error', error => { logError(error, { component: 'http-server' }); void shutdown(1); });

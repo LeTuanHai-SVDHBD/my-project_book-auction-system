@@ -8,8 +8,8 @@
 2. `GET /api/auth/csrf` tạo session ẩn danh và CSRF token gắn với session Redis.
 3. Đăng ký kiểm tra dữ liệu, CSRF và giới hạn thử, băm Argon2id rồi ghi NguoiDung.
 4. API công khai chỉ tạo `nguoi_dung`; UNIQUE email bảo vệ yêu cầu đăng ký đồng thời.
-5. Đăng nhập kiểm tra SQL/hash, đổi session ID và CSRF; lưu Redis trước khi trả thành công.
-6. Yêu cầu bảo vệ đọc lại tài khoản/vai trò từ SQL. Không tin mã người dùng do client khai báo.
+5. Đăng nhập kiểm tra SQL/hash, đổi session ID và CSRF; lưu session và claim quyền điều khiển ở Redis trước khi trả thành công.
+6. Yêu cầu bảo vệ đọc lại tài khoản/vai trò từ SQL và kiểm tra chủ điều khiển Redis. Không tin mã người dùng do client khai báo.
 7. Đăng xuất hủy session được chọn và xóa đúng cookie của tab; không thu hồi tab khác.
 
 F5 giữ phiên tab; tài liệu mới tạo mã tab mới để không kế thừa tài khoản từ storage sao chép.
@@ -69,6 +69,8 @@ hoặc đã có người thắng không được đăng lại, kể cả giao d�
 | POST | `/api/auth/login` | CSRF; email, mật khẩu; đổi session/CSRF |
 | POST | `/api/auth/logout` | CSRF; hủy session được chọn |
 | GET | `/api/auth/me` | Tài khoản hợp lệ |
+| POST | `/api/auth/control` | Cookie hợp lệ + CSRF, body rỗng; claim một lần khi nạp/F5 |
+| GET | `/api/auth/control-status` | Tài khoản hợp lệ và đúng chủ; không tự claim |
 | GET | `/api/auth/admin-check` | Admin hợp lệ |
 
 ### Bài đăng và media
@@ -101,6 +103,10 @@ Thiếu đăng nhập trả 401; thiếu quyền/CSRF sai trả 403; xung đột
 Header chọn tab phải có 32 ký tự hex viết thường; header này không thay cookie hoặc CSRF.
 
 ## Probe hạ tầng
+
+Quyền cửa sổ tài khoản: login hoặc POST `/api/auth/control` có CSRF claim quyền Redis; HTTP riêng kiểm tra chủ,
+Socket `/account` xác thực và ngắt chủ cũ. GET `/api/auth/control-status` chỉ kiểm tra, không giành lại quyền.
+Nối lại mạng không tự claim; F5 được claim một lần khi bootstrap. Chi tiết tại [account-control.md](account-control.md).
 
 `React → API → Redis Streams → Worker → SQL SELECT → Redis result → React`.
 API trả 202 queued; worker chỉ xác nhận completed sau truy vấn kiểm tra thành công.

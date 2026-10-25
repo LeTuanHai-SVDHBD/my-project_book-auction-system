@@ -60,6 +60,8 @@ Số sao nguyên 1–5, nhận xét tùy chọn tối đa 2.000 ký tự. Gửi 
 nội dung khác bị chặn, không có API sửa/xóa đánh giá.
 
 Chi tiết phiên công khai có mục **Uy tín người bán** gồm số đánh giá, trung bình sao và nhận xét phân trang 30 dòng.
+Mục **Đánh giá người bán** trong giao dịch chỉ hiển thị phía người mua; phía người bán không hiện tiêu đề,
+biểu mẫu hoặc hướng dẫn người mua đánh giá. Uy tín công khai của người bán vẫn nằm trong chi tiết phiên.
 Chỉ tính các đánh giá khớp người mua/bán và giao dịch hoàn tất. Không công khai mã giao dịch, email,
 ngưỡng kết thúc sớm, tin nhắn hoặc hồ sơ khiếu nại qua phần này.
 

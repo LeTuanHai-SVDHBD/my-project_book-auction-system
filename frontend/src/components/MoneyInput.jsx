@@ -4,16 +4,17 @@ import {editMoneyInput,formatMoneyInput,moneyDigits,positionAfterDigits} from '.
 export default function MoneyInput({name,label,initialValue='',required=true,followSuggestion=false}){
   const [digits,setDigits]=useState(()=>moneyDigits(initialValue));const [error,setError]=useState('');
   const input=useRef(null);const pendingCaret=useRef(null);
+  const [,renderEdit]=useState(0);
   const edited=useRef(false);
   useLayoutEffect(()=>{if(followSuggestion&&!edited.current)setDigits(moneyDigits(initialValue));},[followSuggestion,initialValue]);
   useLayoutEffect(()=>{if(pendingCaret.current!==null&&input.current){input.current.setSelectionRange(pendingCaret.current,pendingCaret.current);pendingCaret.current=null;}});
   function update(event){
     edited.current=true;
     const element=event.target;const next=editMoneyInput(element.value,element.selectionStart??element.value.length);
-    if(next.digits.length>18){element.value=formatMoneyInput(digits);element.setCustomValidity('Tối đa 18 chữ số.');setError('Tối đa 18 chữ số. Giá trị vượt giới hạn chưa được nhập.');return;}
+    if(next.digits.length>18){pendingCaret.current=Math.min(element.selectionStart??0,formatMoneyInput(digits).length);setError('Tối đa 18 chữ số. Giá trị vượt giới hạn chưa được nhập.');renderEdit(value=>value+1);return;}
     element.setCustomValidity('');setError('');pendingCaret.current=next.caret;setDigits(next.digits);
-    // A rejected character leaves the state unchanged; restore the DOM and caret immediately too.
-    element.value=formatMoneyInput(next.digits);element.setSelectionRange(next.caret,next.caret);
+    // React owns the value. Writing element.value here desynchronizes its input tracker while typing.
+    renderEdit(value=>value+1);
   }
   function removeSeparator(event){
     if(event.ctrlKey||event.metaKey||event.altKey)return;

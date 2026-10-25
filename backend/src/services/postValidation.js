@@ -1,5 +1,6 @@
 /** Hợp đồng bài đăng: tên trường theo schema, tiền VND nguyên dưới dạng chuỗi, lịch có múi giờ. */
 import { HttpError } from '../middlewares/errorHandler.js';
+import {BOOK_GENRES} from '../../../shared/bookGenres.js';
 const bad = message => { throw new HttpError(400, 'INVALID_POST_INPUT', message); };
 export function object(value, allowed, name) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) bad(`${name} không hợp lệ.`);
@@ -47,6 +48,7 @@ export function validatePost(body, { mode = 'create', maxImages = 12, maxVideos 
   if (new Set(media.map(item => item.upload_id)).size !== media.length) bad('Không lặp mã upload trong cùng bài đăng.');
   let normalizedBook;
   if (book) {
+    if(book.the_loai!==undefined&&book.the_loai!==null&&book.the_loai!==''&&!BOOK_GENRES.includes(book.the_loai))bad('Hãy chọn thể loại trong danh mục.');
     normalizedBook = { ten_sach: text(book.ten_sach, 300, 'Tên sách', true), tac_gia: text(book.tac_gia, 200, 'Tác giả'),
       the_loai: text(book.the_loai, 100, 'Thể loại'), nha_xuat_ban: text(book.nha_xuat_ban, 200, 'Nhà xuất bản'),
       tinh_trang_sach: text(book.tinh_trang_sach, 1000, 'Tình trạng sách', true), mo_ta: text(book.mo_ta, 12000, 'Mô tả sách'),

@@ -15,9 +15,9 @@ function visit(dir) {
     else if (/\.(js|mjs)$/.test(item.name)) files.push(target);
   }
 }
-visit(path.join(root, 'backend')); visit(path.join(root, 'scripts'));
+visit(path.join(root, 'backend')); visit(path.join(root, 'scripts')); visit(path.join(root,'shared'));
 for (const file of files) {
   const r = spawnSync(process.execPath, ['--check', file], { stdio: 'inherit' });
   if (r.status !== 0) process.exit(r.status || 1);
 }
-console.log(`Đã kiểm tra cú pháp ${files.length} tệp JavaScript phía máy chủ.`);
+console.log(`Đã kiểm tra cú pháp ${files.length} tệp JavaScript phía máy chủ và dùng chung.`);

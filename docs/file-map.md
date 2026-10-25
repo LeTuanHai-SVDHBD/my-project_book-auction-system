@@ -44,6 +44,21 @@
 | `scripts/` | Công cụ điều phối/cài đặt/kiểm thử |
 | `docs/` | Tài liệu kỹ thuật theo chủ đề |
 | `academic/` | Hướng dẫn lưu báo cáo, slide, UML và bằng chứng được chọn |
+| `shared/bookGenres.js`, `shared/accountControl.js` | Danh mục thể loại chung và thông báo thay cửa sổ |
+
+## Quyền cửa sổ và đầu vào biểu mẫu
+
+| File/nhóm | Trách nhiệm |
+|---|---|
+| `backend/src/services/accountControl.service.js` | Claim/assert/release Redis Lua và Pub/Sub theo tài khoản |
+| `backend/src/realtime/accountSockets.js` | Cookie/tab/control handshake, ngắt chủ cũ và heartbeat bù sự kiện |
+| `frontend/src/services/controlIdentity.js`, `accountControl.js` | Mã tài liệu trong bộ nhớ, Socket và HTTP fallback, khóa khi bị thay |
+| `frontend/src/App.jsx` | Nền inert/mờ và thông báo tải lại khi mất quyền |
+| `frontend/src/components/GenreSelect.jsx`, `shared/bookGenres.js` | Combobox một lựa chọn, lọc không dấu và danh mục dùng chung API |
+| `frontend/src/components/MoneyInput.jsx` | React cập nhật value, phục hồi caret sau render, không ghi DOM value trong onChange |
+| `backend/test/accountControl.test.js` | Hai API/Redis/Socket thật opt-in; takeover, reconnect, CSRF và heartbeat |
+| `backend/test/bookGenres.test.js` | Danh mục, tìm không dấu và kiểm tra bài mới/giữ sách cũ |
+| `docs/account-control.md` | Chính sách quyền, API, khôi phục và nghiệm thu |
 
 ## Giao dịch và tương tác sau phiên
 

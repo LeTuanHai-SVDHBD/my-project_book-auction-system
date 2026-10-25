@@ -2,8 +2,32 @@
 
 # Kết quả kiểm tra
 
-Cập nhật ngày 24/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
+Cập nhật ngày 25/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
+
+## Quyền cửa sổ, ô tiền, đánh giá và thể loại
+
+- Đã xem video LoiNhapSo.mp4: chữ số đầu bị lặp khi gõ liên tục. Bỏ ghi trực tiếp DOM value trong onChange,
+  chỉ để React cập nhật và phục hồi con trỏ sau render; giữ nguyên hợp đồng tiền chuỗi 18 chữ số.
+- Đã đọc đầy đủ TheLoaiSach.docx, đưa nhóm văn học/phi hư cấu/độc giả vào danh mục, bổ sung sách cổ/tư liệu.
+  Tìm có/không dấu; chuột hoặc mũi tên/Enter để chọn, chữ tìm kiếm không trở thành thể loại tự do.
+  API bài mới chỉ nhận danh mục hoặc trống; dữ liệu sách cũ/đăng lại không bị sửa.
+- Kiểm tra mặc định **118 PASS, 11 SKIP**; Redis thật **126 PASS, 3 SKIP SQL**, không lỗi.
+  Check **124 tệp PASS**, build Frontend PASS (72 modules). Kiểm thử cũ không gắn control vẫn kiểm tra
+  cookie riêng; bài accountControl mới gắn đúng service sản xuất để kiểm tra chính sách một chủ.
+- Bài accountControl chạy hai HTTP API/Socket.IO dùng chung Redis/RedisStore/Lua thật, tài khoản/model đấu giá giả:
+  login chủ mới ngắt chủ cũ, HTTP cũ không enqueue, CSRF sai bị chặn, không nhận user ID trong claim,
+  reconnect cũ bị từ chối, F5 với cookie hợp lệ lấy lại quyền, logout cũ không xóa chủ mới, giả cookie/selector bị chặn.
+  Bỏ đăng ký Pub/Sub ở một API vẫn ngắt qua heartbeat; mất khóa Redis chặn cho tới reclaim tường minh.
+- Chromium/React/Express/Redis/Socket thật, SQL và Cloudinary fixture: hai tài khoản khác nhau không bị ảnh hưởng,
+  cùng tài khoản ở hai tab và hai cookie context đổi chủ đúng; tab cũ có nền mờ/inert và thông báo yêu cầu F5.
+  F5 lấy lại, cửa sổ nối mạng lại không tự lấy quyền. Không có page error trong lượt kiểm tra đạt.
+- Ba ô tiền được gõ từng phím với số 0 liên tục, thêm ở đầu/giữa, Backspace sát dấu phân cách, dán lẫn chữ,
+  18 chữ số và từ chối chữ số thứ 19; giá trị hidden/gửi API đúng, không nhân đôi chữ số đầu.
+- Người bán không có mục đánh giá; người mua vẫn đánh giá sau đủ hai xác nhận. Thể loại tìm không dấu,
+  chọn bằng chuột/bàn phím, mở lại danh sách đầy đủ và chặn chữ tự nhập; gửi được lựa chọn qua validator HTTP thật.
+- Đã xem ảnh desktop/mobile 390 px, không tràn ngang. Chưa nghiệm thu trên Windows/UniKey của Hải,
+  SQL Server thật và Cloudinary thật không được kiểm tra lại trong bản sửa này. Không thêm schema/dependency hoặc đổi Gemini.
 
 ## Giao dịch và tương tác sau đấu giá
 

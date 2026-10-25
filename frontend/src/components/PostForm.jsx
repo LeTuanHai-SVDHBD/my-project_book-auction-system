@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {postApi} from '../services/postApi.js';
 import MoneyInput from './MoneyInput.jsx';
+import GenreSelect from './GenreSelect.jsx';
 export default function PostForm({source,mode='create',onSaved,onCancel}) {
   const [config,setConfig]=useState(null); const [media,setMedia]=useState([]); const [busy,setBusy]=useState(false);
   const [error,setError]=useState(''); const [progress,setProgress]=useState('');
@@ -38,7 +39,7 @@ export default function PostForm({source,mode='create',onSaved,onCancel}) {
   const input=(name,label,max,required=false,type='text',value=source?.[name]??'')=><label key={name}>{label}<input name={name} type={type} defaultValue={value} maxLength={max} required={required}/></label>;
   return <section className="post-sheet"><span className="eyebrow">CHỦ SÁCH</span><h2>{mode==='create'?'Đăng sách mới':mode==='resubmit'?'Bổ sung và gửi duyệt lại':'Đăng lại cùng bản sách'}</h2>
     <form onSubmit={submit}><fieldset disabled={busy}>
-      {mode==='create'?<><h3>Thông tin bản sách</h3><div className="form-grid">{input('ten_sach','Tên sách',300,true)}{input('tac_gia','Tác giả',200)}{input('the_loai','Thể loại',100)}{input('nha_xuat_ban','Nhà xuất bản',200)}{input('nam_xuat_ban','Năm xuất bản',4,false,'number')}{input('isbn','ISBN (10 hoặc 13 ký tự)',13)}</div>
+      {mode==='create'?<><h3>Thông tin bản sách</h3><div className="form-grid">{input('ten_sach','Tên sách',300,true)}{input('tac_gia','Tác giả',200)}<GenreSelect/>{input('nha_xuat_ban','Nhà xuất bản',200)}{input('nam_xuat_ban','Năm xuất bản',4,false,'number')}{input('isbn','ISBN (10 hoặc 13 ký tự)',13)}</div>
         <label>Tình trạng sách<textarea name="tinh_trang_sach" required maxLength={1000}/></label><label>Giới thiệu sách<textarea name="mo_ta" maxLength={12000}/></label></>:<p>Giữ sách #{source.sach_id}: <strong>{source.ten_sach}</strong>. {mode==='relist'?'Tạo bài và phiên mới, giữ nguyên lịch sử phiên cũ.':'Giữ bài, phiên, media và lịch sử kiểm duyệt; bổ sung bằng chứng còn thiếu.'}</p>}
       <h3>Nội dung gửi kiểm duyệt</h3>{input('tieu_de','Tiêu đề bài đăng',300,true)}
       <label>Tình trạng, yếu tố quý hiếm và bằng chứng<textarea name="mo_ta_tinh_trang" defaultValue={source?.mo_ta_tinh_trang||''} required maxLength={12000} rows={5}/></label>

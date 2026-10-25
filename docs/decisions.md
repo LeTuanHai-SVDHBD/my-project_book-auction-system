@@ -81,7 +81,7 @@ Chi tiết quyền, đồng hồ và giới hạn tại [realtime.md](realtime.m
 
 ## ADR-010 — Session Redis và phân tách theo tab
 
-**Trạng thái:** áp dụng theo chính sách phiên riêng từng tab.
+**Trạng thái:** cookie riêng theo tab tiếp tục áp dụng; cùng tài khoản chỉ một cửa sổ điều khiển theo ADR-019.
 
 - Argon2id lưu hash tại NguoiDung; API đăng ký công khai chỉ tạo người dùng thường.
 - `express-session`/RedisStore lưu session; API thật không chuyển sang MemoryStore khi Redis lỗi.
@@ -251,3 +251,21 @@ Không mở room Socket riêng; trang mới nhất poll HTTP ba giây, lịch s�
 POST tin/bình luận/hồ sơ không có receipt UUID, không tự retry khi mất phản hồi; đọc lại trước khi gửi.
 Chỉ retry deadlock 1205 đã rollback tối đa một lần. Bình luận khóa phiên và kiểm tra giờ SQL trước INSERT.
 Xem [Giao dịch và tương tác sau đấu giá](after-sales.md).
+
+## ADR-019 — Chủ mới điều khiển tài khoản và đầu vào thể loại có danh mục
+
+**Trạng thái:** áp dụng theo yêu cầu ngày 25/10/2026; không đổi schema hoặc dependency.
+
+Cùng tài khoản dùng một khóa chủ Redis, claim nguyên tử bằng Lua/Pub/Sub khi login hoặc nạp/F5 tài liệu.
+Cookie/CSRF vẫn xác thực, selector tab và mã tài liệu không cấp quyền độc lập. GET me chỉ nhận diện phiên;
+POST control có CSRF mới claim. HTTP riêng assert quyền trước nghiệp vụ; reconnect Socket chỉ assert.
+Namespace /account xác thực, server disconnect chủ cũ, heartbeat và HTTP bù Pub/Sub bị mất. Khác tài khoản vẫn độc lập.
+Yêu cầu đã qua kiểm tra trước khi chuyển chủ có thể hoàn tất, không sửa kết quả SQL/lượt đã tiếp nhận.
+Hợp đồng và giới hạn tại [account-control.md](account-control.md).
+
+Ô tiền để React cập nhật value và chỉ đặt con trỏ sau render; bỏ ghi trực tiếp DOM value trong onChange để tránh
+lặp chữ số khi gõ liên tục. Giữ chuỗi nguyên/18 chữ số, nhóm nghìn và thao tác giữa chuỗi, không chuyển qua Number.
+
+Thể loại là một lựa chọn từ danh mục dùng chung ở shared/bookGenres.js, căn cứ tài liệu thể loại người dùng gửi,
+bổ sung nhóm sách cổ/tư liệu. Gõ có/không dấu chỉ lọc danh sách; API sách mới chặn tên ngoài danh mục.
+Giữ tùy chọn để trống và dữ liệu sách cũ, không migration hoặc tự ánh xạ lại lịch sử.

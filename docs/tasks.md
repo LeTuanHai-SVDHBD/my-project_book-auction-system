@@ -15,8 +15,9 @@
 |---|---|---|
 | Hạ tầng | SQL, Redis, API, worker, Socket.IO và probe | Đã triển khai; nhóm xác nhận healthy/completed và smoke đạt |
 | Tài khoản | Đăng ký/đăng nhập/đăng xuất, Argon2id, CSRF, phân quyền | Đã triển khai; smoke tài khoản được nhóm xác nhận đạt |
-| Phiên tab | Hai tài khoản trong cùng trình duyệt; reload giữ phiên, tab mới đăng nhập lại | Đã kiểm tra HTTP/Redis và trình duyệt; chờ nghiệm thu máy nhóm |
+| Phiên tab | Khác tài khoản độc lập; cùng tài khoản chủ mới ngắt chủ cũ, F5 lấy lại quyền | Đã kiểm tra hai API/Redis/Socket thật và trình duyệt; chờ máy nhóm |
 | Nhập tiền | Chỉ chữ số, dấu chấm hàng nghìn, chuỗi nguyên tối đa 18 chữ số | Đã kiểm tra HTTP/Redis và trình duyệt; chờ nghiệm thu máy nhóm |
+| Thể loại | Danh mục chung, tìm không dấu, chỉ lưu lựa chọn; bổ sung nhóm sách cổ/tư liệu | Đã kiểm tra API và bàn phím/chuột trên desktop/mobile |
 | Đăng sách | Tạo sách/bài/phiên pending và media trong transaction | Đã triển khai; có smoke tích hợp |
 | Media | Cloudinary, vé Redis, ownership, cleanup | Đã triển khai; kiểm thử hợp đồng và Redis; media thật cần nghiệm thu |
 | Kiểm duyệt | Phê duyệt/từ chối có lý do, bổ sung và gửi lại | Đã triển khai; Admin phê duyệt đã được nhóm xác nhận hoạt động |
@@ -50,6 +51,7 @@ Không triển khai thêm trạng thái nghiệp vụ, cổng thanh toán hay c�
 - [ ] Cập nhật mã, giữ cấu hình và volume hiện tại; khởi động lại API/worker/web.
 - [ ] SQL readiness 20 bảng/152 cột; cấu hình Cloudinary đầy đủ.
 - [ ] Hai tab cùng trình duyệt giữ Admin/người dùng riêng; F5, logout và mở tab mới đúng chính sách.
+- [ ] Cùng tài khoản ở hai cửa sổ: chủ mới hoạt động, chủ cũ mờ và API bị chặn; F5 lấy lại, reconnect không tự giành quyền.
 - [ ] Ba ô tiền lọc chữ, định dạng khi nhập/dán/xóa; API nhận chuỗi nguyên chính xác.
 - [ ] Đăng sách với ảnh và video thật; Admin từ chối, bổ sung, duyệt và chủ sách kích hoạt đúng phiên.
 - [ ] API danh mục/đấu giá không có `gia_toi_thieu`.

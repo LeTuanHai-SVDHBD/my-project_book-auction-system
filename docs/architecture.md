@@ -55,6 +55,9 @@ CSRF token giữ trong bộ nhớ, vai trò và tài khoản luôn đọc lại 
 F5 giữ mã tab; một tài liệu mới xoay mã kể cả khi trình duyệt sao chép storage từ tab mở nó.
 Vì vậy tab mới cần đăng nhập, đăng xuất chỉ thu hồi phiên được chọn.
 Client terminal không gửi mã tab tiếp tục dùng hợp đồng cookie chung cho smoke và tích hợp HTTP.
+Riêng quyền điều khiển tài khoản giữ một chủ trong Redis: login/F5 claim, HTTP nghiệp vụ assert,
+namespace /account xác thực cookie và chủ rồi ngắt chủ cũ qua Pub/Sub; heartbeat/HTTP bù tín hiệu lỡ.
+Hai tài khoản khác nhau vẫn độc lập; cùng tài khoản chuyển sang cửa sổ mới theo [account-control.md](account-control.md).
 Đây là cách phân tách thao tác theo tab, không phải ranh giới an toàn giữa các trang cùng origin.
 
 ## Nhất quán dữ liệu
@@ -79,7 +82,8 @@ Sau COMMIT, processor publish tín hiệu ID phiên qua Redis Pub/Sub; API chuy�
 Publish lỗi giữ thông điệp pending; XAUTOCLAIM xử lý lại và đọc quyết định đã lưu trước khi phát lại/ACK.
 Không gửi ngưỡng, giá hoặc quyết định riêng trong tín hiệu Socket. Giao diện lấy snapshot SQL sau thông báo,
 sau khi đăng ký lại room và mỗi 5 giây để bù sự kiện lỡ. Snapshot chứa lịch sử mới nhất cùng giá/kết quả.
-Quyết định của người đặt vẫn được đọc qua HTTP có xác thực, không đưa session vào Socket.
+Quyết định của người đặt vẫn được đọc qua HTTP có xác thực; namespace công khai không chứa session.
+Namespace /account dùng cookie xác thực riêng, không nhận lệnh đặt giá hoặc phát nội dung giao dịch.
 Không có outbox hoặc cam kết giao mọi thông báo; phục hồi trạng thái hiện tại bằng SQL. Xem [realtime.md](realtime.md) và ADR-009.
 
 ## Phân tích sách

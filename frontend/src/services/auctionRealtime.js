@@ -1,12 +1,13 @@
 /** Socket chỉ nhận tín hiệu công khai; luôn lấy lại SQL qua HTTP sau join/reconnect và định kỳ để bù thông báo mất. */
 import {useEffect,useRef,useState} from 'react';
 import {io} from 'socket.io-client';
+import {isAccountReplaced} from './controlIdentity.js';
 const base=import.meta.env.VITE_API_URL||'http://127.0.0.1:5000';
 export function useAuctionRealtime({auctionId=null,onChange,enabled=true}) {
   const latest=useRef(onChange);latest.current=onChange;
   const [state,setState]=useState('connecting');
   useEffect(()=>{
-    if(!enabled)return;
+    if(!enabled||isAccountReplaced())return;
     let disposed=false,timer,running=false,dirty=false,watching=false,joining=false,watchRevision=0;
     async function flush(){
       if(disposed||running)return;running=true;dirty=false;
@@ -31,7 +32,9 @@ export function useAuctionRealtime({auctionId=null,onChange,enabled=true}) {
     const focus=()=>sync(),visible=()=>{if(!document.hidden)sync();};
     window.addEventListener('focus',focus);document.addEventListener('visibilitychange',visible);
     const fallback=setInterval(()=>{if(!watching)watch();sync();},5000);socket.connect();sync();
-    return()=>{disposed=true;clearTimeout(timer);clearInterval(fallback);window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',visible);socket.removeAllListeners();socket.disconnect();};
+    const stop=()=>{disposed=true;clearTimeout(timer);clearInterval(fallback);socket.removeAllListeners();socket.disconnect();};
+    window.addEventListener('account:replaced',stop);
+    return()=>{stop();window.removeEventListener('account:replaced',stop);window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',visible);};
   },[auctionId,enabled]);
   return state;
 }

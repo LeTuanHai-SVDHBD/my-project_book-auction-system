@@ -17,7 +17,7 @@ export function validateAuctionEvent(event,settings=AUCTION) {
   if(Object.keys(event).some(key=>!keys.includes(key)))throw new Error('INVALID_AUCTION_EVENT');
   return event;
 }
-export function createAuctionProcessor({model,locks,leaseMs=AUCTION.leaseMs,settings=AUCTION,log=()=>{}}) {
+export function createAuctionProcessor({model,locks,notify=async()=>{},leaseMs=AUCTION.leaseMs,settings=AUCTION,log=()=>{}}) {
   return async event=>{
     validateAuctionEvent(event,settings);
     const lease=await locks.acquire(event.auctionId);
@@ -30,7 +30,10 @@ export function createAuctionProcessor({model,locks,leaseMs=AUCTION.leaseMs,sett
     },Math.max(25,Math.floor(leaseMs/3)));timer.unref();
     try {
       const beforeCommit=async()=>{if(lost)throw new Error('AUCTION_LEASE_LOST');await renew();};
-      return event.eventType===settings.bidType?await model.processBid(event,{beforeCommit}):await model.closeExpired(event.auctionId,{beforeCommit});
+      const result=event.eventType===settings.bidType?await model.processBid(event,{beforeCommit}):await model.closeExpired(event.auctionId,{beforeCommit});
+      // If publishing fails, the stream stays pending. Replay reads the committed SQL decision and notifies again.
+      if(result)await notify(event.auctionId);
+      return result;
     } finally {
       clearInterval(timer);await renewal;
       try{await lease.release();}catch(error){log(error,{component:'auction-unlock'});}

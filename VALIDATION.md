@@ -2,10 +2,168 @@
 
 # Kết quả kiểm tra
 
-Cập nhật ngày 24/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
+Cập nhật ngày 25/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
-## Giao diện đặt giá và thời gian chờ
+## Thu hồi session cũ và nhập tiền không đổi định dạng
+
+Bản sửa theo phản hồi của Hải: chính sách F5 lấy lại quyền của lượt trước đã bị bỏ. Chỉ login bằng mật khẩu mới đổi phiên.
+
+- Redis/HTTP/Socket thật qua hai API: **126 PASS, 3 SKIP SQL**; session cũ thực sự bị DEL khỏi RedisStore khi login mới.
+  Cookie cũ, GET me, gửi giá, POST control nhận 401; F5 đổi mã tài liệu không thu hồi phiên hợp lệ của tab mới.
+  Sai mật khẩu không thay owner; login đúng mới thay phiên. Logout cũ không xóa owner mới; mất key buộc login lại.
+  Kiểm tra heartbeat khi không nhận Pub/Sub và thông báo đến trễ không ngắt nhầm phiên hiện tại.
+- Chromium với HTTP/session/Redis/Socket thật, SQL/provider giả: tab mới login thì tab cũ tự về biểu mẫu đăng nhập,
+  không còn profile/logout hoặc lớp phủ. F5 xen kẽ hai tab ba vòng không hồi sinh tab cũ hoặc làm tab mới mất phiên.
+  Nhập mật khẩu/login lại ở tab cũ mới thu hồi tab mới; thử thêm cookie context riêng và nối lại mạng.
+- Đã tái hiện lặp giá trị khi input đổi mask lúc focus trong QA. Bỏ hẳn mask trong ô nhập, chỉ nhóm nghìn ở dòng Giá trị.
+  Cả ba ô đã gõ từng phím số 0 liên tục, sửa đầu/giữa, xóa, fill/dán lẫn chữ, 18 chữ số và chặn số thứ 19.
+  Mô phỏng compositionstart/input/compositionend không nhóm nghìn trong ô; hidden và payload HTTP vẫn đúng.
+- Giao diện desktop/mobile 390 px được kiểm tra cùng luồng thể loại và đánh giá; không page error trong lượt đạt.
+  Chưa chạy bàn phím Windows/UniKey thật hoặc SQL Server/Cloudinary thật ở lượt sửa này.
+
+## Bằng chứng bản a1cbd7f trước khi sửa chính sách phiên
+
+Các kết quả bên dưới ghi lại lượt cũ. Chính sách F5 lấy lại quyền, lớp phủ giữ đăng nhập và định dạng tiền trong ô
+đã được thay thế bằng hành vi thu hồi session/nhập số thuần ở mục trên.
+
+
+
+- Đã xem video LoiNhapSo.mp4: chữ số đầu bị lặp khi gõ liên tục. Bỏ ghi trực tiếp DOM value trong onChange,
+  chỉ để React cập nhật và phục hồi con trỏ sau render; giữ nguyên hợp đồng tiền chuỗi 18 chữ số.
+- Đã đọc đầy đủ TheLoaiSach.docx, đưa nhóm văn học/phi hư cấu/độc giả vào danh mục, bổ sung sách cổ/tư liệu.
+  Tìm có/không dấu; chuột hoặc mũi tên/Enter để chọn, chữ tìm kiếm không trở thành thể loại tự do.
+  API bài mới chỉ nhận danh mục hoặc trống; dữ liệu sách cũ/đăng lại không bị sửa.
+- Kiểm tra mặc định **118 PASS, 11 SKIP**; Redis thật **126 PASS, 3 SKIP SQL**, không lỗi.
+  Check **124 tệp PASS**, build Frontend PASS (72 modules). Kiểm thử cũ không gắn control vẫn kiểm tra
+  cookie riêng; bài accountControl mới gắn đúng service sản xuất để kiểm tra chính sách một chủ.
+- Bài accountControl chạy hai HTTP API/Socket.IO dùng chung Redis/RedisStore/Lua thật, tài khoản/model đấu giá giả:
+  login chủ mới ngắt chủ cũ, HTTP cũ không enqueue, CSRF sai bị chặn, không nhận user ID trong claim,
+  reconnect cũ bị từ chối, F5 với cookie hợp lệ lấy lại quyền, logout cũ không xóa chủ mới, giả cookie/selector bị chặn.
+  Bỏ đăng ký Pub/Sub ở một API vẫn ngắt qua heartbeat; mất khóa Redis chặn cho tới reclaim tường minh.
+- Chromium/React/Express/Redis/Socket thật, SQL và Cloudinary fixture: hai tài khoản khác nhau không bị ảnh hưởng,
+  cùng tài khoản ở hai tab và hai cookie context đổi chủ đúng; tab cũ có nền mờ/inert và thông báo yêu cầu F5.
+  F5 lấy lại, cửa sổ nối mạng lại không tự lấy quyền. Không có page error trong lượt kiểm tra đạt.
+- Ba ô tiền được gõ từng phím với số 0 liên tục, thêm ở đầu/giữa, Backspace sát dấu phân cách, dán lẫn chữ,
+  18 chữ số và từ chối chữ số thứ 19; giá trị hidden/gửi API đúng, không nhân đôi chữ số đầu.
+- Người bán không có mục đánh giá; người mua vẫn đánh giá sau đủ hai xác nhận. Thể loại tìm không dấu,
+  chọn bằng chuột/bàn phím, mở lại danh sách đầy đủ và chặn chữ tự nhập; gửi được lựa chọn qua validator HTTP thật.
+- Đã xem ảnh desktop/mobile 390 px, không tràn ngang. Chưa nghiệm thu trên Windows/UniKey của Hải,
+  SQL Server thật và Cloudinary thật không được kiểm tra lại trong bản sửa này. Không thêm schema/dependency hoặc đổi Gemini.
+
+## Giao dịch và tương tác sau đấu giá
+
+Chẩn đoán smoke readiness được bổ sung sau khi Hải báo dừng trước luồng nghiệp vụ:
+ba test riêng đạt; bộ test mặc định **116 PASS, 10 SKIP**, check **118 tệp PASS**. Chẩn đoán phân biệt
+API không kết nối/timeout, HTTP sai/JSON sai và trạng thái SQL/Redis/worker;
+không phản chiếu credentials/body lỗi. Script tách giai đoạn kết nối SQL/Redis, không đổi tiêu chí readiness hoặc tự bỏ qua lỗi.
+CLI smoke:m8 với API không chạy dừng đúng exit 1 và hướng dẫn giữ dev:all, trước khi tạo fixture.
+Kết quả từ máy Hải chưa đủ xác định dependency cụ thể. Chi tiết nghiệm thu chức năng bên dưới giữ nguyên phạm vi thật/giả.
+
+Kiểm tra ngày 24/10/2026 trên mã giữ Gemini; không áp dụng thay đổi Groq đã hủy:
+
+- `check`: **116 tệp PASS**; build Frontend PASS, 67 modules.
+- Mặc định `npm test`: **113 PASS, 10 SKIP**, không có lỗi.
+- Bật Redis 7.0.15 thật: **120 PASS, 3 SKIP** dành cho SQL; không xóa database hoặc FLUSH Redis.
+- `test:community`: **12 PASS, 1 SKIP SQL**. Policy/HTTP/session/CSRF và service media chạy thật;
+  SQL ở HTTP dùng fixture giả, không chứng minh transaction/khóa SQL Server đã đạt.
+- Trình duyệt Chromium bốn tab người mua/người bán/người ngoài/Admin, React/Express/session Redis/vé media thật:
+  chat riêng, cờ đọc phía người nhận, chuỗi tiền 18 chữ số, xác nhận từng bên rồi đánh giá 5 sao,
+  công khai uy tín; người ngoài không thấy giao dịch; HTML trong tin nhắn hiển thị text, không thực thi.
+- Khiếu nại upload ảnh qua API/vé Redis, claim/bind và phản hồi tự cập nhật; SQL/provider Cloudinary giả.
+  Admin chưa tiếp nhận bị chặn chat, đang xử lý được đọc, xử lý xong mất quyền chat; người dùng không thấy nút Admin.
+- Bình luận đang diễn ra được ghi, sau kết thúc khóa ô nhập và giữ lịch sử. Desktop và mobile 390 px
+  không tràn ngang, không page error hoặc cảnh báo key React trong luồng đã chạy; đã xem ảnh giao diện.
+- Đã thêm `COMMUNITY_TEST_SQL=true` trên database riêng `BookAuctionTest_*` để kiểm tra model SQL thật:
+  phòng tạo cùng kết quả, xác nhận/đánh giá đồng thời, rollback bằng chứng, tranh tiếp nhận và biên bình luận.
+  **Chưa chạy bài SQL này** vì môi trường hiện tại không có SQL Server.
+- Đã thêm `smoke:m8` gồm smoke:m5 và luồng sau phiên; **chưa chạy với dịch vụ thật**.
+  Smoke không kiểm tra Cloudinary/bằng chứng ảnh thật; cần nghiệm thu riêng theo [hướng dẫn](docs/after-sales.md).
+
+Không thêm dependency/migration, giữ 20 bảng/152 cột và cơ chế xác thực. Không có thanh toán/vận chuyển tự động,
+đính kèm ảnh vào chat hoặc receipt cho mọi POST. API hạn chế hồ sơ; URL delivery Cloudinary hiện tại chưa được bảo vệ riêng tại CDN.
+
+## Xác nhận tích hợp AI từ máy nhóm
+
+Hải xác nhận `smoke:ai` **PASS** sau chẩn đoán Gemini. Đây là kết quả do người dùng cung cấp,
+phân biệt với các lượt chạy trong môi trường chuẩn bị bên dưới. Kiểm tra sách có ảnh/video thật,
+đối chiếu bằng chứng và hai điểm được Hải chủ động để lại sau khi tìm được dữ liệu.
+Không coi lượt mẫu thiếu ảnh, hai điểm NULL là chứng minh chất lượng thẩm định media.
+
+## Chẩn đoán lỗi Gemini
+
+Kiểm tra ngày 24/10/2026, giữ nguyên Gemini và không áp dụng thay đổi Groq đã hủy:
+
+- Mặc định **101 PASS, 9 SKIP**; bật Redis thật **108 PASS, 2 SKIP** dành cho SQL.
+- `test:ai`: **20 PASS, 2 SKIP** mặc định; `check`: **104 tệp PASS**; build PASS.
+- HTTP giả kiểm tra 400/401/402/403/404/429/503, API_KEY_INVALID trong lỗi Google kiểu cũ,
+  DNS/TLS code, timeout, JSON sai; không lưu body/message phản chiếu khóa hoặc dữ liệu sách vào metadata.
+- `ai:check` dùng đúng client/request với một mẫu không ảnh, không cần SQL/Redis; stub kiểm tra một lần gọi,
+  mã thoát PASS/FAIL, HTTP/provider code và thông báo đã che khóa. CLI thật không cấu hình dừng đúng
+  `AI_NOT_CONFIGURED`, chưa truy cập provider. Import script kiểm thử không tự gọi mạng.
+- Pipeline lưu chẩn đoán allowlist, hai điểm vẫn NULL khi thất bại. Smoke và UI hiện mã chi tiết/hướng kiểm tra.
+- Chromium/HTTP/session/Redis/queue/consumer/processor/React thật, Gemini và SQL giả: điểm/historic/NULL vẫn đúng,
+  lỗi quota hiện `AI_QUOTA_EXCEEDED · HTTP 429`, AI tắt vẫn duyệt thủ công; desktop/mobile không pageerror/tràn ngang.
+
+Chưa xác định nguyên nhân thực tế của log `AI_PROVIDER_ERROR` trên máy nhóm vì phiên bản cũ đã bỏ chi tiết.
+Chưa gọi API key Gemini thật hoặc chạy smoke SQL thật trong bản sửa. Cần kết quả `ai:check` trên máy nhóm
+để phân biệt key/quyền/model/payload/quota/mạng; không coi stub PASS là Gemini thật đã hoạt động.
+
+## Phân tích AI và bộ chấm điểm
+
+Kiểm tra ngày 24/10/2026:
+
+- `ai:example`: PASS, đầu vào JSON mẫu cho độ hiếm 100 và tình trạng 76,39; audit `6875 / 90`.
+- Full test mặc định: **97 PASS, 9 SKIP** theo opt-in. Bật Redis thật: **104 PASS, 2 SKIP** dành cho SQL.
+- `test:ai`: **16 PASS, 2 SKIP** mặc định (Redis/SQL). `check`: **101 tệp PASS**; `build`: PASS.
+- Bộ quy tắc: tổng trọng số từng nhóm 100, hai điểm độc lập, quy đổi 100/75/50/25/0,
+  chọn hư hại nặng nhất, NULL khi thiếu, N/A có căn cứ loại mẫu số và làm tròn chính xác.
+- Gemini REST được giả lập: JSON Schema/Interactions, không gửi giá/tài khoản/ngưỡng, `store:false`,
+  chặn media ngoài Cloudinary dự án, thiếu/vượt media có cảnh báo, quota/phản hồi hỏng/chưa hoàn tất bị chặn.
+- Pipeline với SQL giả: replay receipt không gọi lại/ghi thêm, SQL lỗi dùng cache kết quả,
+  source version cũ không lưu, tự động không lặp cùng version, Admin vẫn yêu cầu phân tích lại được.
+- HTTP/session thật: chủ bài/Admin được xem, người khác không được xem; POST chỉ Admin + CSRF + version,
+  chặn điểm tự chèn và lần phân tích của bài khác; Redis lỗi vẫn đọc SQL, tắt AI không tạo phân tích giả.
+- Redis thật: admission đồng thời chỉ một job/version, xử lý lỗi giữ pending, reclaim/ACK và job version mới.
+- Chromium desktop 1440 px/mobile 390 px, Redis/HTTP/session/queue/consumer/processor/React thật:
+  tự phân tích sau enqueue; Admin/chủ bài cùng thấy 100/76,39 và phép tính; thiếu trang giữ riêng tình trạng NULL;
+  chọn lại lịch sử; quota lỗi hai điểm NULL; tắt AI vẫn phê duyệt thủ công. Không pageerror hoặc tràn ngang;
+  ảnh QA đã được xem. Gemini và SQL được giả lập trong kiểm tra trình duyệt.
+- `setup:ai` được kiểm tra trong thư mục tạm: giữ cấu hình/khóa đã có, chạy lại không nhân đôi và không in khóa.
+
+**Chưa gọi Gemini thật, chưa chạy SQL AI opt-in hoặc `smoke:ai` với SQL Server thật.**
+Lệnh smoke đã thử dừng ở kiểm tra cấu hình do môi trường chưa có DB_PASSWORD, chưa truy cập dịch vụ.
+Cần API key/quota của nhóm và môi trường SQL/Redis/API/worker thật để nghiệm thu.
+Test SQL opt-in đã thêm rollback trước COMMIT, lưu điểm/chi tiết, replay và version cũ;
+`smoke:ai` đã thêm cho một lượt provider thật với dữ liệu không ảnh, không thay nghiệm thu chất lượng ảnh/video.
+Không coi provider/SQL giả là bằng chứng COMMIT SQL hoặc tính chính xác thẩm định sách thật.
+Giữ nguyên 20 bảng/152 cột, lockfile/dependency, volume và xác thực theo tab.
+Xem [Phân tích AI](docs/ai-analysis.md) để bật Gemini, kiểm tra quota và đối chiếu tiêu chí.
+
+## Đồng bộ thời gian thực
+
+Kiểm tra ngày 24/10/2026:
+
+- Test mặc định: **81 PASS, 7 SKIP** theo opt-in; bật Redis thật: **87 PASS, 1 SKIP** (test SQL Server riêng).
+- `check`: **79 tệp PASS**. `build`: PASS. Import bộ smoke dùng chung không tự khởi động hoặc truy cập SQL.
+- HTTP/Socket thật và model giả: chỉ thông báo sau khi model COMMIT, không thông báo khi SQL lỗi;
+  publish lỗi sau COMMIT được retry mà không ghi lại lượt; chặn room chưa công bố, ID/room tự chèn và sự kiện giả.
+- Redis thật: hai subscriber cùng nhận ID phiên; payload có trường riêng bị bỏ qua.
+  Lỗi publish sau COMMIT giữ thông điệp pending; reclaim phát lại, ACK thành công và chỉ một lần ghi trong model giả.
+- Chromium hai tiến trình trình duyệt độc lập, session Redis/HTTP/Socket/React thật: đang chờ không báo chấp nhận;
+  từ chối không tạo lịch sử; người mua, chủ sách và danh mục tự cập nhật giá/lịch sử/kết quả.
+- Browser đang chờ bị ngắt mạng vẫn đọc lại đúng quyết định khi nối mạng. Browser lỡ lượt giá lúc offline tự bắt kịp,
+  không cần bấm tải lại. Bỏ tín hiệu Pub/Sub khi Socket vẫn kết nối cũng được bù bằng đọc snapshot định kỳ.
+- Dồn 100 tín hiệu không làm mất giá đang nhập. Đồng hồ có test biên bắt đầu/hết hạn, không tự chọn người thắng.
+  Public HTTP/Socket không có trường ngưỡng ẩn; desktop/mobile đã xem ảnh, không có pageerror hoặc tràn ngang.
+
+SQL và worker model trong kiểm tra trình duyệt được giả lập; không dùng các kiểm tra đó làm bằng chứng COMMIT SQL thật.
+Đã mở rộng test SQL opt-in cho snapshot/lịch sử, thêm `smoke:m6` dùng SQL/Redis/API/worker thật,
+nhưng **chưa chạy smoke mới hoặc test SQL mới với SQL Server thật** trong bản cập nhật này.
+Schema vẫn 20 bảng/152 cột; dependency, volume và xác thực theo tab giữ nguyên.
+Các kết quả SQL Server thật ở phần dưới là bằng chứng của lần triển khai lõi trước đó.
+
+## Giao diện đặt giá và thời gian chờ (lần kiểm tra trước)
 
 Kiểm tra ngày 24/10/2026 cho giao diện chủ sách/người mua:
 
@@ -62,14 +220,17 @@ Bằng chứng SQL Server 2025/Redis 7 không thay nghiệm thu với đúng phi
 | Kiểm tra | Kết quả |
 |---|---|
 | Full test bật SQL/Redis thật | 87/87 PASS trước bản sửa giao diện; chưa chạy lại cho endpoint mới |
-| Test mặc định | 75 PASS, 6 SKIP theo opt-in, không FAIL |
-| Check cú pháp | PASS 74 file |
+| Test mặc định | 101 PASS, 9 SKIP theo opt-in, không FAIL |
+| Test bật Redis thật | 108 PASS, 2 SKIP dành cho SQL Server |
+| Check cú pháp | PASS 104 file |
 | Build Frontend | Đã đạt; không thêm dependency |
 | db:init và db:migrate | PASS trên database kiểm tra, có chạy migration lặp lại |
 | smoke | PASS với SQL/Redis/API/worker thật, Socket.IO hello và probe |
 | smoke:auth | PASS qua API và SQL/Redis thật, cleanup tài khoản thử hoàn tất |
 | smoke:m5 | PASS toàn luồng thật, cleanup dữ liệu thử hoàn tất |
+| smoke:m6 | Đã thêm; chờ chạy SQL Server/Redis/API/worker thật trên máy nhóm |
 | Browser đấu giá | PASS nhiều tab cùng context, trạng thái chờ, lỗi mạng/retry, người thắng và mobile |
+| AI tự động và giao diện | PASS với Gemini/SQL giả và Redis thật; chờ `smoke:ai`/SQL AI thật |
 | Browser tài khoản/media trước đó | PASS tách tab và ba ô tiền; Redis thật, SQL/Cloudinary giả |
 
 ## SQL và phục hồi đấu giá
@@ -130,9 +291,11 @@ Nhóm đã xác nhận hạ tầng healthy/probe completed, smoke tài khoản v
 Chưa có xác nhận smoke bài đăng toàn luồng sau bản sửa mới nhất; không tự coi đó là PASS Cloudinary thật.
 
 Trên Windows của nhóm: dừng các tiến trình, pull, chạy db:migrate, khởi động lại API/worker/web,
-kiểm tra readiness 20 bảng/152 cột và chạy smoke:m5 trên SQL Server 2022/Redis Compose.
+kiểm tra readiness 20 bảng/152 cột và chạy smoke:m5, smoke:m6 trên SQL Server 2022/Redis Compose.
 Chạy lại smoke:m4 để nghiệm thu media/đăng lại với Cloudinary thật.
 Đối chiếu hai tab, nhập tiền, đặt giá và xem kết quả qua giao diện.
 
-Chưa có thực nghiệm tải lớn hoặc production HTTPS. Realtime nghiệp vụ, AI và xác nhận hoàn tất giao dịch
-chưa triển khai. Claim media chưa rõ COMMIT vẫn cần đối soát thủ công; dead-letter đấu giá cũng cần đối soát riêng.
+Chưa có thực nghiệm tải lớn hoặc production HTTPS. Realtime đã triển khai, chờ smoke SQL thật cho bản mới;
+AI đã triển khai, Hải xác nhận smoke:ai PASS; đối chiếu media thật còn chờ dữ liệu. Xác nhận hai bên đã triển khai,
+chờ nghiệm thu SQL thật theo mục giao dịch ở đầu tài liệu. Claim media chưa rõ COMMIT vẫn cần đối soát thủ công;
+dead-letter đấu giá cũng cần đối soát riêng.

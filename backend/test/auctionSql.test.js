@@ -42,12 +42,17 @@ test('SQL/Redis thật: migration, tranh chấp, quyết định bền vững, k
           INSERT @p SELECT bai_dang_id FROM dbo.BaiDang WHERE nguoi_dung_id IN (${ids});
           INSERT @a SELECT phien_dau_gia_id FROM dbo.PhienDauGia WHERE bai_dang_id IN(SELECT id FROM @p);
           INSERT @b SELECT sach_id FROM dbo.BaiDang WHERE bai_dang_id IN(SELECT id FROM @p);
-          DELETE dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a));
+          DELETE dbo.BangChungKhieuNai WHERE khieu_nai_id IN(SELECT khieu_nai_id FROM dbo.KhieuNai WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a))));
+      DELETE dbo.KhieuNai WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a)));
+      DELETE dbo.TinNhan WHERE cuoc_tro_chuyen_id IN(SELECT cuoc_tro_chuyen_id FROM dbo.CuocTroChuyen WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a))));
+      DELETE dbo.CuocTroChuyen WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a)));
+      DELETE dbo.DanhGia WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a)));
+      DELETE dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a));
           DELETE dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
           DELETE dbo.YeuCauDatGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
           DELETE dbo.LuotDatGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
           DELETE dbo.LichSuDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
-          DELETE dbo.PhienDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
+          DELETE dbo.BinhLuan WHERE phien_dau_gia_id IN(SELECT id FROM @a);DELETE dbo.PhienDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a);
           DELETE dbo.BaiDang WHERE bai_dang_id IN(SELECT id FROM @p);DELETE dbo.Sach WHERE sach_id IN(SELECT id FROM @b);
           DELETE dbo.NguoiDung WHERE nguoi_dung_id IN (${ids});COMMIT TRANSACTION;`);
       }
@@ -126,6 +131,8 @@ test('SQL/Redis thật: migration, tranh chấp, quyết định bền vững, k
       const id=await fixture({price:'999999999999999991',step:'2'}),input=event(id,a,'999999999999999999');
       assert.equal((await model.processBid(input)).muc_gia,'999999999999999999');
       const snapshot=await model.publicAuction(id);assert.equal(snapshot.trang_thai,'da_ket_thuc');assert.equal(snapshot.ket_qua.muc_gia_thang,'999999999999999999');assert.equal(snapshot.ket_qua.ly_do_ket_thuc,'dat_gia_toi_thieu');assert(!('gia_toi_thieu' in snapshot));
+      assert.equal(snapshot.lich_su[0].muc_gia,snapshot.ket_qua.muc_gia_thang);
+      assert.deepEqual((await model.publicHistory(id)).items,snapshot.lich_su);
       await model.processBid(input);await Promise.all([retry(()=>model.closeExpired(id)),retry(()=>model.closeExpired(id))]);
       assert.deepEqual(await counts(id),{bids:1,decisions:1,results:1,trades:1});
       const amount=(await pool.request().input('id',sql.Int,id).query('SELECT CONVERT(VARCHAR(18),g.so_tien) AS amount FROM dbo.GiaoDich g JOIN dbo.KetQuaDauGia k ON g.ket_qua_id=k.ket_qua_id WHERE k.phien_dau_gia_id=@id')).recordset[0].amount;assert.equal(amount,'999999999999999999');

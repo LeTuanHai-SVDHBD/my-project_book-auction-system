@@ -22,6 +22,12 @@
 | `frontend/src/utils/bidAvailability.js`, `backend/test/bidAvailability.test.js` | Đếm chờ từ giờ SQL, xử lý biên thời gian và dữ liệu thiếu/sai |
 | `scripts/smokeM5.mjs` | Smoke API/worker/SQL/Redis thật và cleanup fixture riêng |
 | `docs/auction-processing.md` | Hợp đồng, lưu quyết định, kết thúc và phục hồi |
+| `backend/src/events/auctionUpdates.js` | Pub/Sub chỉ ID phiên, sau COMMIT; subscriber riêng tại API |
+| `backend/src/realtime/auctionSockets.js` | Kiểm tra quyền xem công khai, room phiên/danh mục và tín hiệu thay đổi |
+| `frontend/src/services/auctionRealtime.js` | Join/rejoin, gộp tín hiệu và đọc lại định kỳ |
+| `frontend/src/components/BidHistory.jsx`, `frontend/src/utils/auctionClock.js` | Lịch sử phân trang và đồng hồ dựa trên SQL |
+| `backend/test/auctionRealtime.test.js`, `auctionClock.test.js` | Ranh giới COMMIT, room, Pub/Sub/Streams thật theo opt-in và biên thời gian |
+| `scripts/smokeM6.mjs`, `docs/realtime.md` | Nghiệm thu và hợp đồng thời gian thực; dùng chung fixture với smokeM5 |
 
 ## Cấu trúc chung
 
@@ -38,6 +44,37 @@
 | `scripts/` | Công cụ điều phối/cài đặt/kiểm thử |
 | `docs/` | Tài liệu kỹ thuật theo chủ đề |
 | `academic/` | Hướng dẫn lưu báo cáo, slide, UML và bằng chứng được chọn |
+| `shared/bookGenres.js`, `shared/accountControl.js` | Danh mục thể loại chung và thông báo thay cửa sổ |
+
+## Quyền cửa sổ và đầu vào biểu mẫu
+
+| File/nhóm | Trách nhiệm |
+|---|---|
+| `backend/src/services/accountControl.service.js` | Login đổi owner, xóa session cũ nguyên tử; assert/release và Pub/Sub |
+| `backend/src/realtime/accountSockets.js` | Cookie/tab/control handshake, ngắt chủ cũ và heartbeat bù sự kiện |
+| `frontend/src/services/controlIdentity.js`, `accountControl.js` | Socket/HTTP nhận thu hồi phiên, xóa tài khoản và CSRF, dừng thao tác cũ |
+| `frontend/src/App.jsx` | Chuyển về màn hình đăng nhập khi session bị thu hồi |
+| `frontend/src/components/GenreSelect.jsx`, `shared/bookGenres.js` | Combobox một lựa chọn, lọc không dấu và danh mục dùng chung API |
+| `frontend/src/components/MoneyInput.jsx` | Nhập số thuần, không đổi định dạng khi focus/gõ; xem trước nhóm nghìn và xử lý composition |
+| `backend/test/accountControl.test.js` | Hai API/Redis/Socket thật opt-in; takeover, reconnect, CSRF và heartbeat |
+| `backend/test/bookGenres.test.js` | Danh mục, tìm không dấu và kiểm tra bài mới/giữ sách cũ |
+| `docs/account-control.md` | Chính sách quyền, API, khôi phục và nghiệm thu |
+
+## Giao dịch và tương tác sau phiên
+
+| File/nhóm | Trách nhiệm |
+|---|---|
+| `backend/src/services/communityPolicy.js` | Quyền hai bên, liên kết kết quả, hai xác nhận, đánh giá, giờ bình luận và đầu vào chặt |
+| `backend/src/models/community.model.js` | SQL giao dịch/chat/đã đọc, đánh giá, bình luận, khiếu nại và phân công Admin |
+| `backend/src/services/community.service.js` | Claim ảnh, COMMIT/rollback và bind bằng chứng |
+| `backend/src/controllers/community.controller.js`, `routes/community.routes.js` | Hợp đồng /api/community, phân quyền, CSRF và cursor |
+| `frontend/src/components/TransactionsPanel.jsx` | Giao dịch riêng, trace, xác nhận và đánh giá |
+| `frontend/src/components/CommunityFeed.jsx`, `CommentsPanel.jsx` | Poll/cursor, chat text, bình luận và uy tín công khai |
+| `frontend/src/components/ComplaintForm.jsx`, `ComplaintsPanel.jsx` | Upload ảnh, hồ sơ của mình, tiếp nhận/phản hồi của Admin |
+| `frontend/src/services/communityApi.js` | Client dùng cookie/tab/CSRF chung |
+| `backend/test/community*.test.js`, `helpers/communityFixture.js` | Policy, HTTP/session, media service và SQL opt-in; fixture giả phân biệt rõ |
+| `scripts/smokeM8.mjs`, `smokeAfterSales.mjs` | Nghiệm thu dịch vụ thật, dùng fixture và cleanup của smokeM5 |
+| `docs/after-sales.md` | Quy tắc, API, quyền media/chat và nghiệm thu |
 
 Cài dependency từ gốc bằng `npm.cmd ci`. Không chỉnh thủ công node_modules, frontend/dist hoặc lockfile;
 lockfile được cập nhật bằng npm khi dependency thay đổi.
@@ -69,7 +106,7 @@ Các đường dẫn bên dưới tương đối với `backend/`.
 | Schema | `migrations/001_schema.sql`, `002_cloudinary_metadata.sql`, `003_auction_decisions.sql`, `schema-manifest.json` | DDL nền, migration media/quyết định và cấu trúc dự kiến |
 | CLI | `scripts/initDatabase.js`, `migrateDatabase.js`, `createAdmin.js` | Tạo/nâng schema và tạo Admin qua terminal |
 
-`src/concurrency/`, `src/jobs/`, `src/ai/` được giữ cho chức năng tương ứng; không coi thư mục placeholder là nghiệp vụ đã có.
+`src/concurrency/`, `src/jobs/` và `src/ai/` có logic phối hợp, tác vụ và phân tích đang dùng.
 
 ## Frontend
 
@@ -117,3 +154,19 @@ Các đường dẫn bên dưới tương đối với `frontend/`.
 
 File mã nguồn viết tay có comment đầu file mô tả trách nhiệm. JSON chuẩn không chèn comment.
 Thư mục rỗng được giữ bằng `.gitkeep`; file này không chứng minh chức năng đã triển khai.
+
+## Phân tích AI
+
+| File/nhóm | Trách nhiệm |
+|---|---|
+| `backend/src/ai/criteria.js`, `scoring.js` | Tiêu chí, trọng số, quy đổi, NULL và audit hai điểm độc lập |
+| `backend/src/ai/errors.js`, `scripts/checkAi.mjs` | Phân loại lỗi an toàn, HTTP/provider/DNS/TLS và chẩn đoán mẫu không cần SQL/Redis |
+| `backend/src/ai/input.js`, `gemini.js` | Whitelist/hash đầu vào, kiểm tra media, Gemini Interactions JSON |
+| `backend/src/config/ai.js` | Cờ bật, khóa, model và giới hạn tài nguyên |
+| `backend/src/ai/queue.js`, `consumer.js`, `processor.js`, `reconcile.js` | Admission, pending/reclaim, cache, SQL receipt và bù enqueue |
+| `backend/src/models/ai.model.js` | Lưu nguyên tử, version, lịch sử và truy vấn kết quả |
+| `backend/src/services/ai.service.js`, `routes/ai.routes.js` | Quyền chủ bài/Admin, yêu cầu phân tích và trạng thái |
+| `frontend/src/components/AiPanel.jsx` | Hai điểm, bằng chứng, cảnh báo, lịch sử và nút Admin |
+| `backend/test/ai*.test.js`, `fixtures/ai-observations.json` | Bộ quy tắc, hợp đồng provider, HTTP, pipeline, Redis/SQL opt-in và mẫu đối chiếu |
+| `scripts/setupAi.mjs`, `aiScoreExample.mjs`, `smokeAi.mjs` | Cấu hình, tính mẫu không gọi AI và smoke Gemini thật |
+| `docs/ai-analysis.md` | Cấu hình, tiêu chí, công thức, quyền và nghiệm thu |

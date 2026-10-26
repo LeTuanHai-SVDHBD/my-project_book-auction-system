@@ -12,17 +12,17 @@ SQL Server giữ trạng thái nghiệp vụ có thẩm quyền; Redis hỗ tr�
 
 | Thành phần | Trách nhiệm | Kết nối |
 |---|---|---|
-| React | Tài khoản, bài đăng, kiểm duyệt, đặt lịch, đặt giá và kết quả | HTTP/JSON và upload nhị phân qua API |
+| React | Tài khoản, bài đăng, đấu giá, giao dịch, chat, phản hồi và khiếu nại | HTTP/JSON, upload và tín hiệu Socket.IO |
 | Express API | Xác thực, phân quyền, đầu vào, nghiệp vụ HTTP và Socket.IO | SQL Server, Redis, Cloudinary |
 | SQL Server | Tài khoản, sách, bài, phiên, quyết định giá, kết quả, giao dịch và lịch sử | Thư viện `mssql`, truy vấn tham số hóa |
 | Redis | Session, vé media, admission đặt giá, khóa phiên, giới hạn thử, probe và heartbeat | Redis client; Lua khi cần thao tác nguyên tử |
-| Redis Streams | Stream probe và stream nghiệp vụ đấu giá độc lập | Consumer group tại worker |
-| Worker | Đọc/xử lý probe và đấu giá; job chốt hạn | Hai kết nối BLOCK riêng; transaction SQL nghiệp vụ |
+| Redis Streams | Stream probe, đấu giá và AI độc lập | Consumer group tại worker |
+| Worker | Đọc/xử lý probe, đấu giá và AI; chốt hạn và đối soát AI | Ba kết nối BLOCK riêng; transaction SQL nghiệp vụ |
 | Cloudinary | Lưu và phân phối ảnh/video | HTTPS REST từ Backend; SQL lưu URL/public_id |
-| Socket.IO | Kiểm tra kết nối bằng `system:hello` | Cùng HTTP server; chưa có sự kiện nghiệp vụ riêng tư |
-| Gemini API | Phân tích sách dự kiến | Chưa tích hợp; Admin hiện kiểm duyệt thủ công |
+| Socket.IO | Room phiên/danh mục chỉ đọc, tín hiệu sau COMMIT và `system:hello` | Subscriber Redis riêng tại mỗi API; không phát dữ liệu riêng tư |
+| Gemini API | Quan sát sách/media theo hợp đồng JSON; không quyết định duyệt | HTTPS chỉ từ worker; Backend kiểm tra/tính điểm rồi lưu SQL |
 
-Frontend không truy cập SQL hoặc Redis trực tiếp. Bí mật Cloudinary chỉ có ở Backend.
+Frontend không truy cập SQL hoặc Redis trực tiếp. Bí mật Cloudinary/Gemini chỉ có ở Backend.
 API, worker và React chạy riêng; SQL Server và Redis chạy trong Docker theo [README](../README.md).
 
 ## Phân lớp Backend
@@ -41,7 +41,7 @@ Probe không ghi lượt giá, kết quả đấu giá hoặc giao dịch.
 Luồng đấu giá: `HTTP → Redis Streams → Consumer → Redis lock → SQL transaction → ACK`.
 Job hết hạn đọc đồng hồ SQL và xếp sự kiện chốt vào cùng stream nghiệp vụ.
 YeuCauDatGia lưu quyết định cuối; LuotDatGia chỉ lưu lượt hợp lệ.
-Cùng transaction ghi quyết định, lượt/giá/lịch sử, kết quả và giao dịch nếu phiên kết thúc.
+Cùng transaction ghi quyết định, lượt/giá/lịch sử, kết quả, giao dịch và phòng chat nếu có người thắng khi phiên kết thúc.
 SQL có 20 bảng/152 cột sau migration 003; DDL nền được giữ để nâng cấp tại chỗ.
 
 ## Xác thực theo tab
@@ -55,6 +55,9 @@ CSRF token giữ trong bộ nhớ, vai trò và tài khoản luôn đọc lại 
 F5 giữ mã tab; một tài liệu mới xoay mã kể cả khi trình duyệt sao chép storage từ tab mở nó.
 Vì vậy tab mới cần đăng nhập, đăng xuất chỉ thu hồi phiên được chọn.
 Client terminal không gửi mã tab tiếp tục dùng hợp đồng cookie chung cho smoke và tích hợp HTTP.
+Mỗi tài khoản chỉ có một phiên đăng nhập trong Redis: login bằng mật khẩu đổi owner và xóa session cũ nguyên tử.
+HTTP riêng, kể cả me, kiểm tra session hiện tại; namespace /account ngắt phiên bị thu hồi qua Pub/Sub và heartbeat.
+Tab cũ tự về đăng nhập, F5 không claim hoặc hồi sinh phiên. Khác tài khoản vẫn độc lập; xem [account-control.md](account-control.md).
 Đây là cách phân tách thao tác theo tab, không phải ranh giới an toàn giữa các trang cùng origin.
 
 ## Nhất quán dữ liệu
@@ -74,14 +77,29 @@ claim chưa rõ commit được giữ để đối soát thủ công. Không có
 
 ## Cập nhật thời gian thực và phục hồi
 
-Socket.IO mới cung cấp lời chào hạ tầng; giao diện đọc trạng thái bài/phiên qua HTTP.
 Worker đặt giá và tác vụ hết hạn dùng cùng khóa phiên và transaction/rowversion SQL.
-Pending được nhận lại bằng XAUTOCLAIM; ACK chỉ sau COMMIT. Quyết định SQL giúp phục hồi khi crash trước ACK.
-Giao diện poll yêu cầu đang chờ, còn giá/trạng thái giữa các tab lấy lại bằng nút tải lại.
-Realtime sau này chỉ phát thông báo sau COMMIT và kiểm tra quyền trước khi vào room riêng tư.
-Kênh worker → API cùng cơ chế phát lại sau sự cố chưa được triển khai; xem ADR-009.
+Sau COMMIT, processor publish tín hiệu ID phiên qua Redis Pub/Sub; API chuyển vào room công khai đã kiểm tra quyền xem.
+Publish lỗi giữ thông điệp pending; XAUTOCLAIM xử lý lại và đọc quyết định đã lưu trước khi phát lại/ACK.
+Không gửi ngưỡng, giá hoặc quyết định riêng trong tín hiệu Socket. Giao diện lấy snapshot SQL sau thông báo,
+sau khi đăng ký lại room và mỗi 5 giây để bù sự kiện lỡ. Snapshot chứa lịch sử mới nhất cùng giá/kết quả.
+Quyết định của người đặt vẫn được đọc qua HTTP có xác thực; namespace công khai không chứa session.
+Namespace /account dùng cookie xác thực riêng, không nhận lệnh đặt giá hoặc phát nội dung giao dịch.
+Không có outbox hoặc cam kết giao mọi thông báo; phục hồi trạng thái hiện tại bằng SQL. Xem [realtime.md](realtime.md) và ADR-009.
 
-## Phạm vi phát triển tiếp theo
+## Phân tích sách
 
-Realtime nghiệp vụ, AI, xác nhận hoàn tất giao dịch, trò chuyện, bình luận, đánh giá và khiếu nại
-được theo dõi theo chức năng trong [tasks.md](tasks.md). Thiết kế tương lai được phân biệt với mã đã có tại [flows.md](flows.md).
+Sau khi đăng/gửi duyệt lại COMMIT, API xếp job AI riêng. Worker gửi thông tin sách đã lọc và media đủ điều kiện,
+kiểm tra JSON, áp dụng bộ điểm cố định, rồi lưu PhanTichAI/ChiTietPhanTichAI nguyên tử.
+Tác vụ đối soát tìm bài pending chưa có lần phân tích của phiên bản hiện tại, bù lỗi enqueue.
+Không gọi Gemini trong SQL transaction; không sửa trạng thái bài/phiên khi lưu AI.
+Chi tiết quy tắc, phục hồi và giới hạn tại [ai-analysis.md](ai-analysis.md).
+
+## Giao dịch và tương tác sau phiên
+
+HTTP riêng kiểm tra chuỗi kết quả/người thắng/chủ bài trước khi cho hai bên đọc hoặc ghi giao dịch/chat.
+Các thao tác ghi khóa GiaoDich trong SERIALIZABLE; đủ hai xác nhận mới hoàn tất, UNIQUE giới hạn một phòng và một đánh giá.
+Khiếu nại kiểm tra cả giao dịch, người gửi và phòng; Admin được phân công chỉ đọc chat khi hồ sơ đang xử lý.
+Bình luận khóa dòng phiên rồi kiểm tra cửa sổ thời gian bằng SQL. Không phát chat/hồ sơ vào Socket công khai.
+Trang mới nhất tự đọc HTTP mỗi ba giây, lịch sử dùng cursor; không có receipt cho mọi POST hoặc cam kết giao đúng một lần.
+Bằng chứng ảnh dùng vé media hiện có; API hạn chế truy cập hồ sơ nhưng delivery Cloudinary chưa phải CDN riêng tư.
+Chi tiết tại [after-sales.md](after-sales.md); phần chờ nghiệm thu/thực nghiệm tại [tasks.md](tasks.md).

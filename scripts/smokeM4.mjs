@@ -99,7 +99,7 @@ finally {
         ids.forEach((value,index)=>req.input(`u${index}`,sql.Int,value));
         const params=ids.map((_,index)=>`@u${index}`).join(',');
         const result=await req.query(`DECLARE @posts TABLE(id INT); DECLARE @auctions TABLE(id INT); DECLARE @books TABLE(id INT);
-          INSERT @posts SELECT bai_dang_id FROM dbo.BaiDang WHERE nguoi_dung_id IN (${params});
+          INSERT @posts SELECT bai_dang_id FROM dbo.BaiDang WITH (UPDLOCK,HOLDLOCK) WHERE nguoi_dung_id IN (${params});
           INSERT @auctions SELECT phien_dau_gia_id FROM dbo.PhienDauGia WHERE bai_dang_id IN(SELECT id FROM @posts);
           INSERT @books SELECT DISTINCT sach_id FROM dbo.BaiDang WHERE bai_dang_id IN(SELECT id FROM @posts);
           SELECT 'image' AS kind,cloudinary_public_id AS publicId FROM dbo.HinhAnh WHERE bai_dang_id IN(SELECT id FROM @posts) AND cloudinary_public_id IS NOT NULL
@@ -109,11 +109,16 @@ finally {
           DELETE dbo.KiemDuyet WHERE bai_dang_id IN(SELECT id FROM @posts);
           DELETE dbo.HinhAnh WHERE bai_dang_id IN(SELECT id FROM @posts); DELETE dbo.Video WHERE bai_dang_id IN(SELECT id FROM @posts);
           DELETE dbo.LichSuDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
-          DELETE dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions));
+          DELETE dbo.BangChungKhieuNai WHERE khieu_nai_id IN(SELECT khieu_nai_id FROM dbo.KhieuNai WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions))));
+      DELETE dbo.KhieuNai WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions)));
+      DELETE dbo.TinNhan WHERE cuoc_tro_chuyen_id IN(SELECT cuoc_tro_chuyen_id FROM dbo.CuocTroChuyen WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions))));
+      DELETE dbo.CuocTroChuyen WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions)));
+      DELETE dbo.DanhGia WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions)));
+      DELETE dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions));
           DELETE dbo.YeuCauDatGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
           DELETE dbo.LuotDatGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
           DELETE dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
-          DELETE dbo.PhienDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
+          DELETE dbo.BinhLuan WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);DELETE dbo.PhienDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @auctions);
           DELETE dbo.BaiDang WHERE bai_dang_id IN(SELECT id FROM @posts);
           DELETE dbo.Sach WHERE sach_id IN(SELECT id FROM @books) AND NOT EXISTS(SELECT 1 FROM dbo.BaiDang b WHERE b.sach_id=dbo.Sach.sach_id);
           DELETE dbo.NguoiDung WHERE nguoi_dung_id IN(${params});`);

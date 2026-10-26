@@ -17,6 +17,7 @@ export function requireUser(users) {
     if (!Number.isInteger(req.session?.userId)) throw new HttpError(401, 'UNAUTHENTICATED', 'Vui lòng đăng nhập.');
     const user = await users.findById(req.session.userId);
     if (!user) throw new HttpError(401, 'UNAUTHENTICATED', 'Tài khoản không còn tồn tại.');
+    if(req.accountControl)await req.accountControl.assert(req);
     req.user = publicUser(user); next();
   };
 }

@@ -70,15 +70,18 @@ Thêm dependency hoặc thay kiến trúc cần được thống nhất trước
 
 ## ADR-009 — Phát thông báo sau COMMIT
 
-**Trạng thái:** nguyên tắc đã chốt; cơ chế phục hồi chưa triển khai.
+**Trạng thái:** áp dụng cho cập nhật trực tiếp.
 
-API và worker là tiến trình riêng. Cần chọn kênh chuyển thông báo, cơ chế phát lại sau COMMIT
-và loại trùng trước khi triển khai realtime nghiệp vụ. Transactional outbox là lựa chọn cần đánh giá,
-chưa phải thành phần đã có. Socket.IO hiện chỉ phát lời chào hạ tầng công khai.
+API và worker là tiến trình riêng; Redis Pub/Sub chuyển tín hiệu ID phiên sau COMMIT tới các API.
+Processor phát lỗi thì giữ pending để đọc quyết định SQL và phát lại trước ACK; tín hiệu trùng chỉ gây đọc lại.
+Socket chỉ có room phiên/danh mục công khai được server kiểm tra, không thay cơ chế xác thực HTTP theo tab.
+Client lấy lại snapshot sau join/reconnect và mỗi 5 giây để bù thông báo lỡ, kể cả Pub/Sub lỡ khi không có subscriber.
+Chọn phục hồi trạng thái hiện tại từ SQL; không cam kết giao mọi sự kiện, không bổ sung outbox/bảng hoặc Redis Adapter.
+Chi tiết quyền, đồng hồ và giới hạn tại [realtime.md](realtime.md).
 
 ## ADR-010 — Session Redis và phân tách theo tab
 
-**Trạng thái:** áp dụng theo chính sách phiên riêng từng tab.
+**Trạng thái:** cookie riêng theo tab tiếp tục áp dụng; cùng tài khoản chỉ một cửa sổ điều khiển theo ADR-019.
 
 - Argon2id lưu hash tại NguoiDung; API đăng ký công khai chỉ tạo người dùng thường.
 - `express-session`/RedisStore lưu session; API thật không chuyển sang MemoryStore khi Redis lỗi.
@@ -148,7 +151,7 @@ Tham khảo: [Cloudinary Upload API](https://cloudinary.com/documentation/image_
 
 ## ADR-013 — Vòng đời bài đăng và kiểm duyệt
 
-**Trạng thái:** áp dụng; tích hợp AI chưa triển khai.
+**Trạng thái:** áp dụng; AI hỗ trợ theo ADR-017.
 
 Tạo sách/bài/phiên/media/lịch sử trong transaction SERIALIZABLE; cặp pending và chưa có lịch.
 UUID ánh xạ `BK` + 32 ký tự hex thành mã sản phẩm UNIQUE; cùng mã trả bài đã tạo của đúng chủ,
@@ -162,7 +165,7 @@ Kích hoạt chỉ cập nhật đúng phiên đã duyệt của chủ sách, l�
 Đăng lại khóa Sach, kiểm tra phiên cuối đã kết thúc và kết quả rõ không người thắng; tạo bài/phiên mới cùng Sach,
 không ghi đè lần trước. Thiếu kết quả không đủ điều kiện đăng lại.
 Public projection không có ngưỡng giá, owner/email, version hoặc nhận xét nội bộ.
-Chưa gọi Gemini thì trả `ai: null`, không tạo điểm/kết quả lỗi giả; kiểm duyệt thủ công vẫn hoạt động.
+Chưa có lần gọi Gemini thì trả `ai: null`, không tạo điểm/kết quả lỗi giả; kiểm duyệt thủ công vẫn hoạt động.
 
 ## ADR-014 — Hợp đồng phiên bản dữ liệu
 
@@ -179,9 +182,10 @@ Tham khảo: [Microsoft rowversion](https://learn.microsoft.com/en-us/sql/t-sql/
 
 **Trạng thái:** áp dụng.
 
-Ba ô giá khởi điểm/ngưỡng kết thúc sớm/bước giá chỉ hiển thị chữ số và dấu chấm nhóm nghìn.
+Ba ô giá khởi điểm/ngưỡng kết thúc sớm/bước giá nhập số thuần; dòng Giá trị bên dưới hiển thị nhóm nghìn.
+Không đổi định dạng trong ô khi gõ/focus/blur để tránh can thiệp IME hoặc làm lặp chữ số.
 Input hiển thị tách khỏi hidden input mang chuỗi nguyên gửi API. Không chuyển tiền sang Number,
-không làm tròn và không âm thầm cắt bớt khi vượt 18 chữ số. Chỉnh sửa/xóa ở giữa chuỗi giữ con trỏ theo chữ số.
+không làm tròn và không âm thầm cắt bớt khi vượt 18 chữ số. Chỉnh sửa/xóa chuỗi số dùng hành vi bàn phím thông thường; chỉ hiệu chỉnh khi lọc ký tự không phải số.
 Giá hiện tại thuộc nghiệp vụ đặt giá, không cho chủ sách tự nhập.
 Backend tiếp tục kiểm tra chuỗi nguyên dương, ngưỡng không nhỏ hơn giá khởi điểm và các ràng buộc SQL.
 
@@ -209,5 +213,60 @@ Không tự cắt stream theo MAXLEN để tránh xóa mất pending. Dead-lette
 
 Job mỗi giây tìm tối đa 50 phiên hết hạn theo SQL và xếp yêu cầu chốt, chống xếp lặp trong 10 giây.
 Kết thúc có hai lý do đã chốt, lưu tại KetQuaDauGia.ly_do_ket_thuc; chỉ tạo GiaoDich khi có người thắng.
-Giao diện poll quyết định của mình, tải lại snapshot phiên khi cần; realtime nghiệp vụ chưa triển khai.
+Giao diện poll quyết định của mình; snapshot công khai đồng bộ qua tín hiệu Socket và HTTP theo ADR-009.
 Chi tiết: [Xử lý đấu giá](auction-processing.md).
+
+## ADR-017 — AI quan sát, Backend tính điểm, Admin quyết định
+
+**Trạng thái:** áp dụng; Hải xác nhận smoke:ai PASS; đối chiếu ảnh/video thật còn chờ dữ liệu.
+
+Theo báo cáo tuần 7 và yêu cầu hiện tại, độ hiếm gồm bốn nhóm 25%; tình trạng gồm 20/25/30/15/10%.
+Giữ hai tổng độc lập; thiếu tiêu chí áp dụng giữ NULL, không áp dụng có căn cứ mới loại trọng số.
+Gemini chỉ trả quan sát có cấu trúc; Backend giữ bảng quy đổi/trọng số, không dùng điểm do mô hình tự chọn.
+Ảnh không thấy không chứng minh bộ phận bị mất; chữ ký quan sát được không có nghĩa chữ ký thật.
+Không dùng điểm cao hoặc sự cố AI để tự duyệt/từ chối bài.
+
+Hàng đợi AI và kết nối BLOCK riêng không chặn vòng đặt giá/chốt hạn. Đối soát SQL bù enqueue bị mất;
+lưu kết quả và chi tiết trong transaction kiểm tra lại version/pending. Receipt request trong metadata
+chống ghi trùng, cache kết quả đã kiểm tra hạn chế gọi lại Gemini khi SQL lỗi. Không cam kết gọi provider đúng một lần:
+crash trước cache có thể tốn thêm lượt gọi. Không thêm bảng/cột hoặc dependency.
+Metadata có phiên bản quy tắc, hash đầu vào, model, nguồn và cảnh báo; lịch sử cũ được giữ.
+Xem [Phân tích AI](ai-analysis.md) để tra công thức, hợp đồng, cấu hình và giới hạn media.
+
+## ADR-018 — Giao dịch hai xác nhận và quyền chat theo hồ sơ
+
+**Trạng thái:** áp dụng; chờ SQL Server/Cloudinary thật và smoke:m8.
+
+Dùng các bảng sẵn có, không thêm schema/dependency. Kết quả có người thắng tạo GiaoDich và CuocTroChuyen
+cùng transaction; hai bên được suy từ kết quả/chủ bài, số tiền giữ nguyên chuỗi DECIMAL(18,0).
+Khóa giao dịch trong SERIALIZABLE khi xác nhận, tạo phòng, gửi tin, đánh giá hoặc xử lý khiếu nại.
+Mỗi bên chỉ ghi dấu xác nhận của mình; đủ hai dấu mới hoàn tất. UNIQUE giữ một phòng/một đánh giá.
+Chỉ người mua hoàn tất được đánh giá; cùng nội dung trả bản cũ, không cho ghi đè lịch sử.
+
+Chat riêng chỉ có hai bên. Admin xem hồ sơ/bằng chứng để tiếp nhận; chỉ người được phân công và đang xử lý
+mới đọc chat liên quan, không gửi tin hoặc đánh dấu đọc. Sau xử lý không tiếp tục quyền đọc chat qua hồ sơ.
+Khiếu nại không tự đổi giao dịch/kết quả. Ảnh dùng vé upload của người gửi; bind lỗi sau COMMIT không đảo kết quả.
+URL delivery Cloudinary hiện tại chưa có bảo vệ riêng tại CDN; quyền API không đồng nghĩa ảnh chỉ truy cập bằng session.
+
+Không mở room Socket riêng; trang mới nhất poll HTTP ba giây, lịch sử cursor không tự thay trang.
+POST tin/bình luận/hồ sơ không có receipt UUID, không tự retry khi mất phản hồi; đọc lại trước khi gửi.
+Chỉ retry deadlock 1205 đã rollback tối đa một lần. Bình luận khóa phiên và kiểm tra giờ SQL trước INSERT.
+Xem [Giao dịch và tương tác sau đấu giá](after-sales.md).
+
+## ADR-019 — Chủ mới điều khiển tài khoản và đầu vào thể loại có danh mục
+
+**Trạng thái:** áp dụng theo yêu cầu ngày 25/10/2026; không đổi schema hoặc dependency.
+
+Cùng tài khoản chỉ một phiên đăng nhập. Theo yêu cầu xác nhận lại, chỉ login bằng mật khẩu mới đổi owner,
+xóa session cũ và publish trong Lua; owner theo session ID giữ ổn định khi F5. GET me/control-status và POST control
+chỉ kiểm tra, không được khôi phục quyền từ cookie cũ. Namespace /account ngắt phiên cũ; giao diện xóa user/CSRF,
+trở về đăng nhập. Không còn lớp phủ yêu cầu F5 để tiếp tục. Khác tài khoản vẫn độc lập.
+Hợp đồng và giới hạn tại [account-control.md](account-control.md).
+
+Ô tiền luôn nhập số thuần, kể cả khi focus hoặc rời ô; định dạng có dấu chấm chỉ hiện ở dòng Giá trị riêng.
+Không ghi DOM value hoặc đổi mask trong khi gõ. Trong composition giữ draft, chốt và kiểm tra số sau compositionend;
+giữ chuỗi nguyên/18 chữ số, không chuyển Number hoặc tự cắt phần vượt giới hạn.
+
+Thể loại là một lựa chọn từ danh mục dùng chung ở shared/bookGenres.js, căn cứ tài liệu thể loại người dùng gửi,
+bổ sung nhóm sách cổ/tư liệu. Gõ có/không dấu chỉ lọc danh sách; API sách mới chặn tên ngoài danh mục.
+Giữ tùy chọn để trống và dữ liệu sách cũ, không migration hoặc tự ánh xạ lại lịch sử.

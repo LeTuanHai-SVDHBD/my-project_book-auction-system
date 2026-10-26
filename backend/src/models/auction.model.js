@@ -63,6 +63,14 @@ export function createAuctionModel({getPool,sql}) {
       FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id=@id`);
     return result.recordset[0]||null;
   }
+  async function bidHistory(tx,auctionId,before=null) {
+    const result=await request(tx).input('id',sql.Int,auctionId).input('before',sql.Int,before).query(`SELECT TOP(51)
+      luot_dat_gia_id,nguoi_dung_id,CONVERT(VARCHAR(18),muc_gia) AS muc_gia,thoi_gian_dat
+      FROM dbo.LuotDatGia WHERE phien_dau_gia_id=@id AND (@before IS NULL OR luot_dat_gia_id<@before)
+      ORDER BY luot_dat_gia_id DESC`);
+    const items=result.recordset.slice(0,50);
+    return {items,nextBefore:result.recordset.length>50?items.at(-1).luot_dat_gia_id:null};
+  }
   function versionRequest(tx,auction) {
     return request(tx).input('id',sql.Int,auction.phien_dau_gia_id)
       .input('version',sql.Binary(8),Buffer.from(encodeRowVersion(auction.row_version),'hex'));
@@ -88,8 +96,9 @@ export function createAuctionModel({getPool,sql}) {
     if(outcome.nguoi_thang_dau_id!==null) {
       await request(tx).input('code',sql.VarChar(40),'GD'+randomUUID().replaceAll('-','')).input('result',sql.Int,saved.recordset[0].ket_qua_id)
         .input('buyer',sql.Int,outcome.nguoi_thang_dau_id).input('seller',sql.Int,auction.nguoi_ban_id).input('amount',sql.VarChar(18),outcome.muc_gia_thang)
-        .query(`INSERT dbo.GiaoDich(ma_giao_dich,ket_qua_id,nguoi_mua_id,nguoi_ban_id,so_tien)
-          VALUES(@code,@result,@buyer,@seller,CAST(@amount AS DECIMAL(18,0)))`);
+        .query(`DECLARE @created TABLE(id INT);INSERT dbo.GiaoDich(ma_giao_dich,ket_qua_id,nguoi_mua_id,nguoi_ban_id,so_tien)
+          OUTPUT inserted.giao_dich_id INTO @created VALUES(@code,@result,@buyer,@seller,CAST(@amount AS DECIMAL(18,0)));
+          INSERT dbo.CuocTroChuyen(giao_dich_id,nguoi_mua_id,nguoi_ban_id) SELECT id,@buyer,@seller FROM @created`);
     }
     await history(tx,auction.phien_dau_gia_id,null,`Kết thúc phiên: ${reason}`,outcome.muc_gia_thang);
     return {...outcome,ket_qua_id:saved.recordset[0].ket_qua_id};
@@ -105,6 +114,14 @@ export function createAuctionModel({getPool,sql}) {
   }
   return {
     findRequest,
+    async publicHistory(auctionId,before=null) {
+      return transaction(async tx=>{
+        const result=await request(tx).input('id',sql.Int,auctionId).query(`SELECT p.phien_dau_gia_id
+          FROM dbo.PhienDauGia p JOIN dbo.BaiDang b ON b.bai_dang_id=p.bai_dang_id
+          WHERE p.phien_dau_gia_id=@id AND b.trang_thai='da_duyet' AND p.trang_thai IN ('da_kich_hoat','da_ket_thuc')`);
+        return result.recordset.length?bidHistory(tx,auctionId,before):null;
+      });
+    },
     async bidStatus(auctionId,userId) {
       const result=await request(await getPool()).input('id',sql.Int,auctionId).input('user',sql.Int,userId)
         .query(`SELECT CAST(CASE WHEN b.nguoi_dung_id=@user THEN 1 ELSE 0 END AS BIT) AS la_chu_sach,
@@ -126,7 +143,8 @@ export function createAuctionModel({getPool,sql}) {
         WHERE p.phien_dau_gia_id=@id AND b.trang_thai='da_duyet' AND p.trang_thai IN ('da_kich_hoat','da_ket_thuc')`);
       const row=result.recordset[0];if(!row)return null;
       const outcome=await resultFor(tx,auctionId);
-      return {...row,ket_qua:outcome};
+      const page=await bidHistory(tx,auctionId);
+      return {...row,ket_qua:outcome,lich_su:page.items,lich_su_truoc:page.nextBefore};
       });
     },
     async expired(limit=50) {

@@ -1,0 +1,16 @@
+/** Khiếu nại với vé ảnh của chính người gửi; tệp chưa dùng được dọn, claim chưa rõ COMMIT được Backend bảo vệ. */
+import {useEffect,useRef,useState} from 'react';
+import {postApi} from '../services/postApi.js';
+import {communityPost} from '../services/communityApi.js';
+export default function ComplaintForm({tradeId,onSaved,onCancel}){
+  const [media,setMedia]=useState([]),[config,setConfig]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');const tickets=useRef([]),saved=useRef(false);
+  useEffect(()=>{let active=true;postApi.config().then(value=>{if(active)setConfig(value);}).catch(failure=>{if(active)setError(failure.message);});return()=>{active=false;if(!saved.current)for(const row of tickets.current)void postApi.discard(row.upload_id).catch(()=>{});};},[]);
+  async function upload(event){const files=[...event.target.files];event.target.value='';setBusy(true);setError('');try{if(tickets.current.length+files.length>5)throw Error('Tối đa 5 ảnh bằng chứng.');for(const file of files){if(!config.imageTypes.includes(file.type)||file.size>config.imageMaxBytes)throw Error('Ảnh cần đúng định dạng/kích thước được hỗ trợ.');const row={...await postApi.upload(file),tieu_de:file.name.slice(0,500)};tickets.current.push(row);setMedia([...tickets.current]);}}catch(failure){setError(failure.message);}finally{setBusy(false);}}
+  async function remove(row){setBusy(true);try{await postApi.discard(row.upload_id);tickets.current=tickets.current.filter(x=>x.upload_id!==row.upload_id);setMedia([...tickets.current]);}catch(failure){setError(failure.message);}finally{setBusy(false);}}
+  async function submit(event){event.preventDefault();setBusy(true);setError('');const data=new FormData(event.currentTarget);try{const result=await communityPost(`/trades/${tradeId}/complaints`,{ly_do:data.get('ly_do'),noi_dung:data.get('noi_dung'),media:media.map(({upload_id,tieu_de})=>({upload_id,tieu_de}))});saved.current=true;onSaved(result.khieu_nai_id);}catch(failure){setError(failure.message+' Kiểm tra danh sách khiếu nại trước khi gửi lại nếu mất phản hồi.');}finally{setBusy(false);}}
+  return <form onSubmit={submit} className="complaint-form"><fieldset disabled={busy}><h3>Gửi khiếu nại</h3><label>Lý do khiếu nại<input name="ly_do" maxLength={300} required/></label><label>Nội dung khiếu nại<textarea name="noi_dung" maxLength={12000} rows={5} required/></label>
+    <label>Ảnh bằng chứng (tối đa 5)<input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={upload} disabled={!config?.configured||busy}/></label>
+    {config&&!config.configured&&<p className="notice">Tải ảnh chưa sẵn sàng. Bạn vẫn có thể gửi nội dung khiếu nại.</p>}
+    <div className="media-grid">{media.map(row=><figure key={row.upload_id}><img src={row.url} alt={row.tieu_de}/><figcaption>{row.tieu_de}</figcaption><button type="button" onClick={()=>remove(row)}>Bỏ ảnh</button></figure>)}</div>
+    <div className="actions"><button className="primary">{busy?'Đang gửi…':'Gửi khiếu nại'}</button><button type="button" onClick={onCancel}>Đóng biểu mẫu</button></div></fieldset>{error&&<p className="error" role="alert">{error}</p>}</form>;
+}

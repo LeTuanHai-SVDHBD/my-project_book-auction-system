@@ -1,5 +1,6 @@
 /** SQL bài đăng/phiên: khóa cặp trạng thái và sách vật lý, tiền được truyền/đọc bằng chuỗi. */
 import { HttpError } from '../middlewares/errorHandler.js';
+import {analysisView} from '../ai/input.js';
 import {withRowVersion} from '../utils/rowVersion.js';
 import {assertVersion,assertStatePair,assertRelistable} from '../services/postPolicy.js';
 const conflict = message => { throw new HttpError(409,'POST_CONFLICT',message); };
@@ -63,7 +64,7 @@ export function createPostModel({ getPool, sql }) {
   return {
     findRequest,
     async isMediaReferenced(publicId) {
-      const result=await request(await getPool()).input('publicId',sql.VarChar(255),publicId).query('SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.HinhAnh WHERE cloudinary_public_id=@publicId) OR EXISTS(SELECT 1 FROM dbo.Video WHERE cloudinary_public_id=@publicId) THEN 1 ELSE 0 END AS used');
+      const result=await request(await getPool()).input('publicId',sql.VarChar(255),publicId).query('SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.HinhAnh WHERE cloudinary_public_id=@publicId) OR EXISTS(SELECT 1 FROM dbo.Video WHERE cloudinary_public_id=@publicId) OR EXISTS(SELECT 1 FROM dbo.BangChungKhieuNai WHERE CHARINDEX(@publicId,duong_dan_anh_khieu_nai)>0) THEN 1 ELSE 0 END AS used');
       return result.recordset[0].used===1;
     },
     async list({owner=null,pending=false,publicOnly=false,after=2147483647}) {
@@ -83,6 +84,7 @@ export function createPostModel({ getPool, sql }) {
       row.kiem_duyet=(await request(pool).input('id',sql.Int,postId).query('SELECT kiem_duyet_id,ket_qua,phan_hoi_admin,ngay_kiem_duyet FROM dbo.KiemDuyet WHERE bai_dang_id=@id ORDER BY kiem_duyet_id DESC')).recordset;
       row.ai=(await request(pool).input('id',sql.Int,postId).query('SELECT TOP(1) phan_tich_id,diem_do_hiem,diem_tinh_trang,trang_thai,ngay_phan_tich FROM dbo.PhanTichAI WHERE bai_dang_id=@id ORDER BY phan_tich_id DESC')).recordset[0]||null;
       if (row.ai) row.ai.chi_tiet=(await request(pool).input('id',sql.Int,row.ai.phan_tich_id).query('SELECT tieu_chi,diem,bang_chung,do_tin_cay,canh_bao,nhom_tieu_chi,trang_thai_danh_gia,trong_so,nguon_doi_chieu FROM dbo.ChiTietPhanTichAI WHERE phan_tich_id=@id ORDER BY chi_tiet_id')).recordset;
+      row.ai=analysisView(row.ai,row);
       row.co_the_dang_lai=(await request(pool).input('id',sql.Int,postId).query(`SELECT CASE WHEN p.trang_thai='da_ket_thuc' AND k.trang_thai='khong_co_nguoi_thang' AND k.nguoi_thang_dau_id IS NULL
         AND NOT EXISTS(SELECT 1 FROM dbo.BaiDang newer WHERE newer.sach_id=b.sach_id AND newer.bai_dang_id>b.bai_dang_id) THEN 1 ELSE 0 END AS allowed
         FROM dbo.BaiDang b JOIN dbo.PhienDauGia p ON p.bai_dang_id=b.bai_dang_id LEFT JOIN dbo.KetQuaDauGia k ON k.phien_dau_gia_id=p.phien_dau_gia_id WHERE b.bai_dang_id=@id`)).recordset[0].allowed===1;
@@ -161,7 +163,7 @@ export function createPostModel({ getPool, sql }) {
           .query("UPDATE dbo.PhienDauGia SET thoi_gian_bat_dau=@start,thoi_gian_ket_thuc=@end,trang_thai='da_kich_hoat' OUTPUT INSERTED.phien_dau_gia_id WHERE phien_dau_gia_id=@id AND @start>SYSUTCDATETIME() AND @end>@start");
         if (!result.recordset.length) conflict('Giờ bắt đầu phải ở tương lai theo đồng hồ SQL Server; kết thúc phải sau bắt đầu.');
         await history(tx,row.phien_dau_gia_id,owner,'Chủ sách đặt lịch và kích hoạt phiên đã được kiểm duyệt');
-        return {id:postId};
+        return {id:postId,auctionId:row.phien_dau_gia_id};
       });
     },
   };

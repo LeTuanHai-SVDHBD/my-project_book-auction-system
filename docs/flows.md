@@ -8,8 +8,8 @@
 2. `GET /api/auth/csrf` tạo session ẩn danh và CSRF token gắn với session Redis.
 3. Đăng ký kiểm tra dữ liệu, CSRF và giới hạn thử, băm Argon2id rồi ghi NguoiDung.
 4. API công khai chỉ tạo `nguoi_dung`; UNIQUE email bảo vệ yêu cầu đăng ký đồng thời.
-5. Đăng nhập kiểm tra SQL/hash, đổi session ID và CSRF; lưu Redis trước khi trả thành công.
-6. Yêu cầu bảo vệ đọc lại tài khoản/vai trò từ SQL. Không tin mã người dùng do client khai báo.
+5. Đăng nhập kiểm tra SQL/hash, đổi session ID và CSRF; lưu session, đổi owner và xóa session cũ ở Redis trước khi trả thành công.
+6. Yêu cầu bảo vệ đọc lại tài khoản/vai trò từ SQL và kiểm tra chủ điều khiển Redis. Không tin mã người dùng do client khai báo.
 7. Đăng xuất hủy session được chọn và xóa đúng cookie của tab; không thu hồi tab khác.
 
 F5 giữ phiên tab; tài liệu mới tạo mã tab mới để không kế thừa tài khoản từ storage sao chép.
@@ -21,7 +21,7 @@ Client HTTP không gửi `X-Tab-ID` dùng cookie chung độc lập với các c
 1. Sau xác thực/quyền/CSRF, API kiểm tra MIME, magic bytes và kích thước của từng tệp.
 2. Tạo vé Redis trước khi gọi Cloudinary để theo dõi cả upload bị ngắt.
 3. Cloudinary trả URL/public_id; API trả vé UUID và URL xem trước cho đúng chủ sách.
-4. React gửi nội dung sách/bài/giá cùng vé; các ô tiền hiển thị dấu chấm nhưng gửi chuỗi nguyên.
+4. React gửi nội dung sách/bài/giá cùng vé; các ô tiền nhập số thuần, dòng xem trước nhóm nghìn; API nhận chuỗi nguyên.
 5. Service claim tất cả vé nguyên tử, xác nhận owner/trạng thái/tuổi vé; không tin URL do client khai báo.
 6. Transaction SQL tạo Sach, BaiDang, PhienDauGia pending, media và lịch sử; chưa có lịch đấu giá.
 7. Sau COMMIT, acknowledgement dọn vé. Cùng UUID yêu cầu trả lại bài đã tạo, không tạo trùng.
@@ -44,8 +44,8 @@ Model lấy khóa rồi đối chiếu rowversion. SQL xuất BINARY(8), utility
 HTTP 409 yêu cầu client đọc lại dữ liệu. Không cấp version mặc định khi thiếu.
 
 Admin ghi căn cứ quý hiếm và nguồn đối chiếu. Tình trạng vật lý tốt không thay điều kiện quý hiếm;
-thiếu bằng chứng phải được ghi rõ. Chưa tích hợp AI thì kiểm tra thủ công, không sinh phân tích giả.
-Kết quả AI đã có chỉ để tham khảo, không tự phê duyệt/từ chối.
+thiếu bằng chứng phải được ghi rõ. Worker AI phân tích riêng sau COMMIT khi đã bật; khi tắt hoặc lỗi, Admin tiếp tục kiểm tra thủ công.
+Kết quả AI chỉ để tham khảo, không tự phê duyệt/từ chối. Hợp đồng và quy tắc tại [ai-analysis.md](ai-analysis.md).
 
 ## Đăng lại
 
@@ -69,6 +69,8 @@ hoặc đã có người thắng không được đăng lại, kể cả giao d�
 | POST | `/api/auth/login` | CSRF; email, mật khẩu; đổi session/CSRF |
 | POST | `/api/auth/logout` | CSRF; hủy session được chọn |
 | GET | `/api/auth/me` | Tài khoản hợp lệ |
+| POST | `/api/auth/control` | Cookie/owner hợp lệ + CSRF, body rỗng; chỉ kiểm tra, không claim |
+| GET | `/api/auth/control-status` | Tài khoản hợp lệ và đúng chủ; không tự claim |
 | GET | `/api/auth/admin-check` | Admin hợp lệ |
 
 ### Bài đăng và media
@@ -102,9 +104,14 @@ Header chọn tab phải có 32 ký tự hex viết thường; header này khôn
 
 ## Probe hạ tầng
 
+Phiên tài khoản: chỉ login bằng mật khẩu mới đổi owner và thu hồi session cũ. HTTP/Socket chỉ kiểm tra phiên;
+GET me, control-status và POST control không khôi phục phiên cũ. Tab bị thu hồi tự về đăng nhập, F5 không đổi owner.
+Chi tiết tại [account-control.md](account-control.md).
+
 `React → API → Redis Streams → Worker → SQL SELECT → Redis result → React`.
 API trả 202 queued; worker chỉ xác nhận completed sau truy vấn kiểm tra thành công.
-Kết quả probe được lấy qua HTTP; Socket.IO chỉ gửi lời chào kết nối.
+Kết quả probe được lấy qua HTTP; kênh hạ tầng Socket.IO vẫn gửi `system:hello`.
+Namespace `/auctions` cập nhật nghiệp vụ theo [realtime.md](realtime.md).
 Endpoint development cần `DEV_PROBE_TOKEN`, không dùng khóa này thay tài khoản.
 
 ## Đặt giá và kết thúc phiên
@@ -115,6 +122,7 @@ Các endpoint đã triển khai:
 | Phương thức | Endpoint | Điều kiện |
 |---|---|---|
 | GET | `/api/auctions/:id` | Công khai, chỉ phiên đã công bố; không có ngưỡng giá ẩn |
+| GET | `/api/auctions/:id/history` | Lượt hợp lệ công khai, 50 lượt/trang; `before` lấy trang cũ hơn |
 | GET | `/api/auctions/:id/bid-status` | Đăng nhập; trạng thái chủ sách, thời điểm đặt lại của chính session và giờ SQL |
 | POST | `/api/auctions/:id/bids` | Người dùng + CSRF; body chỉ `ma_yeu_cau` UUID v4 và `muc_gia` chuỗi nguyên |
 | GET | `/api/auctions/:id/requests/:requestId` | Chỉ chủ yêu cầu; đọc SQL trước admission Redis |
@@ -142,11 +150,14 @@ Tác vụ hết hạn và worker đặt giá dùng cùng cơ chế bảo vệ ph
 Trong một transaction, chuyển phiên kết thúc, tạo một KetQuaDauGia và tạo GiaoDich chỉ nếu có người thắng.
 Hết hạn có lượt hợp lệ thì lượt cao nhất thắng dù chưa đạt ngưỡng. Không có kết thúc thủ công hoặc hủy giữa phiên.
 
-## Thiết kế sau phiên — chưa triển khai
+## Giao dịch và tương tác sau phiên
 
 Giao dịch đã được tạo từ kết quả có người thắng, xác định người mua/bán và số tiền.
-Các chức năng mở trao đổi gắn giao dịch, xác nhận hoàn tất và phản hồi chưa triển khai.
-Hoàn tất cần đủ xác nhận hai bên; đánh giá uy tín theo quyền và điều kiện hoàn tất.
-Khiếu nại kiểm tra quan hệ người gửi–giao dịch–cuộc trò chuyện, lưu bằng chứng và xử lý theo quyền Admin.
+Phòng trò chuyện được tạo cùng giao dịch; dữ liệu cũ thiếu phòng được tạo bổ sung sau khi kiểm tra quyền.
+Hai bên trao đổi văn bản, người nhận đánh dấu đã đọc. Hoàn tất cần đủ xác nhận độc lập bằng giờ SQL;
+chỉ người mua được đánh giá người bán một lần sau hoàn tất. Uy tín/nhận xét được đọc công khai ở chi tiết phiên.
+Khiếu nại kiểm tra quan hệ người gửi–giao dịch–cuộc trò chuyện, lưu bằng chứng ảnh và phân công một Admin.
+Chỉ Admin được phân công, hồ sơ đang xử lý, mới đọc chat liên quan; không gửi tin hoặc đánh dấu đọc thay hai bên.
 Không tự thay đổi người thắng hoặc trạng thái giao dịch chỉ vì có khiếu nại.
-Các chức năng này phải được đối chiếu thiết kế đã thống nhất trước khi triển khai.
+Bình luận chỉ nhận khi phiên đã công bố và đang trong [bắt đầu, kết thúc) theo giờ SQL; sau đó giữ lịch sử đọc.
+Hợp đồng `/api/community`, quyền, phân trang, retry và nghiệm thu tại [after-sales.md](after-sales.md).

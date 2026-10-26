@@ -5,11 +5,12 @@ const tabPattern=/^[0-9a-f]{32}$/;
 function selectedCookie(header,name) {
   return (header||'').split(';').map(part=>part.trim()).find(part=>part.startsWith(name+'='));
 }
-export function createSessionMiddleware(authConfig, store) {
+export function createSessionMiddleware(authConfig, store, {control}={}) {
   const middleware=session({ name:authConfig.cookieName, secret:authConfig.secret, store,
     resave:false, saveUninitialized:false, rolling:true,
     cookie:{...authConfig.cookie,maxAge:authConfig.idleSeconds*1000} });
   return (req,res,next)=>{
+    req.accountControl=control;
     const tabId=req.get('x-tab-id');
     // Terminal/API clients without a tab selector retain the documented single-cookie contract.
     if(tabId===undefined)return middleware(req,res,next);

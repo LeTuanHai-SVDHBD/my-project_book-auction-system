@@ -45,21 +45,21 @@ export default function InfrastructurePanel() {
     finally { if (mounted.current) setBusy(false); }
   }
   const db = health?.services?.sqlserver; const redis = health?.services?.redis; const worker = health?.services?.worker;
-  return <div className="page"><header><a className="brand" href="#"><span className="mark">B</span> BookAuction <span className="tag">NHÓM 15</span></a><span className="stage">MỐC 02 / MÔI TRƯỜNG CHẠY</span></header>
+  return <div className="page"><header><a className="brand" href="#"><span className="mark">B</span> BookAuction <span className="tag">NHÓM 15</span></a><span className="stage">KIỂM TRA HỆ THỐNG</span></header>
     <main><div className="eyebrow">NỀN TẢNG CHO HỆ THỐNG ĐẤU GIÁ SÁCH</div><h1>Kết nối trước.<br/><em>Triển khai từng bước.</em></h1>
       <p className="intro">Kiểm tra giao diện, API, cơ sở dữ liệu và tiến trình xử lý nền trong cùng một nơi.</p>
       <div className="summary"><span className={`dot ${health?.ok ? 'green' : 'amber'}`}/><b>{health?.ok ? 'Các thành phần đã sẵn sàng' : 'Đang chờ đủ các thành phần'}</b><button onClick={refresh}>Kiểm tra lại ↗</button></div>
       {networkError && <p className="alert" role="alert">{networkError}</p>}
       <section className="services" aria-label="Trạng thái hạ tầng">
         <Status label="Express API" value={health ? true : networkError ? false : undefined} detail="Tiếp nhận yêu cầu · cổng 5000"/>
-        <Status label="SQL Server" value={db?.ok} detail={db?.connected ? `${db.databaseName} · ${db.tables}/${db.expectedTables ?? 19} bảng · ${db.columns}/${db.expectedColumns ?? 144} trường` : 'Kho dữ liệu chính · cổng 14330'}/>
+        <Status label="SQL Server" value={db?.ok} detail={db?.connected ? `${db.databaseName} · ${db.tables}/${db.expectedTables ?? 20} bảng · ${db.columns}/${db.expectedColumns ?? 152} trường` : 'Kho dữ liệu chính · cổng 14330'}/>
         <Status label="Redis" value={redis?.ok} detail="Redis Streams · cổng 63790"/>
         <Status label="Event Worker" value={worker?.ok} detail={worker?.consumer || 'Tiến trình Node.js chạy riêng'}/>
         <Status label="Socket.IO" value={socketReady} detail="Kiểm tra kết nối thời gian thực"/>
       </section>
       <section className="probe"><div className="probe-copy"><span className="eyebrow">KIỂM TRA ĐƯỜNG ĐI SỰ KIỆN</span><h2>Một yêu cầu, qua đủ các thành phần.</h2>
         <p>React gửi yêu cầu → API đưa vào Redis Streams → worker đọc và truy vấn SQL Server → giao diện lấy kết quả.</p>
-        <p className="muted">Luồng này chỉ kiểm tra hạ tầng. Chức năng đặt giá và xử lý người thắng sẽ được triển khai ở các mốc sau.</p></div>
+        <p className="muted">Luồng này kiểm tra hạ tầng. Đặt giá, lịch sử và kết quả được theo dõi trong Danh mục.</p></div>
         <div className="probe-form"><label htmlFor="token">Khóa kiểm tra cục bộ</label><input id="token" type="password" value={token} onChange={e => setToken(e.target.value)} placeholder="DEV_PROBE_TOKEN trong .env" autoComplete="off"/>
           <button className="primary" disabled={busy || !token.trim()} onClick={probe}>{busy ? 'Đang kiểm tra…' : 'Gửi sự kiện kiểm tra →'}</button>
           {probeError && <p className="error" role="alert">{probeError}</p>}

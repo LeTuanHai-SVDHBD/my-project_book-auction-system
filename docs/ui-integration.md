@@ -14,6 +14,14 @@ npm.cmd run dev:all
 
 Mở `http://localhost:5173`. Không cần pnpm, không đổi `.env` và không tạo lại database. Migration 004 chỉ thêm `ThongBao`/index, chạy lại được; schema mới 21 bảng/161 cột. Bản cũ 20/152 được init nhận diện để nâng cấp giữ dữ liệu.
 
+## Phiên biểu mẫu và giao diện khách
+
+`services/apiBase.js` dùng chung cho HTTP, Socket tài khoản, Socket đấu giá và công cụ hạ tầng. Nếu web/API là hai tên loopback `localhost`/`127.0.0.1` cùng giao thức, lấy hostname đang mở ở web và giữ cổng/giao thức API. Không sửa `.env` cá nhân hoặc đổi URL API ở host khác. Ví dụ web `http://localhost:5173` + cấu hình API `http://127.0.0.1:5000` sẽ gọi `http://localhost:5000` để cookie không bị chặn vì khác site.
+
+Khi POST bị Backend từ chối bằng HTTP 403/`INVALID_CSRF` trước khi xử lý nghiệp vụ, client lấy lại CSRF rồi gửi lại đúng một lần trong cùng phiên. Không tự thử lại lỗi mạng, sai mật khẩu, lỗi nghiệp vụ hoặc yêu cầu thuộc phiên cũ; không thay CSRF/token mới theo một phản hồi lỗi cũ. Cookie HttpOnly/SameSite=Lax và cơ chế thu hồi đăng nhập giữ nguyên.
+
+Khách chỉ có các liên kết điều hướng/đăng nhập và tìm kiếm, không có avatar hoặc chuông. Đăng nhập thành công mới hiện hai phần đó; đăng xuất/thu hồi phiên gỡ chúng và đóng hộp thông báo.
+
 ## Giao diện và đường dẫn
 
 Phong cách tham chiếu: [frontend-book tại 83add59](https://github.com/LeTuanHai-SVDHBD/frontend-book/tree/83add5905dc2b0ed1da23c46af7b1367d260c94d). Navy/vàng/kem, Inter/Playfair tự phục vụ, chữ 20px desktop/18px mobile, trang chủ có ảnh thư viện, card, sidebar Admin với chuông/tài khoản. Màn hình nhỏ mở sidebar qua Menu quản trị. Không dùng bộ chọn vai trò/trạng thái mẫu, ảnh sách tạo bởi AI, giá hoặc đồng hồ mẫu trong ứng dụng chính. Khi không có sách/media, hiển thị trạng thái rỗng.

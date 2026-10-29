@@ -1,10 +1,11 @@
 /** Kênh tài khoản riêng; mất phiên thì xóa tài khoản ở giao diện, HTTP bù thông báo lỡ, không tự đăng nhập lại. */
+import {browserApiBase} from './apiBase.js';
 import {useEffect} from 'react';
 import {io} from 'socket.io-client';
 import {apiRequest,invalidateSession} from './authApi.js';
 import {getTabId} from './tabIdentity.js';
 import {getControlId,isAccountReplaced} from './controlIdentity.js';
-const base=import.meta.env.VITE_API_URL||'http://127.0.0.1:5000';
+const base=browserApiBase();
 export function useAccountControl(user){
   useEffect(()=>{
     if(!user||isAccountReplaced())return;

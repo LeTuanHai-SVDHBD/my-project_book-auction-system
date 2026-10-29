@@ -2,9 +2,10 @@
  * Màn hình kiểm tra môi trường Mốc 2.
  * Hiển thị trạng thái dịch vụ và gửi probe kiểm tra hạ tầng.
  */
+import {browserApiBase} from '../services/apiBase.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-const base = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
+const base=browserApiBase();
 function Status({ label, value, detail }) {
   const status = value === undefined ? 'waiting' : value ? 'ready' : 'down';
   return <article className={`service ${status}`}><div className="service-top"><span className="dot"/><span>{label}</span></div>

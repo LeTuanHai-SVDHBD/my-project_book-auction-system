@@ -5,6 +5,14 @@
 Cập nhật ngày 29/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
+## Sửa đăng nhập CSRF và header khách — 29/10/2026
+
+- Đã tái hiện trên Chromium: web `localhost:4173`, cấu hình API `127.0.0.1:5000` → GET CSRF 200 nhưng cookie không được giữ, POST login 403/INVALID_CSRF.
+- Dùng hostname loopback nhất quán cho HTTP/Socket, không đổi kiểm tra CSRF hoặc chính sách cookie phía Backend.
+- Chromium production build, HTTP/session/CSRF thật với MemoryStore/model tài khoản fixture: trên cả localhost và 127.0.0.1, chủ động xóa phiên khách khỏi store → POST đầu bị từ chối CSRF → lấy token mới → lần thứ hai đăng nhập thành công. F5 giữ tài khoản; logout gỡ avatar/chuông; Cookie vẫn HttpOnly/SameSite=Lax.
+- Kiểm tra lỗi CSRF liên tục chỉ gửi tối đa hai POST, lỗi mạng/sai mật khẩu không tự retry; Admin vẫn có chuông/tài khoản trong sidebar, không có header ngang. Khách desktop/mobile không có avatar hoặc chuông.
+- `npm run check`: 130 tệp; `npm test`: **122 PASS, 11 SKIP**; `npm run build`: PASS. Thêm test chuẩn hóa URL API. Chưa chạy lại SQL/Redis thật cho bản này; Backend, migration và nghiệp vụ không đổi.
+
 ## Tích hợp giao diện BookBid, tìm kiếm và thông báo — 29/10/2026
 
 - Giao diện nguồn: `frontend-book` commit `83add5905dc2b0ed1da23c46af7b1367d260c94d`; áp dụng vào frontend chính, dùng API thật, giữ cơ chế xác thực/đặt giá/media hiện có. Không thêm dependency hoặc đổi lockfile/phiên bản.

@@ -175,6 +175,7 @@ Thư mục rỗng được giữ bằng `.gitkeep`; file này không chứng min
 
 - `frontend/src/components/BookBidShell.jsx`, `Home.jsx`, `BookCard.jsx`, `BookGallery.jsx`, `DesignUi.jsx`: layout, trang chủ, card và media theo thiết kế đã chốt.
 - `frontend/src/design.css`, `integration.css`, `styles/fonts.css`, `public/assets/`: màu/font/style và tài nguyên có giấy phép; không có fixture sách giả trong ứng dụng.
+- `frontend/src/services/apiBase.js`: chuẩn hóa tên host loopback cho HTTP/Socket để cookie phiên hoạt động khi web mở bằng localhost hoặc 127.0.0.1.
 - `frontend/src/services/navigation.js`: route hash; ID bài đăng tách biệt với ID phiên/giao dịch.
 - `frontend/src/components/Notifications.jsx`: đọc hộp thông báo của session, cập nhật 10 giây, đọc lại khi focus/online; không dùng room công khai.
 - `backend/src/services/catalogSearch.js`: giới hạn từ khóa/bộ lọc/sắp xếp; model bài đăng truy vấn SQL tham số hóa.

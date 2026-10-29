@@ -123,7 +123,7 @@ Máy cài mới dùng tên volume chuẩn `my-project_book-auction-system_sqlser
 
 ### Frontend
 
-`frontend/.env` chứa `VITE_API_URL`, mặc định `http://127.0.0.1:5000`.
+`frontend/.env` chứa `VITE_API_URL`, mặc định `http://127.0.0.1:5000`. Khi web/API dùng hai tên loopback `localhost` và `127.0.0.1`, frontend đồng bộ tên host theo URL đang mở (giữ nguyên cổng/giao thức) cho HTTP và Socket.IO để cookie SameSite=Lax hoạt động. API trên host khác được giữ nguyên cấu hình.
 Dùng `127.0.0.1` nhất quán cho Frontend và API để cookie hoạt động cùng site.
 
 ### Giới hạn media
@@ -340,7 +340,7 @@ xem [hướng dẫn](docs/after-sales.md). Bản giao dịch mới không thêm 
 | smoke:m5/m6/m8 dừng tại readiness | Giữ dev:all ở terminal khác; xem từng thành phần tại /api/health/ready và docker compose ps; [hướng dẫn chẩn đoán](docs/after-sales.md#dừng-tại-readiness) |
 | SQL readiness chưa đạt 21 bảng/161 cột | Kiểm tra đúng database, kết nối và chạy `npm.cmd run db:migrate` |
 | Không upload được | Kiểm tra ba biến Cloudinary, giới hạn tệp và khởi động lại API |
-| Lỗi CSRF hoặc phiên hết hạn | F5 tab hiện tại và đăng nhập lại nếu cần |
+| Lỗi CSRF hoặc phiên hết hạn | Frontend tự lấy token mới và thử lại đúng một lần khi Backend trả INVALID_CSRF; phiên đăng nhập đã hết hạn/thu hồi vẫn phải đăng nhập lại. Không tắt bảo vệ cookie/CSRF. |
 | HTTP 409 khi duyệt/kích hoạt | Tải lại chi tiết trước khi thao tác; không dùng `row_version` cũ |
 | Hai tab vẫn đổi tài khoản cùng nhau | Cập nhật cả Backend/Frontend, khởi động lại API/web và F5 từng tab |
 | Báo thiếu phiên bản dữ liệu | Khởi động API bản mới, F5 và mở lại chi tiết bài; token API phải có 16 ký tự hex |

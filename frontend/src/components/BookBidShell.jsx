@@ -20,6 +20,9 @@ export default function BookBidShell({ user, route, children }) {
     desktop.addEventListener("change", close);
     return () => desktop.removeEventListener("change", close);
   }, []);
+  useEffect(() => {
+    if (!user) setNotifications(false);
+  }, [user]);
   const initials = (user?.ho_ten || "Khách")
     .split(" ")
     .slice(-2)
@@ -183,10 +186,14 @@ export default function BookBidShell({ user, route, children }) {
               ))}
             </nav>
             <div className="header-actions">
-              {bell}
-              <a href="#/account" className="avatar" aria-label="Tài khoản">
-                {initials}
-              </a>
+              {user && (
+                <>
+                  {bell}
+                  <a href="#/account" className="avatar" aria-label="Tài khoản">
+                    {initials}
+                  </a>
+                </>
+              )}
               <button
                 className="icon-button mobile-menu"
                 aria-label="Mở điều hướng"
@@ -254,7 +261,7 @@ export default function BookBidShell({ user, route, children }) {
           </div>
         </footer>
       </div>
-      {notifications && (
+      {user && notifications && (
         <Notifications
           key={user?.nguoi_dung_id || "guest"}
           inbox={inbox}

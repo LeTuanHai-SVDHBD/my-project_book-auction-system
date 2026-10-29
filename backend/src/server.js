@@ -3,6 +3,8 @@
  * Mở kết nối dịch vụ và xử lý đóng ứng dụng.
  * Không đặt logic nghiệp vụ đấu giá trong file này.
  */
+import {createNotificationModel} from './models/notification.model.js';
+import {createNotificationRouter} from './routes/notification.routes.js';
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { config } from './config/env.js';
@@ -64,7 +66,8 @@ const auctionRouter=createAuctionRouter({sessionMiddleware,users,model:auctionMo
 const authRouter = createAuthRouter({ authConfig, sessionMiddleware, users, passwords,
   limiter: createAuthRateLimiter({ getRedis: requireRedis, secret: authConfig.secret }),
   ready: () => redis.isReady });
-const app = createApp({ config, authRouter, postRouter, mediaRouter, auctionRouter, aiRouter, communityRouter, deps: { sqlserver: databaseStatus, redis: redisStatus, worker: workerStatus },
+const notificationRouter=createNotificationRouter({sessionMiddleware,users,model:createNotificationModel({getPool,sql})});
+const app = createApp({ config, notificationRouter, authRouter, postRouter, mediaRouter, auctionRouter, aiRouter, communityRouter, deps: { sqlserver: databaseStatus, redis: redisStatus, worker: workerStatus },
   probes: { enqueue: () => enqueueProbe(requireRedis()), get: async id => {
     const raw = await requireRedis().get(INFRA.resultPrefix + id); return raw ? JSON.parse(raw) : null;
   } }, log: logError });

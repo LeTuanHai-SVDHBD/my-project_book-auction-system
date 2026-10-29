@@ -1,11 +1,12 @@
 /** SQL Server thật opt-in, database BookAuctionTest_*: chat nguyên tử, xác nhận đồng thời, quyền và rollback bằng chứng. */
 import test from 'node:test';import assert from 'node:assert/strict';import {randomUUID} from 'node:crypto';import {readFile} from 'node:fs/promises';
+import {createNotificationModel} from '../src/models/notification.model.js';import {createPostModel} from '../src/models/post.model.js';
 import {createCommunityModel} from '../src/models/community.model.js';import {createAuctionModel} from '../src/models/auction.model.js';
 test('SQL sau phiên: truy vết, một phòng chat, hai xác nhận, một đánh giá và khiếu nại có quyền',{skip:process.env.COMMUNITY_TEST_SQL!=='true',timeout:60000},async t=>{
   assert.match(process.env.DB_DATABASE||'',/^BookAuctionTest_[A-Za-z0-9_]+$/);const {getPool,sql,closeDatabase}=await import('../src/config/database.js'),{config}=await import('../src/config/env.js');
   const master=await new sql.ConnectionPool({...config.sql,database:'master'}).connect();try{await master.request().query(`IF DB_ID('${config.sql.database}') IS NULL CREATE DATABASE [${config.sql.database}]`);}finally{await master.close();}
   const pool=await getPool();if(!(await pool.request().query("SELECT OBJECT_ID('dbo.GiaoDich') AS id")).recordset[0].id){const ddl=await readFile(new URL('../migrations/001_schema.sql',import.meta.url),'utf8');for(const batch of ddl.split(/^\s*GO\s*$/gim).filter(x=>x.trim()))await pool.request().batch(batch);}
-  for(const name of ['002_cloudinary_metadata.sql','003_auction_decisions.sql'])await pool.request().batch(await readFile(new URL('../migrations/'+name,import.meta.url),'utf8'));
+  for(const name of ['002_cloudinary_metadata.sql','003_auction_decisions.sql','004_notifications.sql'])await pool.request().batch(await readFile(new URL('../migrations/'+name,import.meta.url),'utf8'));
   const run=randomUUID(),users=[];let postId,bookId,auctionId;
   t.after(async()=>{try{if(postId)await pool.request().input('p',sql.Int,postId).input('b',sql.Int,bookId).input('a',sql.Int,auctionId).query(`SET XACT_ABORT ON;BEGIN TRANSACTION;DECLARE @g TABLE(id INT);INSERT @g SELECT g.giao_dich_id FROM dbo.GiaoDich g JOIN dbo.KetQuaDauGia k ON k.ket_qua_id=g.ket_qua_id WHERE k.phien_dau_gia_id=@a;
     DELETE dbo.BangChungKhieuNai WHERE khieu_nai_id IN(SELECT khieu_nai_id FROM dbo.KhieuNai WHERE giao_dich_id IN(SELECT id FROM @g));DELETE dbo.KhieuNai WHERE giao_dich_id IN(SELECT id FROM @g);DELETE dbo.TinNhan WHERE cuoc_tro_chuyen_id IN(SELECT cuoc_tro_chuyen_id FROM dbo.CuocTroChuyen WHERE giao_dich_id IN(SELECT id FROM @g));DELETE dbo.CuocTroChuyen WHERE giao_dich_id IN(SELECT id FROM @g);DELETE dbo.DanhGia WHERE giao_dich_id IN(SELECT id FROM @g);DELETE dbo.GiaoDich WHERE giao_dich_id IN(SELECT id FROM @g);
@@ -26,5 +27,14 @@ test('SQL sau phiên: truy vết, một phòng chat, hai xác nhận, một đá
   const input={reason:'Đối chiếu',content:'Chỉ dữ liệu kiểm thử'},items=[{kind:'image',url:'https://res.cloudinary.com/demo/image/upload/m8-fixture.png',title:'Ảnh fixture'}];const broken=createCommunityModel({getPool,sql,beforeCommit:async()=>{throw Error('before COMMIT');}});
   await assert.rejects(broken.createComplaint(id,buyer,input,items),/before COMMIT/);assert.equal((await model.detail(id,buyer)).khieu_nai.length,0);const saved=await model.createComplaint(id,buyer,input,items),caseId=saved.khieu_nai_id;assert.equal((await model.complaintDetail(caseId,buyer)).bang_chung.length,1);await assert.rejects(model.complaintDetail(caseId,seller),{status:404});await assert.rejects(model.complaintMessages(caseId,admin,2147483647),{status:403});
   const claims=await Promise.allSettled([model.claim(caseId,admin),model.claim(caseId,admin2)]);assert.equal(claims.filter(x=>x.status==='fulfilled').length,1);const assigned=(await model.complaintDetail(caseId,admin)).admin_id===admin.nguoi_dung_id?admin:admin2;assert.equal((await model.complaintMessages(caseId,assigned,2147483647)).items[0].noi_dung,'Tin riêng SQL');
-  await model.resolve(caseId,assigned,'Đã đối chiếu.');await assert.rejects(model.complaintMessages(caseId,assigned,2147483647),{status:409});assert.equal((await model.detail(id,buyer)).trang_thai,'hoan_tat');await assert.rejects(model.comment(auctionId,buyer,'Sau kết thúc'),{status:409});assert.equal((await model.comments(auctionId,2147483647)).items.length,1);
+  const notifications=createNotificationModel({getPool,sql});
+  const [inbox1,inbox2]=await Promise.all([notifications.list(seller),notifications.list(seller)]);
+  assert.equal(inbox1.items.filter(x=>x.loai==='trades').length,inbox2.items.filter(x=>x.loai==='trades').length);
+  assert(inbox1.items.some(x=>x.tieu_de==='Tin nhắn giao dịch mới'));
+  assert(inbox1.items.some(x=>x.tieu_de==='Người mua đã xác nhận hoàn tất'));
+  assert(!(await notifications.list(admin)).items.some(x=>x.loai==='trades'));
+  const notification=inbox1.items.find(x=>x.loai==='trades');await assert.rejects(notifications.read(buyer,notification.thong_bao_id),{status:404});await notifications.read(seller,notification.thong_bao_id);
+  assert((await notifications.list(seller)).items.find(x=>x.thong_bao_id===notification.thong_bao_id).ngay_doc);
+  const search=createPostModel({getPool,sql});const results=await search.search({q:'',genre:'',phase:'ended',sort:'newest',page:1});assert(results.items.some(x=>x.bai_dang_id===postId));
+  await model.resolve(caseId,assigned,'Đã đối chiếu.');assert((await notifications.list(buyer)).items.some(x=>x.tieu_de==='Khiếu nại đã có phản hồi'));await assert.rejects(model.complaintMessages(caseId,assigned,2147483647),{status:409});assert.equal((await model.detail(id,buyer)).trang_thai,'hoan_tat');await assert.rejects(model.comment(auctionId,buyer,'Sau kết thúc'),{status:409});assert.equal((await model.comments(auctionId,2147483647)).items.length,1);
 });

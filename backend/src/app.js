@@ -10,7 +10,7 @@ function sameToken(received, expected) {
   const a = Buffer.from(received || ''); const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
 }
-export function createApp({ config, deps, probes, authRouter, postRouter, mediaRouter, auctionRouter, aiRouter, communityRouter, log = () => {} }) {
+export function createApp({ config, deps, probes, authRouter, postRouter, mediaRouter, auctionRouter, aiRouter, communityRouter, notificationRouter, log = () => {} }) {
   const app = express();
   app.disable('x-powered-by'); app.use(helmet());
   app.use((req, res, next) => { req.requestId = randomUUID(); res.setHeader('X-Request-ID', req.requestId); next(); });
@@ -43,6 +43,7 @@ export function createApp({ config, deps, probes, authRouter, postRouter, mediaR
   if (mediaRouter) app.use('/api/media', mediaRouter);
   if (auctionRouter) app.use('/api/auctions', auctionRouter);
   if (aiRouter) app.use('/api/ai', aiRouter);
+  if (notificationRouter) app.use('/api/notifications',notificationRouter);
   if (communityRouter) app.use('/api/community',communityRouter);
   app.use((req, res, next) => next(new HttpError(404, 'NOT_FOUND', 'Không tìm thấy API.')));
   app.use(errorHandler(log));

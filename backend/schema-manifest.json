@@ -19,9 +19,10 @@
     "BangChungKhieuNai",
     "DanhGia",
     "PhanTichAI",
-    "ChiTietPhanTichAI"
+    "ChiTietPhanTichAI",
+    "ThongBao"
   ],
-  "columns": 152,
-  "checks": 96,
-  "uniqueConstraints": 14
+  "columns": 161,
+  "checks": 98,
+  "uniqueConstraints": 15
 }

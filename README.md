@@ -13,7 +13,9 @@ Hệ thống hướng tới xử lý tranh chấp đặt giá đồng thời và
 - Đăng sách kèm ảnh/video Cloudinary; tạo bài đăng và phiên chờ kiểm duyệt trong cùng giao dịch SQL.
 - Admin phê duyệt hoặc từ chối có lý do; chủ sách bổ sung bài bị từ chối và gửi duyệt lại.
 - Chủ sách đặt lịch, kích hoạt phiên đã duyệt và đăng lại bản sách đủ điều kiện.
-- Danh mục công khai; giữ ẩn giá kết thúc sớm đối với người mua.
+- Giao diện BookBid theo bản thiết kế đã chốt: trang chủ, danh mục/card, gallery ảnh/video cùng bản sách, form 4 bước, Admin chỉ có sidebar.
+- Tìm kiếm tên sách/tác giả/ISBN/thể loại có hoặc không dấu; lọc trạng thái, thể loại, sắp xếp và phân trang phía Backend. Giữ ẩn giá kết thúc sớm và dữ liệu AI riêng.
+- Thông báo riêng lưu SQL: gửi duyệt, quyết định kiểm duyệt, kết thúc phiên, tin nhắn, xác nhận giao dịch và khiếu nại; số chưa đọc, đánh dấu đã đọc và mở đúng hồ sơ.
 - Đặt giá qua Redis Streams; kiểm tra bước giá/cooldown, chống xử lý trùng và theo dõi quyết định.
 - Tự kết thúc khi hết giờ hoặc đạt ngưỡng; một kết quả mỗi phiên, tạo giao dịch khi có người thắng.
 - Cập nhật trực tiếp giá, trạng thái, lịch sử và kết quả giữa các trình duyệt; tự lấy lại dữ liệu khi nối mạng.
@@ -25,6 +27,12 @@ Hệ thống hướng tới xử lý tranh chấp đặt giá đồng thời và
 AI hỗ trợ kiểm duyệt; Admin tiếp tục quyết định. Giao dịch chỉ hoàn tất sau xác nhận của cả người mua và người bán.
 Socket.IO báo phiên có thay đổi sau SQL COMMIT; giao diện lấy snapshot Backend để đồng bộ.
 Quyết định đặt giá riêng của từng tài khoản tiếp tục được kiểm tra qua HTTP có xác thực.
+
+## Giao diện BookBid và thông báo
+
+Giao diện tích hợp từ [`frontend-book` tại 83add59](https://github.com/LeTuanHai-SVDHBD/frontend-book/tree/83add5905dc2b0ed1da23c46af7b1367d260c94d). Dùng dữ liệu/API thật; không mang bộ chọn vai trò, trạng thái mẫu, đồng hồ cố định hoặc dữ liệu sách minh họa vào dự án chính. Trang chủ là trang mặc định; mở `#/account` để đăng nhập.
+
+Cách cập nhật, route, API tìm kiếm/thông báo và kiểm chứng: [Tích hợp giao diện BookBid](docs/ui-integration.md). **Phải chạy `npm.cmd run db:migrate` sau khi cập nhật**, trước khi khởi động lại API/worker. Cổng dự án chính vẫn là **5173**, chạy bằng `npm.cmd run dev:all` từ thư mục gốc; không dùng lệnh/cổng của repo thiết kế.
 
 ## Yêu cầu môi trường
 
@@ -64,7 +72,7 @@ npm.cmd run admin:create
 ```
 
 `setup` tạo `.env` và cấu hình Frontend khi chưa có; các script setup giữ nguyên giá trị đã tồn tại.
-`db:init` tạo schema nền rồi áp dụng các migration media và quyết định đấu giá. Schema hiện tại có **20 bảng, 152 cột**.
+`db:init` tạo schema nền rồi áp dụng các migration media và quyết định đấu giá. Schema hiện tại có **21 bảng, 161 cột**.
 `admin:create` yêu cầu tên, email và mật khẩu kín trong terminal. Admin đã tồn tại được giữ nguyên mật khẩu;
 script không tự nâng quyền tài khoản người dùng thường.
 
@@ -82,7 +90,7 @@ npm.cmd run setup:ai
 npm.cmd run db:migrate
 ```
 
-`db:migrate` chạy migration có thể lặp lại: metadata Cloudinary, bảng `YeuCauDatGia` và
+`db:migrate` chạy migration có thể lặp lại: metadata Cloudinary, bảng `YeuCauDatGia`, hộp thông báo riêng `ThongBao` và
 cột `KetQuaDauGia.ly_do_ket_thuc`. Lượt giá cũ được backfill thành quyết định chấp nhận;
 lý do kết thúc chưa biết của dữ liệu cũ giữ NULL. Dừng API/worker trước khi nâng cấp.
 DDL nền, tài khoản, dữ liệu và volume hiện có được giữ lại. Không cần khởi tạo lại database.
@@ -330,7 +338,7 @@ xem [hướng dẫn](docs/after-sales.md). Bản giao dịch mới không thêm 
 | Hiện tượng | Kiểm tra |
 |---|---|
 | smoke:m5/m6/m8 dừng tại readiness | Giữ dev:all ở terminal khác; xem từng thành phần tại /api/health/ready và docker compose ps; [hướng dẫn chẩn đoán](docs/after-sales.md#dừng-tại-readiness) |
-| SQL readiness chưa đạt 20 bảng/152 cột | Kiểm tra đúng database, kết nối và chạy `npm.cmd run db:migrate` |
+| SQL readiness chưa đạt 21 bảng/161 cột | Kiểm tra đúng database, kết nối và chạy `npm.cmd run db:migrate` |
 | Không upload được | Kiểm tra ba biến Cloudinary, giới hạn tệp và khởi động lại API |
 | Lỗi CSRF hoặc phiên hết hạn | F5 tab hiện tại và đăng nhập lại nếu cần |
 | HTTP 409 khi duyệt/kích hoạt | Tải lại chi tiết trước khi thao tác; không dùng `row_version` cũ |

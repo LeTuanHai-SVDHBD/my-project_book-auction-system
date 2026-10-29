@@ -103,7 +103,7 @@ Các đường dẫn bên dưới tương đối với `backend/`.
 | Hạ tầng | `src/constants/infrastructure.js`, `src/controllers/health.controller.js`, `src/services/infrastructure.service.js` | Readiness, heartbeat và hằng số probe |
 | Sự kiện | `src/events/eventPublisher.js`, `eventConsumer.js`, `src/processors/systemProbe.processor.js` | Xuất bản, đọc/nhận lại/xác nhận và xử lý probe |
 | Utility | `src/utils/rowVersion.js`, `logger.js`, `src/middlewares/errorHandler.js` | Mã hóa version, log che bí mật và lỗi HTTP |
-| Schema | `migrations/001_schema.sql`, `002_cloudinary_metadata.sql`, `003_auction_decisions.sql`, `schema-manifest.json` | DDL nền, migration media/quyết định và cấu trúc dự kiến |
+| Schema | `migrations/001_schema.sql`, `002_cloudinary_metadata.sql`, `003_auction_decisions.sql`, `004_notifications.sql`, `schema-manifest.json` | DDL nền, migration media/quyết định và cấu trúc dự kiến |
 | CLI | `scripts/initDatabase.js`, `migrateDatabase.js`, `createAdmin.js` | Tạo/nâng schema và tạo Admin qua terminal |
 
 `src/concurrency/`, `src/jobs/` và `src/ai/` có logic phối hợp, tác vụ và phân tích đang dùng.
@@ -170,3 +170,14 @@ Thư mục rỗng được giữ bằng `.gitkeep`; file này không chứng min
 | `backend/test/ai*.test.js`, `fixtures/ai-observations.json` | Bộ quy tắc, hợp đồng provider, HTTP, pipeline, Redis/SQL opt-in và mẫu đối chiếu |
 | `scripts/setupAi.mjs`, `aiScoreExample.mjs`, `smokeAi.mjs` | Cấu hình, tính mẫu không gọi AI và smoke Gemini thật |
 | `docs/ai-analysis.md` | Cấu hình, tiêu chí, công thức, quyền và nghiệm thu |
+
+## Tích hợp BookBid
+
+- `frontend/src/components/BookBidShell.jsx`, `Home.jsx`, `BookCard.jsx`, `BookGallery.jsx`, `DesignUi.jsx`: layout, trang chủ, card và media theo thiết kế đã chốt.
+- `frontend/src/design.css`, `integration.css`, `styles/fonts.css`, `public/assets/`: màu/font/style và tài nguyên có giấy phép; không có fixture sách giả trong ứng dụng.
+- `frontend/src/services/navigation.js`: route hash; ID bài đăng tách biệt với ID phiên/giao dịch.
+- `frontend/src/components/Notifications.jsx`: đọc hộp thông báo của session, cập nhật 10 giây, đọc lại khi focus/online; không dùng room công khai.
+- `backend/src/services/catalogSearch.js`: giới hạn từ khóa/bộ lọc/sắp xếp; model bài đăng truy vấn SQL tham số hóa.
+- `backend/src/models/notification.model.js`, `routes/notification.routes.js`: dựng hộp thông báo từ sự kiện SQL đã COMMIT, chống trùng theo người nhận/nguồn và API riêng có CSRF.
+- `backend/migrations/004_notifications.sql`: bảng ThongBao và index, có thể chạy lại, giữ dữ liệu.
+- `backend/test/catalogSearch.test.js`, `notificationHttp.test.js`, phần mở rộng `communitySql.test.js`/`scripts/smokeAfterSales.mjs`: quyền, tìm kiếm và nghiệm thu SQL thật khi môi trường sẵn sàng.

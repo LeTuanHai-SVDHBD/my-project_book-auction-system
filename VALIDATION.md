@@ -2,8 +2,18 @@
 
 # Kết quả kiểm tra
 
-Cập nhật ngày 25/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
+Cập nhật ngày 29/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
+
+## Tích hợp giao diện BookBid, tìm kiếm và thông báo — 29/10/2026
+
+- Giao diện nguồn: `frontend-book` commit `83add5905dc2b0ed1da23c46af7b1367d260c94d`; áp dụng vào frontend chính, dùng API thật, giữ cơ chế xác thực/đặt giá/media hiện có. Không thêm dependency hoặc đổi lockfile/phiên bản.
+- `npm run check`: kiểm tra cú pháp 129 tệp JavaScript máy chủ/dùng chung.
+- `npm test`: **121 PASS, 11 SKIP** (SQL/Redis opt-in), tổng 132 test. Có kiểm tra mới cho hợp đồng tìm kiếm, giới hạn đầu vào/wildcard, projection công khai, hộp thông báo riêng, quyền Admin/khách, CSRF và đọc lại.
+- `npm run build`: PASS production build React/Vite.
+- Chromium trên production build với HTTP/session/CSRF/Socket và model fixture: tìm kiếm và trạng thái rỗng; form bốn bước gửi API; gallery/video thật theo URL API; 202 và quyết định chấp nhận; chủ sách không có ô đặt giá; hai xác nhận và đánh giá chỉ phía người mua; thông báo đánh dấu đọc/mở đúng giao dịch; Admin không có header ngang/lời mời đăng sách; sidebar mobile/thông báo. Ma trận desktop 1440px và responsive 1100/768/390/320px.
+- Chưa chạy migration 004, truy vấn tìm kiếm và đồng bộ hộp thông báo trên **SQL Server thật** trong môi trường chuẩn bị; chưa chạy SQL/Redis/provider thật hoặc nghiệm thu Windows/UniKey lại cho lần tích hợp này. Không coi model fixture là bằng chứng transaction SQL. Sau migration trên máy nhóm, chạy `npm.cmd run smoke:m8` (đã bổ sung tìm kiếm/thông báo) và nghiệm thu ảnh/video Cloudinary.
+- Migration chỉ thêm bảng `ThongBao`/index, không thêm trigger và không sửa transaction nghiệp vụ; hộp được đồng bộ từ lịch sử SQL đã COMMIT khi người nhận đọc, lặp 10 giây/focus/online. Chi tiết, giới hạn và cách nâng cấp: [docs/ui-integration.md](docs/ui-integration.md).
 
 ## Thu hồi session cũ và nhập tiền không đổi định dạng
 

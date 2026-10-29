@@ -1,6 +1,7 @@
 /** HTTP Mốc 4; dùng chung session và CSRF trong bộ nhớ với mô-đun tài khoản. */
 import {apiRequest,apiPost,ensureCsrf} from './authApi.js';
 export const postApi={
+  search:filters=>apiRequest(`/posts/catalog?${new URLSearchParams(filters)}`),
   list:(mode,before)=>apiRequest(`/posts/${mode}${before?`?before=${before}`:''}`),
   detail:(id,publicOnly=false)=>apiRequest(`/posts/${publicOnly?'catalog/':''}${id}`),
   save:(body,id,mode)=>apiPost(id?`/posts/${id}/${mode}`:'/posts',body),

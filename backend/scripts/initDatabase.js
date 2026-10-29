@@ -18,7 +18,7 @@ try {
   if (found.recordset[0].n > 0) {
     const columns = await app.request().query(`SELECT COUNT(*) AS n FROM sys.columns c JOIN sys.tables t ON c.object_id=t.object_id JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name='dbo' AND t.name IN (${names})`);
     const signature=`${found.recordset[0].n}/${columns.recordset[0].n}`;
-    if (!['19/142','19/144',`${manifest.tables.length}/${manifest.columns}`].includes(signature)) throw new Error('Schema đang có không khớp cấu trúc đã biết. Dừng để bảo vệ dữ liệu; không tự sửa hay xóa.');
+    if (!['19/142','19/144','20/152',`${manifest.tables.length}/${manifest.columns}`].includes(signature)) throw new Error('Schema đang có không khớp cấu trúc đã biết. Dừng để bảo vệ dữ liệu; không tự sửa hay xóa.');
     console.log('Database đã có schema nền; giữ nguyên dữ liệu.');
   } else {
     const contents = await readFile(new URL('../migrations/001_schema.sql', import.meta.url), 'utf8');

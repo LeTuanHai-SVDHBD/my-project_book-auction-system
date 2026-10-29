@@ -1,22 +1,79 @@
-/** Điều hướng tài khoản, đăng sách/kiểm duyệt, danh mục và hạ tầng. */
-import {useEffect,useState} from 'react';
-import AccountPanel from './components/AccountPanel.jsx';
-import InfrastructurePanel from './components/InfrastructurePanel.jsx';
-import TransactionsPanel from './components/TransactionsPanel.jsx';
-import ComplaintsPanel from './components/ComplaintsPanel.jsx';
-import PostsPanel from './components/PostsPanel.jsx';
-import {useAccountControl} from './services/accountControl.js';
-export default function App(){
-  const [tab,setTab]=useState('account');const [user,setUser]=useState(null);
+/** BookBid presentation on existing authenticated APIs and auction control policy. */
+import { useEffect, useState } from "react";
+import AccountPanel from "./components/AccountPanel.jsx";
+import InfrastructurePanel from "./components/InfrastructurePanel.jsx";
+import TransactionsPanel from "./components/TransactionsPanel.jsx";
+import ComplaintsPanel from "./components/ComplaintsPanel.jsx";
+import PostsPanel from "./components/PostsPanel.jsx";
+import BookBidShell from "./components/BookBidShell.jsx";
+import Home from "./components/Home.jsx";
+import { useAccountControl } from "./services/accountControl.js";
+import { useNavigation, navigate } from "./services/navigation.js";
+export default function App() {
+  const route = useNavigation(),
+    [user, setUser] = useState(null);
   useAccountControl(user);
-  useEffect(()=>{const signedOut=()=>{setUser(null);setTab('account');};window.addEventListener('account:signed-out',signedOut);return()=>window.removeEventListener('account:signed-out',signedOut);},[]);
-  const selected=['mine','trades'].includes(tab)&&user?.vai_tro!=='nguoi_dung'||tab==='pending'&&user?.vai_tro!=='admin'||tab==='complaints'&&!user?'account':tab;
-  const button=(value,label)=><button aria-current={selected===value?'page':undefined} onClick={()=>setTab(value)}>{label}</button>;
-  return <><nav className="app-nav" aria-label="Điều hướng chính"><a className="brand" href="#" onClick={event=>{event.preventDefault();setTab('catalog');}}><span className="mark">B</span>BookAuction</a><div>{button('catalog','Danh mục')}{user?.vai_tro==='nguoi_dung'&&button('mine','Bài của tôi')}{user?.vai_tro==='admin'&&button('pending','Kiểm duyệt')}{user?.vai_tro==='nguoi_dung'&&button('trades','Giao dịch')}{user&&button('complaints',user.vai_tro==='admin'?'Khiếu nại':'Khiếu nại của tôi')}{button('account','Tài khoản')}{button('infra','Kiểm tra hệ thống')}</div></nav>
-    <div hidden={selected!=='account'}><AccountPanel onUserChange={setUser}/></div>
-    {['catalog','mine','pending'].includes(selected)&&<PostsPanel key={`${selected}-${user?.nguoi_dung_id||'guest'}`} mode={selected} user={user}/>}
-    {selected==='trades'&&user&&<TransactionsPanel key={user.nguoi_dung_id} user={user}/>}
-    {selected==='complaints'&&user&&<ComplaintsPanel key={user.nguoi_dung_id} user={user}/>}
-    {selected==='infra'&&<InfrastructurePanel/>}
-  </>;
+  useEffect(() => {
+    const signedOut = () => {
+      setUser(null);
+      navigate("account");
+    };
+    window.addEventListener("account:signed-out", signedOut);
+    return () => window.removeEventListener("account:signed-out", signedOut);
+  }, []);
+  const protectedPage =
+    (["mine", "create", "trades"].includes(route.page) &&
+      user?.vai_tro !== "nguoi_dung") ||
+    (route.page === "pending" && user?.vai_tro !== "admin") ||
+    (route.page === "complaints" && !user);
+  const page = protectedPage ? "account" : route.page;
+  return (
+    <BookBidShell user={user} route={route}>
+      <div hidden={page !== "account"}>
+        <AccountPanel onUserChange={setUser} />
+      </div>
+      {page === "home" && <Home />}
+      {["catalog", "mine", "pending", "create"].includes(page) && (
+        <PostsPanel
+          key={`${page}-${user?.nguoi_dung_id || "guest"}-${route.query}`}
+          mode={page === "create" ? "mine" : page}
+          user={user}
+          selectedId={route.id}
+          initialCreate={page === "create"}
+          query={route.query}
+        />
+      )}
+      {page === "trades" && user && (
+        <TransactionsPanel
+          key={user.nguoi_dung_id}
+          user={user}
+          selectedId={route.id}
+        />
+      )}
+      {page === "complaints" && user && (
+        <ComplaintsPanel
+          key={user.nguoi_dung_id}
+          user={user}
+          selectedId={route.id}
+        />
+      )}
+      {page === "infra" && <InfrastructurePanel />}
+      {![
+        "home",
+        "account",
+        "catalog",
+        "mine",
+        "pending",
+        "create",
+        "trades",
+        "complaints",
+        "infra",
+      ].includes(page) && (
+        <div className="page-container empty-state">
+          <h1>Không tìm thấy trang</h1>
+          <a href="#/home">Về trang chủ</a>
+        </div>
+      )}
+    </BookBidShell>
+  );
 }

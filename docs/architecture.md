@@ -42,7 +42,7 @@ Luồng đấu giá: `HTTP → Redis Streams → Consumer → Redis lock → SQL
 Job hết hạn đọc đồng hồ SQL và xếp sự kiện chốt vào cùng stream nghiệp vụ.
 YeuCauDatGia lưu quyết định cuối; LuotDatGia chỉ lưu lượt hợp lệ.
 Cùng transaction ghi quyết định, lượt/giá/lịch sử, kết quả, giao dịch và phòng chat nếu có người thắng khi phiên kết thúc.
-SQL có 20 bảng/152 cột sau migration 003; DDL nền được giữ để nâng cấp tại chỗ.
+SQL có 21 bảng/161 cột sau migration 004 (thêm hộp thông báo riêng); DDL nền được giữ để nâng cấp tại chỗ.
 
 ## Xác thực theo tab
 

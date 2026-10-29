@@ -1,5 +1,6 @@
 /** Admin xem bằng chứng, tiếp nhận và phản hồi; chat chỉ mở cho Admin phụ trách khiếu nại đang xử lý. */
 import {useCallback,useEffect,useRef,useState} from 'react';
+import {navigate} from '../services/navigation.js';
 import {communityGet,communityPost} from '../services/communityApi.js';
 import {ChatFeed,FeedButtons,useCommunityPage,money,when} from './CommunityFeed.jsx';
 const states={cho_xu_ly:'Chờ xử lý',dang_xu_ly:'Đang xử lý',da_xu_ly:'Đã xử lý'};
@@ -18,6 +19,6 @@ function ComplaintDetail({id,user,onClose}){
     {row.phan_hoi_admin&&<blockquote><strong>Kết quả xử lý · {when(row.ngay_xu_ly)}</strong><p className="preserve-lines">{row.phan_hoi_admin}</p></blockquote>}
   </>}{message&&<p className="account-success" role="status">{message}</p>}{error&&<p className="error" role="alert">{error}</p>}</article>;
 }
-export default function ComplaintsPanel({user}){const feed=useCommunityPage('/complaints'),[selected,setSelected]=useState(null);
+export default function ComplaintsPanel({user,selectedId}){const feed=useCommunityPage('/complaints'),[selected,setSelected]=[selectedId,value=>navigate('complaints',value)];
   return <main className="posts-page"><header className="posts-heading"><div><span className="eyebrow">BOOKAUCTION · NHÓM 15</span><h1>{user.vai_tro==='admin'?'Xử lý khiếu nại':'Khiếu nại của tôi'}</h1><p>{user.vai_tro==='admin'?'Xem bằng chứng và tiếp nhận hồ sơ để đối chiếu trao đổi liên quan.':'Theo dõi hồ sơ đã gửi và phản hồi của Admin.'}</p></div></header>{selected?<ComplaintDetail key={selected} id={selected} user={user} onClose={()=>{setSelected(null);feed.latest();}}/>:<><div className="post-list">{feed.data?.items.map(row=><article className="post-card" key={row.khieu_nai_id}><span className="status-pill">{states[row.trang_thai]}</span><h2>{row.ly_do}</h2><p>Khiếu nại #{row.khieu_nai_id} · Giao dịch #{row.giao_dich_id}</p><p>{when(row.ngay_khieu_nai)}</p><button className="secondary" onClick={()=>setSelected(row.khieu_nai_id)}>Xem khiếu nại</button></article>)}</div>{feed.data&&!feed.data.items.length&&<p className="empty-state">Chưa có khiếu nại ở trang này.</p>}<FeedButtons feed={feed}/>{feed.error&&<p className="error" role="alert">{feed.error}</p>}</>}</main>;
 }

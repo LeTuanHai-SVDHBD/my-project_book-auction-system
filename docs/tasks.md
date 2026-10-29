@@ -49,7 +49,7 @@ Không triển khai thêm trạng thái nghiệp vụ, cổng thanh toán hay c�
 ## Checklist nghiệm thu môi trường nhóm
 
 - [ ] Cập nhật mã, giữ cấu hình và volume hiện tại; khởi động lại API/worker/web.
-- [ ] SQL readiness 20 bảng/152 cột; cấu hình Cloudinary đầy đủ.
+- [ ] SQL readiness 21 bảng/161 cột; cấu hình Cloudinary đầy đủ.
 - [ ] Hai tab cùng trình duyệt giữ Admin/người dùng riêng; F5, logout và mở tab mới đúng chính sách.
 - [ ] Cùng tài khoản ở hai cửa sổ: phiên mới hoạt động, tab cũ tự về đăng nhập; F5 không hồi sinh hoặc đăng xuất phiên mới.
 - [ ] Ba ô tiền không lặp số khi gõ/IME, focus/blur, dán/xóa; dòng Giá trị nhóm nghìn, API nhận chuỗi nguyên chính xác.

@@ -28,7 +28,7 @@ function money(value, name) {
   if (typeof value !== 'string' || !/^[1-9]\d{0,17}$/.test(value)) bad(`${name} phải là chuỗi số nguyên VND dương, tối đa 18 chữ số.`);
   return value;
 }
-export function validatePost(body, { mode = 'create', maxImages = 12, maxVideos = 3 } = {}) {
+export function validatePost(body, { mode = 'create' } = {}) {
   object(body, ['ma_yeu_cau', 'sach', 'bai_dang', 'phien', 'media', 'reuse_media', 'row_version'], 'Bài đăng');
   if (body.reuse_media !== undefined && typeof body.reuse_media !== 'boolean') bad('reuse_media không hợp lệ.');
   const book = mode === 'create' ? object(body.sach, ['ten_sach','tac_gia','the_loai','nha_xuat_ban','nam_xuat_ban','isbn','tinh_trang_sach','mo_ta'], 'Sách') : null;
@@ -40,7 +40,7 @@ export function validatePost(body, { mode = 'create', maxImages = 12, maxVideos 
     thoi_gian_cho_dat_lai: auction.thoi_gian_cho_dat_lai ?? 20 };
   if (BigInt(prices.gia_toi_thieu) < BigInt(prices.gia_khoi_diem)) bad('Giá kết thúc sớm phải lớn hơn hoặc bằng giá khởi điểm.');
   if (!Number.isInteger(prices.thoi_gian_cho_dat_lai) || prices.thoi_gian_cho_dat_lai < 10 || prices.thoi_gian_cho_dat_lai > 30) bad('Thời gian chờ đặt lại phải từ 10 đến 30 giây.');
-  if (!Array.isArray(body.media) || body.media.length > maxImages + maxVideos) bad('Danh sách media không hợp lệ.');
+  if (!Array.isArray(body.media)) bad('Danh sách media không hợp lệ.');
   const media = body.media.map(item => {
     object(item, ['upload_id','tieu_de'], 'Media');
     return { upload_id: uuid(item.upload_id), tieu_de: text(item.tieu_de, 500, 'Tiêu đề media') };

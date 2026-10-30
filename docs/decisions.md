@@ -145,7 +145,7 @@ Claim chưa rõ và không có reference được giữ/cảnh báo để đối
 Mất Redis có thể để lại orphan; không có distributed transaction SQL–Cloudinary.
 Chưa có chức năng xóa bài; xóa SQL thủ công không tự xóa tệp. File dùng chung giữa các lần đăng cần được bảo vệ theo reference.
 
-Giới hạn mặc định: 12 ảnh/3 video mỗi bài, 10 MB/ảnh, 50 MB/video, hai upload đồng thời/API process,
+Cập nhật 30/10/2026: bỏ giới hạn số ảnh mỗi bài theo yêu cầu. Giữ mặc định 3 video/bài (tính cả media giữ lại), 10 MB/ảnh, 50 MB/video, hai upload đồng thời/API process,
 60 lần thử/tài khoản/giờ. Đây là giới hạn kỹ thuật, không thay bộ tiêu chí thẩm định sách.
 Tham khảo: [Cloudinary Upload API](https://cloudinary.com/documentation/image_upload_api_reference).
 

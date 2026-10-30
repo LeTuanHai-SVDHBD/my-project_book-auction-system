@@ -55,24 +55,41 @@ export function useNotifications(user) {
   }, [refresh, user?.nguoi_dung_id]);
   return { data, error, refresh };
 }
+function timeAgo(value) {
+  const stamp = Date.parse(value);
+  if (!Number.isFinite(stamp)) return "";
+  const minutes = Math.max(0, Math.floor((Date.now() - stamp) / 60000));
+  return minutes < 1
+    ? "Vừa xong"
+    : minutes < 60
+      ? `${minutes} phút trước`
+      : minutes < 1440
+        ? `${Math.floor(minutes / 60)} giờ trước`
+        : new Date(stamp).toLocaleDateString("vi-VN");
+}
 export default function Notifications({ inbox, user, onClose }) {
-  const [expanded, setExpanded] = useState(false),
+  const [filter, setFilter] = useState("all"),
     [older, setOlder] = useState([]),
-    [next, setNext] = useState(null),
+    [next, setNext] = useState(undefined),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const items = [
     ...new Map(
-      [...(inbox.data?.items || []), ...older].map((x) => [x.thong_bao_id, x]),
+      [...older, ...(inbox.data?.items || [])].map((item) => [
+        item.thong_bao_id,
+        item,
+      ]),
     ).values(),
-  ];
+  ].sort((a, b) => b.thong_bao_id - a.thong_bao_id);
+  const visible =
+    filter === "unread" ? items.filter((item) => !item.ngay_doc) : items;
+  const cursor = next === undefined ? inbox.data?.nextBefore : next;
   async function more() {
+    if (!cursor) return;
     setBusy(true);
     setError("");
     try {
-      const value = await apiRequest(
-        `/notifications?before=${next || inbox.data.nextBefore}`,
-      );
+      const value = await apiRequest(`/notifications?before=${cursor}`);
       setOlder((old) => [...old, ...value.items]);
       setNext(value.nextBefore);
     } catch (e) {
@@ -88,13 +105,7 @@ export default function Notifications({ inbox, user, onClose }) {
       await apiPost(`/notifications/${item.thong_bao_id}/read`);
       await inbox.refresh();
       onClose();
-      const page =
-        item.loai === "pending"
-          ? "pending"
-          : item.loai === "mine"
-            ? "mine"
-            : item.loai;
-      navigate(page, item.doi_tuong_id);
+      navigate(item.loai, item.doi_tuong_id);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -102,94 +113,131 @@ export default function Notifications({ inbox, user, onClose }) {
     }
   }
   return (
-    <Dialog
-      title="Thông báo"
-      className="admin-notifications live-notifications"
-      onClose={onClose}
-    >
-      {!user ? (
-        <p>Đăng nhập để xem thông báo của bạn.</p>
-      ) : (
-        <>
-          <p className="notification-note">
-            {inbox.data
-              ? `${inbox.data.unread} thông báo chưa đọc`
-              : "Đang tải thông báo…"}
-          </p>
-          {!items.length && inbox.data && (
-            <div className="empty-state">
-              <Icon name="bell" size={36} />
-              <h3>Chưa có thông báo</h3>
-              <p>Các cập nhật liên quan đến bạn sẽ xuất hiện tại đây.</p>
-            </div>
+    <Dialog title="Thông báo" className="inbox-dialog" onClose={onClose}>
+      <div className="inbox-toolbar">
+        <p>
+          {inbox.data ? (
+            <>
+              <strong>{inbox.data.unread}</strong> thông báo chưa đọc
+            </>
+          ) : (
+            "Cập nhật dành riêng cho bạn"
           )}
-          {(expanded ? items : items.slice(0, 5)).map((item) => (
-            <button
-              type="button"
-              disabled={busy}
-              className={`notification-item notification-link ${item.ngay_doc ? "" : "unread"}`}
-              key={item.thong_bao_id}
-              onClick={() => open(item)}
-            >
-              <span>
-                <Icon
-                  name={
-                    item.loai === "trades"
-                      ? "chat"
-                      : item.loai === "complaints"
-                        ? "shield"
-                        : "file"
-                  }
-                />
-              </span>
-              <div>
-                <b>{item.tieu_de}</b>
-                <p>{item.noi_dung}</p>
-                <small>
-                  {new Date(item.ngay_tao).toLocaleString("vi-VN")} ·{" "}
-                  {item.ngay_doc ? "Đã đọc" : "Chưa đọc"}
-                </small>
-              </div>
-            </button>
-          ))}
-          {!expanded && items.length > 0 && (
-            <button
-              type="button"
-              className="notification-all"
-              onClick={() => setExpanded(true)}
-            >
-              Xem tất cả thông báo
-            </button>
-          )}
-          {expanded && (older.length ? next : inbox.data?.nextBefore) && (
-            <button
-              type="button"
-              className="notification-all"
-              disabled={busy}
-              onClick={more}
-            >
-              {busy ? "Đang tải…" : "Xem thêm thông báo"}
-            </button>
-          )}
-          <button
-            type="button"
-            className="text-button"
-            disabled={busy}
-            onClick={() => {
-              setOlder([]);
-              setNext(null);
-              void inbox.refresh();
-            }}
-          >
-            Tải lại thông báo
-          </button>
-        </>
-      )}
+        </p>
+        <button
+          type="button"
+          className="inbox-refresh"
+          aria-label="Tải lại thông báo"
+          title="Tải lại thông báo"
+          disabled={busy}
+          onClick={() => {
+            setOlder([]);
+            setNext(undefined);
+            void inbox.refresh();
+          }}
+        >
+          <Icon name="clock" size={20} />
+        </button>
+      </div>
+      <div className="inbox-filters" role="group" aria-label="Lọc thông báo">
+        <button
+          type="button"
+          aria-pressed={filter === "all"}
+          onClick={() => setFilter("all")}
+        >
+          Tất cả
+        </button>
+        <button
+          type="button"
+          aria-pressed={filter === "unread"}
+          onClick={() => setFilter("unread")}
+        >
+          Chưa đọc
+        </button>
+      </div>
       {(error || inbox.error) && (
         <p className="error" role="alert">
           {error || inbox.error}
         </p>
       )}
+      {!inbox.data && !inbox.error && (
+        <p className="inbox-loading" role="status">
+          Đang tải thông báo…
+        </p>
+      )}
+      <div className="inbox-scroll">
+        {inbox.data && !visible.length && (
+          <div className="inbox-empty">
+            <Icon name="bell" size={46} />
+            <h3>
+              {filter === "unread"
+                ? "Không có mục chưa đọc"
+                : "Bạn chưa có thông báo"}
+            </h3>
+            <p>
+              {filter === "unread"
+                ? "Các thông báo đã tải đều được đọc."
+                : "Quyết định kiểm duyệt, giao dịch và phản hồi liên quan sẽ xuất hiện ở đây."}
+            </p>
+            {cursor && <p>Còn thông báo cũ hơn bên dưới.</p>}
+          </div>
+        )}
+        <ul className="inbox-list">
+          {visible.map((item) => (
+            <li key={item.thong_bao_id}>
+              <button
+                type="button"
+                disabled={busy}
+                className={`inbox-entry ${item.ngay_doc ? "" : "is-unread"}`}
+                onClick={() => open(item)}
+              >
+                <span className={`inbox-entry-icon kind-${item.loai}`}>
+                  <Icon
+                    name={
+                      item.loai === "trades"
+                        ? "chat"
+                        : item.loai === "complaints"
+                          ? "shield"
+                          : item.loai === "catalog"
+                            ? "gavel"
+                            : "file"
+                    }
+                    size={22}
+                  />
+                </span>
+                <span className="inbox-entry-copy">
+                  <span className="inbox-entry-title">
+                    {item.tieu_de}
+                    {!item.ngay_doc && <i aria-label="Chưa đọc" />}
+                  </span>
+                  <span className="inbox-entry-body">{item.noi_dung}</span>
+                  <span
+                    className="inbox-entry-time"
+                    title={new Date(item.ngay_tao).toLocaleString("vi-VN")}
+                  >
+                    {timeAgo(item.ngay_tao)} ·{" "}
+                    {item.ngay_doc ? "Đã đọc" : "Chưa đọc"}
+                  </span>
+                </span>
+                <Icon name="chevron" size={17} />
+              </button>
+            </li>
+          ))}
+        </ul>
+        {cursor && (
+          <button
+            type="button"
+            className="inbox-more"
+            disabled={busy}
+            onClick={more}
+          >
+            {busy ? "Đang tải…" : "Xem thêm thông báo"}
+          </button>
+        )}
+      </div>
+      <p className="inbox-footnote">
+        Chọn một thông báo để mở nội dung và đánh dấu đã đọc.
+      </p>
     </Dialog>
   );
 }

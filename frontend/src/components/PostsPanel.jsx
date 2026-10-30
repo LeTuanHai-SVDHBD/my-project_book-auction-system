@@ -1,6 +1,6 @@
 /** Danh mục, bài của tôi, kiểm duyệt thủ công và luồng đặt giá/kết quả phiên. */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BOOK_GENRES } from "../../../shared/bookGenres.js";
+import { BOOK_GENRE_GROUPS } from "../../../shared/bookGenres.js";
 import { navigate } from "../services/navigation.js";
 import BookCard from "./BookCard.jsx";
 import BookGallery from "./BookGallery.jsx";
@@ -281,6 +281,7 @@ export default function PostsPanel({
           ? await postApi.search({
               q: filters.get("q") || "",
               genre: filters.get("genre") || "",
+              group: filters.get("group") || "",
               phase: filters.get("phase") || "all",
               sort: filters.get("sort") || "newest",
               page: append ? next : 1,
@@ -355,6 +356,8 @@ export default function PostsPanel({
   function filter(key, value) {
     const params = new URLSearchParams(query);
     params.set(key, value);
+    if (key === "group") params.delete("genre");
+    if (key === "genre") params.delete("group");
     navigate("catalog", null, params.toString());
   }
   const title =
@@ -521,12 +524,33 @@ export default function PostsPanel({
                 <div className="select-filters">
                   <select
                     aria-label="Lọc thể loại"
-                    value={filters.get("genre") || ""}
-                    onChange={(e) => filter("genre", e.target.value)}
+                    value={
+                      filters.get("group")
+                        ? `group:${filters.get("group")}`
+                        : filters.get("genre") || ""
+                    }
+                    onChange={(e) =>
+                      e.target.value.startsWith("group:")
+                        ? filter("group", e.target.value.slice(6))
+                        : filter("genre", e.target.value)
+                    }
                   >
                     <option value="">Tất cả thể loại</option>
-                    {BOOK_GENRES.map((g) => (
-                      <option key={g}>{g}</option>
+                    <optgroup label="Nhóm chính">
+                      {BOOK_GENRE_GROUPS.map((group) => (
+                        <option key={group.name} value={`group:${group.name}`}>
+                          {group.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                    {BOOK_GENRE_GROUPS.map((group) => (
+                      <optgroup key={group.name} label={group.name}>
+                        {group.items.map((genre) => (
+                          <option key={genre} value={genre}>
+                            {genre}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                   <select

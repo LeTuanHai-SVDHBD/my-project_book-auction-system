@@ -1,6 +1,7 @@
 /** Biểu mẫu sách/bài đăng; tệp được tải trước, chỉ vé upload được gửi cùng nội dung. */
 import { useEffect, useRef, useState } from "react";
 import { postApi } from "../services/postApi.js";
+import UploadMediaCard from "./UploadMediaCard.jsx";
 import MoneyInput from "./MoneyInput.jsx";
 import GenreSelect from "./GenreSelect.jsx";
 export default function PostForm({
@@ -12,6 +13,8 @@ export default function PostForm({
   const [step, setStep] = useState(0),
     [review, setReview] = useState({});
   const formRef = useRef(null);
+  const [isbnMode, setIsbnMode] = useState(source?.isbn ? "has" : "none"),
+    [isbn, setIsbn] = useState(source?.isbn || "");
   const [config, setConfig] = useState(null);
   const [media, setMedia] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -49,6 +52,24 @@ export default function PostForm({
       for (const [index, file] of files.entries()) {
         const image = config.imageTypes.includes(file.type);
         const video = config.videoTypes.includes(file.type);
+        if (video) {
+          const reused =
+            mode === "resubmit" ||
+            (mode === "relist" &&
+              formRef.current?.elements.reuse_media?.checked);
+          const existing = reused
+            ? (source?.media || []).filter((item) => item.kind === "video")
+                .length
+            : 0;
+          if (
+            existing +
+              tickets.current.filter((item) => item.kind === "video").length >=
+            config.maxVideos
+          )
+            throw new Error(
+              `Tối đa ${config.maxVideos} video cho mỗi bài đăng, tính cả video giữ lại.`,
+            );
+        }
         if (!image && !video)
           throw new Error("Chỉ hỗ trợ JPEG, PNG, WebP, MP4 và WebM.");
         if (file.size > (image ? config.imageMaxBytes : config.videoMaxBytes))
@@ -222,7 +243,59 @@ export default function PostForm({
                   <GenreSelect />
                   {input("nha_xuat_ban", "Nhà xuất bản", 200)}
                   {input("nam_xuat_ban", "Năm xuất bản", 4, false, "number")}
-                  {input("isbn", "ISBN (10 hoặc 13 ký tự)", 13)}
+                  <div className="isbn-field">
+                    <fieldset className="isbn-choice">
+                      <legend>ISBN</legend>
+                      <div role="radiogroup" aria-label="Thông tin ISBN">
+                        <label>
+                          <input
+                            type="radio"
+                            name="isbn_option"
+                            value="has"
+                            checked={isbnMode === "has"}
+                            onChange={() => setIsbnMode("has")}
+                          />
+                          Có ISBN
+                        </label>
+                        <label>
+                          <input
+                            type="radio"
+                            name="isbn_option"
+                            value="none"
+                            checked={isbnMode === "none"}
+                            onChange={() => setIsbnMode("none")}
+                          />
+                          Không có ISBN
+                        </label>
+                      </div>
+                    </fieldset>
+                    {isbnMode === "has" ? (
+                      <label>
+                        ISBN (10 hoặc 13 ký tự)
+                        <input
+                          name="isbn"
+                          aria-label="ISBN (10 hoặc 13 ký tự)"
+                          value={isbn}
+                          onChange={(event) =>
+                            setIsbn(event.target.value.toUpperCase())
+                          }
+                          maxLength={13}
+                          pattern="(?:[0-9]{13}|[0-9]{9}[0-9X])"
+                          title="Nhập 13 chữ số hoặc ISBN-10 (có thể kết thúc bằng X)."
+                          required
+                          autoComplete="off"
+                        />
+                        <small className="field-hint">
+                          Nhập liền, không có dấu gạch nối.
+                        </small>
+                      </label>
+                    ) : (
+                      <p className="field-hint">
+                        Sách cổ hoặc bản sách không có mã ISBN vẫn có thể gửi
+                        kiểm duyệt.
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <label>
                   Tình trạng sách
@@ -268,7 +341,7 @@ export default function PostForm({
             )}
             <p className="field-hint">
               {config
-                ? `Tối đa ${config.maxImages} ảnh (${config.imageMaxBytes / 1048576} MB/tệp), ${config.maxVideos} video (${config.videoMaxBytes / 1048576} MB/tệp). JPEG, PNG, WebP, MP4, WebM.`
+                ? `Không giới hạn số lượng ảnh (${config.imageMaxBytes / 1048576} MB/ảnh). Tối đa ${config.maxVideos} video (${config.videoMaxBytes / 1048576} MB/video). JPEG, PNG, WebP, MP4, WebM.`
                 : "Đang tải cấu hình…"}
             </p>
             {config && !config.configured && (
@@ -286,24 +359,33 @@ export default function PostForm({
                 onChange={upload}
               />
             </label>
-            <div className="media-grid">
+            {media.length > 0 && (
+              <div className="media-selection-summary">
+                <strong>
+                  {media.filter((item) => item.kind === "image").length} ảnh ·{" "}
+                  {media.filter((item) => item.kind === "video").length} video
+                  vừa tải lên
+                </strong>
+                <span>Nhấn × trên tệp để bỏ trước khi gửi bài.</span>
+              </div>
+            )}
+            <div className="media-grid upload-selection">
               {media.map((item) => (
-                <figure key={item.upload_id}>
-                  {item.kind === "image" ? (
-                    <img src={item.url} alt={item.tieu_de} />
-                  ) : (
-                    <video src={item.url} controls preload="metadata" />
-                  )}
-                  <figcaption>{item.tieu_de}</figcaption>
-                  <button type="button" onClick={() => remove(item)}>
-                    Bỏ tệp
-                  </button>
-                </figure>
+                <UploadMediaCard
+                  key={item.upload_id}
+                  item={item}
+                  onRemove={remove}
+                  disabled={busy}
+                />
               ))}
             </div>
             {source?.media?.length > 0 && (
               <>
                 <h4>Media đã gắn với bản sách</h4>
+                <p className="field-hint">
+                  Media đã lưu được giữ lại cùng lịch sử bài đăng. Nút × chỉ áp
+                  dụng cho tệp vừa tải lên.
+                </p>
                 <div className="media-grid">
                   {source.media.map((item) => (
                     <figure key={item.url}>
@@ -370,6 +452,8 @@ export default function PostForm({
             <dl className="post-info">
               <dt>Tên sách</dt>
               <dd>{source?.ten_sach || review.ten_sach}</dd>
+              <dt>ISBN</dt>
+              <dd>{source?.isbn || review.isbn || "Không có ISBN"}</dd>
               <dt>Tiêu đề bài</dt>
               <dd>{review.tieu_de}</dd>
               <dt>Media mới</dt>

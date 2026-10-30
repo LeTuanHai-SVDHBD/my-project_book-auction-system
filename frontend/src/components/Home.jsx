@@ -1,4 +1,5 @@
 /** Approved home layout backed by the public catalog, never fixture auction data. */
+import { BOOK_GENRE_GROUPS } from "../../../shared/bookGenres.js";
 import { useEffect, useState } from "react";
 import { postApi } from "../services/postApi.js";
 import { navigate } from "../services/navigation.js";
@@ -99,9 +100,12 @@ export default function Home() {
       <section className="figma-section">
         <h2>Khám phá theo thể loại</h2>
         <div className="figma-chips">
-          {["Văn học", "Lịch sử", "Văn hóa", "Thơ", "Tư liệu"].map((genre) => (
-            <a key={genre} href={`#/catalog?q=${encodeURIComponent(genre)}`}>
-              {genre}
+          {BOOK_GENRE_GROUPS.map((group) => (
+            <a
+              key={group.name}
+              href={`#/catalog?${new URLSearchParams({ group: group.name })}`}
+            >
+              {group.name}
             </a>
           ))}
         </div>

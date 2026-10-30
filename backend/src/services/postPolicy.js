@@ -12,3 +12,8 @@ export function canRelist({sourceId,latestId,state,outcome}) {
 export function assertRelistable(input) {
   if(!canRelist(input))throw new HttpError(409,'POST_CONFLICT','Chỉ đăng lại phiên mới nhất của sách đã kết thúc và có kết quả không có người thắng.');
 }
+
+/** Image count has no per-listing business cap; video count includes reused media. */
+export function assertVideoLimit(items,maxVideos) {
+  if(items.filter(item=>item.kind==='video').length>maxVideos)throw new HttpError(400,'MEDIA_COUNT',`Tối đa ${maxVideos} video cho mỗi bài đăng.`);
+}

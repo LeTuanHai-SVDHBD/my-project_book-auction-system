@@ -3,11 +3,19 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { createApp } from "../src/app.js";
 import { createPostRouter } from "../src/routes/post.routes.js";
+import { BOOK_GENRE_GROUPS } from "../../shared/bookGenres.js";
 import { catalogSearch, searchPattern } from "../src/services/catalogSearch.js";
 test("search bounds, literal wildcards, normalization and sort whitelist", () => {
   assert.deepEqual(
     catalogSearch({ q: "  Đắc nhân tâm  ", phase: "live", page: "2" }),
-    { q: "Đắc nhân tâm", genre: "", phase: "live", sort: "newest", page: 2 },
+    {
+      q: "Đắc nhân tâm",
+      genre: "",
+      group: "",
+      phase: "live",
+      sort: "newest",
+      page: 2,
+    },
   );
   assert.equal(searchPattern("Đ%_[~"), "%d~%~_~[~~%");
   for (const q of [
@@ -76,4 +84,13 @@ test("HTTP search remains public, bounded and strips internal data", async (t) =
   assert.equal((await fetch(base + "?sort=invalid")).status, 400);
   assert.equal((await fetch(base + "?q=a&q=b")).status, 400);
   assert.equal((await fetch(base + "?q=a&before=1")).status, 400);
+});
+
+test("parent genre group is validated against the shared taxonomy", () => {
+  for (const group of BOOK_GENRE_GROUPS)
+    assert.equal(catalogSearch({ group: group.name }).group, group.name);
+  assert.throws(() => catalogSearch({ group: "Văn học" }), { status: 400 });
+  assert.throws(() => catalogSearch({ group: ["Văn học và hư cấu"] }), {
+    status: 400,
+  });
 });

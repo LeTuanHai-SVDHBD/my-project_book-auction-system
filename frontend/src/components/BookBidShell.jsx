@@ -43,11 +43,15 @@ export default function BookBidShell({ user, route, children }) {
       aria-label="Thông báo"
       aria-haspopup="dialog"
       aria-expanded={notifications}
+      title={
+        inbox.data?.unread
+          ? `${inbox.data.unread} thông báo chưa đọc`
+          : "Thông báo"
+      }
       onClick={() => setNotifications(true)}
     >
-      <span className="notification-trigger">
-        <Icon name="bell" size={27} />
-        {inbox.data?.unread > 0 && <i />}
+      <span className="notification-bell-icon">
+        <Icon name="bell" size={25} />
       </span>
       {admin && (
         <span>
@@ -58,7 +62,7 @@ export default function BookBidShell({ user, route, children }) {
         </span>
       )}
       {inbox.data?.unread > 0 && (
-        <span className="admin-notification-count">
+        <span className="notification-count">
           {inbox.data.unread > 99 ? "99+" : inbox.data.unread}
         </span>
       )}

@@ -12,7 +12,7 @@ import {createSessionMiddleware} from '../src/middlewares/session.js';
 import {parseAuthConfig} from '../src/config/auth.js';
 import {parseMediaConfig} from '../src/config/media.js';
 import {validatePost,validateReview,validateActivation} from '../src/services/postValidation.js';
-import {canRelist,assertStatePair,assertVersion} from '../src/services/postPolicy.js';
+import {canRelist,assertStatePair,assertVersion,assertVideoLimit} from '../src/services/postPolicy.js';
 import {createPostService} from '../src/services/post.service.js';
 import {publicPost} from '../src/controllers/post.controller.js';
 import {createCloudinary,verifyMedia} from '../src/services/cloudinary.service.js';
@@ -156,4 +156,12 @@ test('HTTP upload: chỉ hai provider call đồng thời, request thứ ba bị
   try {await bothStarted;assert.equal((await c.call('/media/image','POST',bytes,c.token,'image/jpeg')).status,429);}
   finally{finish();}
   assert.equal((await first).status,201);assert.equal((await second).status,201);assert.equal(started,2);
+});
+
+test('listing images have no count cap; videos still include reused media in their limit',()=>{
+ const config=parseMediaConfig({MEDIA_MAX_IMAGES:'12'});assert.equal(config.maxImages,null);assert.equal(config.maxVideos,3);
+ const body=payload();body.media=Array.from({length:100},()=>({upload_id:randomUUID()}));assert.equal(validatePost(body,config).media.length,100);
+ const images=body.media.map(()=>({kind:'image'}));assert.doesNotThrow(()=>assertVideoLimit([...images,...Array.from({length:3},()=>({kind:'video'}))],3));
+ assert.throws(()=>assertVideoLimit([...images,...Array.from({length:4},()=>({kind:'video'}))],3),{status:400,code:'MEDIA_COUNT'});
+ body.sach.isbn=null;assert.equal(validatePost(body).book.isbn,null);body.sach.isbn='123';assert.throws(()=>validatePost(body),{status:400});
 });

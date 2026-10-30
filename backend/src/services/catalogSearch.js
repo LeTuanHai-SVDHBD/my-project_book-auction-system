@@ -1,4 +1,5 @@
 /** Bounded search values and server-owned sort expressions; SQL LIKE treats user punctuation literally. */
+import { BOOK_GENRE_GROUPS } from "../../../shared/bookGenres.js";
 import { HttpError } from "../middlewares/errorHandler.js";
 export function catalogSearch(query) {
   const fail = () => {
@@ -9,7 +10,7 @@ export function catalogSearch(query) {
     );
   };
   for (const key of Object.keys(query))
-    if (!["q", "genre", "phase", "sort", "page"].includes(key)) fail();
+    if (!["q", "genre", "group", "phase", "sort", "page"].includes(key)) fail();
   const text = (key, max) => {
     const v = query[key] ?? "";
     if (typeof v !== "string" || v.length > max || /[\x00-\x1f]/.test(v))
@@ -20,6 +21,7 @@ export function catalogSearch(query) {
   };
   const q = text("q", 120),
     genre = text("genre", 100),
+    group = text("group", 100),
     phase = query.phase || "all",
     sort = query.sort || "newest";
   if (
@@ -27,6 +29,7 @@ export function catalogSearch(query) {
     !["newest", "price", "ending"].includes(sort)
   )
     fail();
+  if (group && !BOOK_GENRE_GROUPS.some((item) => item.name === group)) fail();
   const page =
     query.page === undefined
       ? 1
@@ -34,7 +37,7 @@ export function catalogSearch(query) {
         ? Number(query.page)
         : 0;
   if (!page) fail();
-  return { q, genre, phase, sort, page };
+  return { q, genre, group, phase, sort, page };
 }
 export const searchPattern = (value) =>
   "%" +

@@ -130,10 +130,12 @@ Dùng `127.0.0.1` nhất quán cho Frontend và API để cookie hoạt động 
 
 | Loại | Định dạng | Giới hạn mặc định |
 |---|---|---|
-| Ảnh | JPEG, PNG, WebP | 12 tệp/bài; 10 MB/tệp |
+| Ảnh | JPEG, PNG, WebP | Không giới hạn số ảnh/bài; 10 MB/tệp |
 | Video | MP4, WebM | 3 tệp/bài; 50 MB/tệp |
 
-Điều chỉnh bằng `MEDIA_MAX_IMAGES`, `MEDIA_MAX_VIDEOS`, `MEDIA_IMAGE_MAX_MB`, `MEDIA_VIDEO_MAX_MB`.
+Điều chỉnh bằng `MEDIA_MAX_VIDEOS`, `MEDIA_IMAGE_MAX_MB`, `MEDIA_VIDEO_MAX_MB`. `MEDIA_MAX_IMAGES` cũ không còn được áp dụng; không cần sửa `.env` riêng. Ảnh vừa tải lên có nút × để bỏ trước khi gửi bài, chỉ gửi các vé còn giữ. Giới hạn video tính cả video giữ lại khi bổ sung/đăng lại.
+
+ISBN là tùy chọn: chọn **Có ISBN** để nhập ISBN-10/13, hoặc **Không có ISBN** để lưu NULL. Trang chủ dùng đúng bốn nhóm từ `shared/bookGenres.js`; chọn nhóm sẽ lọc các thể loại con, không tìm nhóm bằng từ khóa tự đặt.
 API kiểm tra MIME, magic bytes và kích thước; tối đa hai upload đang xử lý mỗi tiến trình và 60 lần thử/tài khoản/giờ.
 Đây là giới hạn tài nguyên của bản triển khai. Chưa có kiểm tra thời lượng video.
 

@@ -9,59 +9,99 @@ import {
   money,
   when,
 } from "./CommunityFeed.jsx";
+import { Dialog, Icon } from "./DesignUi.jsx";
 import ComplaintForm from "./ComplaintForm.jsx";
 const complaintStates = {
   cho_xu_ly: "Chờ xử lý",
   dang_xu_ly: "Đang xử lý",
   da_xu_ly: "Đã xử lý",
 };
-function OwnComplaint({ id, user, onClose }) {
+function OwnComplaint({ id, onClose }) {
   const { data: row, error } = useCommunityPage(`/complaints/${id}`);
   return (
-    <section aria-label="Chi tiết khiếu nại">
-      <h3>Khiếu nại #{id}</h3>
-      <button type="button" onClick={onClose}>
-        Đóng khiếu nại
-      </button>
-      {row && (
-        <>
-          <p>
-            {complaintStates[row.trang_thai]} · {when(row.ngay_khieu_nai)}
-          </p>
-          <strong>{row.ly_do}</strong>
-          <p className="preserve-lines">{row.noi_dung}</p>
-          {row.phan_hoi_admin && (
-            <blockquote className="preserve-lines">
-              {row.phan_hoi_admin}
-            </blockquote>
-          )}
-          <div className="media-grid">
-            {row.bang_chung.map((item) => (
-              <figure key={item.bang_chung_id}>
-                <a
-                  href={item.duong_dan_anh_khieu_nai}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <img
-                    src={item.duong_dan_anh_khieu_nai}
-                    alt={item.mo_ta_anh_khieu_nai || "Bằng chứng khiếu nại"}
-                  />
-                </a>
-                <figcaption>{item.mo_ta_anh_khieu_nai}</figcaption>
-              </figure>
-            ))}
-          </div>
-        </>
-      )}
+    <Dialog
+      title={`Khiếu nại #${id}`}
+      className="complaint-dialog"
+      onClose={onClose}
+    >
+      {!row && !error && <p role="status">Đang tải hồ sơ…</p>}
       {error && (
         <p className="error" role="alert">
           {error}
         </p>
       )}
-    </section>
+      {row && (
+        <>
+          <div className="case-overview">
+            <span className={`case-state ${row.trang_thai}`}>
+              {complaintStates[row.trang_thai]}
+            </span>
+            <p>Gửi lúc {when(row.ngay_khieu_nai)}</p>
+          </div>
+          <section className="case-section">
+            <span className="eyebrow">Vấn đề cần đối chiếu</span>
+            <h3>{row.ly_do}</h3>
+            <h4>Nội dung khiếu nại</h4>
+            <p className="case-description preserve-lines">{row.noi_dung}</p>
+          </section>
+          <section className="case-section">
+            <h4>
+              Ảnh bằng chứng <span>({row.bang_chung.length})</span>
+            </h4>
+            {row.bang_chung.length ? (
+              <div className="media-grid case-evidence">
+                {row.bang_chung.map((item) => (
+                  <figure key={item.bang_chung_id}>
+                    <a
+                      href={item.duong_dan_anh_khieu_nai}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <img
+                        src={item.duong_dan_anh_khieu_nai}
+                        alt={item.mo_ta_anh_khieu_nai || "Bằng chứng khiếu nại"}
+                      />
+                    </a>
+                    <figcaption>{item.mo_ta_anh_khieu_nai}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            ) : (
+              <p className="case-muted">
+                Hồ sơ này chưa đính kèm ảnh bằng chứng.
+              </p>
+            )}
+          </section>
+          <section
+            className={`case-admin-response ${row.phan_hoi_admin ? "has-response" : ""}`}
+          >
+            <div>
+              <Icon name="shield" size={24} />
+              <h4>Phản hồi của Admin</h4>
+            </div>
+            {row.phan_hoi_admin ? (
+              <>
+                <p className="preserve-lines">{row.phan_hoi_admin}</p>
+                <small>Phản hồi lúc {when(row.ngay_xu_ly)}</small>
+              </>
+            ) : (
+              <p>
+                Chưa có phản hồi. Bạn có thể theo dõi trạng thái xử lý tại hồ sơ
+                này.
+              </p>
+            )}
+          </section>
+          <div className="case-dialog-actions">
+            <button type="button" className="secondary" onClick={onClose}>
+              Đóng hồ sơ
+            </button>
+          </div>
+        </>
+      )}
+    </Dialog>
   );
 }
+
 function TradeDetail({ id, user, onClose }) {
   const [row, setRow] = useState(null),
     [error, setError] = useState(""),
@@ -244,44 +284,80 @@ function TradeDetail({ id, user, onClose }) {
               Mở cuộc trò chuyện
             </button>
           )}
-          <section className="panel">
-            {" "}
-            <h3>Khiếu nại của tôi trong giao dịch</h3>
-            {row.khieu_nai.map((item) => (
-              <p key={item.khieu_nai_id}>
-                <button onClick={() => setComplaint(item.khieu_nai_id)}>
-                  Khiếu nại #{item.khieu_nai_id}: {item.ly_do}
-                </button>{" "}
-                · {complaintStates[item.trang_thai]}
-              </p>
-            ))}
+          <section className="panel trade-complaints">
+            <div className="trade-complaints-heading">
+              <span className="case-heading-icon">
+                <Icon name="shield" size={26} />
+              </span>
+              <div>
+                <h3>Khiếu nại giao dịch</h3>
+                <p>Hồ sơ bạn đã gửi và phản hồi từ Admin.</p>
+              </div>
+            </div>
+            {row.khieu_nai.length ? (
+              <ul className="trade-case-list">
+                {row.khieu_nai.map((item) => (
+                  <li key={item.khieu_nai_id}>
+                    <div>
+                      <span className="case-number">
+                        Hồ sơ #{item.khieu_nai_id}
+                      </span>
+                      <span className={`case-state ${item.trang_thai}`}>
+                        {complaintStates[item.trang_thai]}
+                      </span>
+                    </div>
+                    <h4>{item.ly_do}</h4>
+                    <p>Gửi lúc {when(item.ngay_khieu_nai)}</p>
+                    <button
+                      type="button"
+                      className="case-open"
+                      onClick={() => setComplaint(item.khieu_nai_id)}
+                    >
+                      Xem hồ sơ và phản hồi <Icon name="arrow" size={18} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="trade-cases-empty">
+                <p>Bạn chưa gửi khiếu nại cho giao dịch này.</p>
+                <small>
+                  Nếu thông tin bản sách hoặc thỏa thuận chưa khớp, hãy gửi nội
+                  dung và bằng chứng để Admin đối chiếu.
+                </small>
+              </div>
+            )}
+            <button
+              type="button"
+              className="secondary create-complaint"
+              onClick={() => setForm(true)}
+            >
+              <Icon name="plus" size={18} /> Gửi khiếu nại mới
+            </button>
             {complaint && (
               <OwnComplaint
                 key={`complaint-${complaint}`}
                 id={complaint}
-                user={user}
                 onClose={() => setComplaint(null)}
               />
             )}
-            {form ? (
-              <ComplaintForm
-                tradeId={id}
-                onCancel={() => setForm(false)}
-                onSaved={(caseId) => {
-                  setForm(false);
-                  setComplaint(caseId);
-                  setMessage("Đã gửi khiếu nại.");
-                  void load();
-                }}
-              />
-            ) : (
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setForm(true)}
+            {form && (
+              <Dialog
+                title="Gửi khiếu nại"
+                className="complaint-dialog"
+                onClose={() => setForm(false)}
               >
-                Tạo khiếu nại
-              </button>
+                <ComplaintForm
+                  tradeId={id}
+                  onCancel={() => setForm(false)}
+                  onSaved={(caseId) => {
+                    setForm(false);
+                    setComplaint(caseId);
+                    setMessage("Đã gửi khiếu nại.");
+                    void load();
+                  }}
+                />
+              </Dialog>
             )}
           </section>
         </div>

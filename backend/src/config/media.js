@@ -13,7 +13,7 @@ export function parseMediaConfig(env) {
   return { cloudName, apiKey, apiSecret, configured,
     imageMaxBytes: integer('MEDIA_IMAGE_MAX_MB', 10, 20) * 1024 * 1024,
     videoMaxBytes: integer('MEDIA_VIDEO_MAX_MB', 50, 100) * 1024 * 1024,
-    maxImages: integer('MEDIA_MAX_IMAGES', 12, 30), maxVideos: integer('MEDIA_MAX_VIDEOS', 3, 5),
+    maxImages: null, maxVideos: integer('MEDIA_MAX_VIDEOS', 3, 5),
     pendingSeconds: 3600, uploadTimeoutMs: 120000 };
 }
 export function publicMediaConfig(config) {

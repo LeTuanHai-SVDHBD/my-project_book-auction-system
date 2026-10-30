@@ -1,9 +1,10 @@
 /** SQL bài đăng/phiên: khóa cặp trạng thái và sách vật lý, tiền được truyền/đọc bằng chuỗi. */
+import {BOOK_GENRE_GROUPS} from '../../../shared/bookGenres.js';
 import {searchPattern,catalogOrders} from '../services/catalogSearch.js';
 import { HttpError } from '../middlewares/errorHandler.js';
 import {analysisView} from '../ai/input.js';
 import {withRowVersion} from '../utils/rowVersion.js';
-import {assertVersion,assertStatePair,assertRelistable} from '../services/postPolicy.js';
+import {assertVersion,assertStatePair,assertRelistable,assertVideoLimit} from '../services/postPolicy.js';
 const conflict = message => { throw new HttpError(409,'POST_CONFLICT',message); };
 const notFound = () => { throw new HttpError(404,'POST_NOT_FOUND','Không tìm thấy bài đăng.'); };
 const projection = `b.bai_dang_id,b.sach_id,b.nguoi_dung_id,b.ma_san_pham,b.tieu_de,b.mo_ta_tinh_trang,b.trang_thai AS trang_thai_bai,b.ngay_dang,
@@ -49,7 +50,7 @@ export function createPostModel({ getPool, sql }) {
   }
   async function insertMedia(tx,postId,items,limits,existing=[]) {
     const all=[...existing,...items];
-    if (all.filter(x=>x.kind==='image').length>limits.maxImages || all.filter(x=>x.kind==='video').length>limits.maxVideos) throw new HttpError(400,'MEDIA_COUNT','Số tệp vượt giới hạn ảnh/video.');
+    assertVideoLimit(all,limits.maxVideos);
     const count={image:existing.filter(x=>x.kind==='image').length,video:existing.filter(x=>x.kind==='video').length};
     for (const item of items) {
       const image=item.kind==='image'; const table=image?'HinhAnh':'Video'; const suffix=image?'img':'video';
@@ -68,14 +69,19 @@ export function createPostModel({ getPool, sql }) {
       const result=await request(await getPool()).input('publicId',sql.VarChar(255),publicId).query('SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.HinhAnh WHERE cloudinary_public_id=@publicId) OR EXISTS(SELECT 1 FROM dbo.Video WHERE cloudinary_public_id=@publicId) OR EXISTS(SELECT 1 FROM dbo.BangChungKhieuNai WHERE CHARINDEX(@publicId,duong_dan_anh_khieu_nai)>0) THEN 1 ELSE 0 END AS used');
       return result.recordset[0].used===1;
     },
-    async search({q,genre,phase,sort,page}) {
+    async search({q,genre,group='',phase,sort,page}) {
       const folded=column=>`REPLACE(LOWER(${column}),N'đ',N'd') COLLATE Vietnamese_100_CI_AI`;
-      const result=await request(await getPool()).input('q',sql.NVarChar(250),searchPattern(q)).input('genre',sql.NVarChar(100),genre)
+      const groupItems=BOOK_GENRE_GROUPS.find(item=>item.name===group)?.items||[];
+      const req=request(await getPool());
+      groupItems.forEach((item,index)=>req.input('group'+index,sql.NVarChar(100),item));
+      const groupClause=!group?'1=1':groupItems.length?`s.the_loai IN (${groupItems.map((_,index)=>'@group'+index).join(',')})`:'1=0';
+      const result=await req.input('q',sql.NVarChar(250),searchPattern(q)).input('genre',sql.NVarChar(100),genre)
         .input('phase',sql.VarChar(10),phase).input('skip',sql.Int,(page-1)*30).query(`
           SELECT ${projection},(SELECT TOP(1) duong_dan_img FROM dbo.HinhAnh WHERE bai_dang_id=b.bai_dang_id ORDER BY thu_tu_img) AS anh_bia
           ${joins} WHERE b.trang_thai='da_duyet' AND p.trang_thai IN ('da_kich_hoat','da_ket_thuc')
           AND (${['s.ten_sach','b.tieu_de','s.tac_gia','s.isbn','s.the_loai'].map(c=>`${folded(c)} LIKE @q COLLATE Vietnamese_100_CI_AI ESCAPE N'~'`).join(' OR ')})
           AND (@genre=N'' OR s.the_loai COLLATE Vietnamese_100_CI_AI=@genre COLLATE Vietnamese_100_CI_AI)
+          AND (${groupClause})
           AND (@phase='all' OR @phase='ended' AND p.trang_thai='da_ket_thuc'
             OR @phase='live' AND p.trang_thai='da_kich_hoat' AND p.thoi_gian_bat_dau<=SYSUTCDATETIME() AND p.thoi_gian_ket_thuc>SYSUTCDATETIME()
             OR @phase='scheduled' AND p.trang_thai='da_kich_hoat' AND p.thoi_gian_bat_dau>SYSUTCDATETIME())

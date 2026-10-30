@@ -39,7 +39,7 @@ try {
   stage='rollback SQL khi bước gắn media thất bại';
   const rollbackInput=body();rollbackInput.sach.ten_sach=`ROLLBACK ${runId}`;
   const model=createPostModel({getPool,sql});
-  await assert.rejects(model.create({owner:accounts[0].nguoi_dung_id,input:validatePost(rollbackInput),items:[{kind:'image',url:'https://example.test/never-committed.png'}],limits:{maxImages:0,maxVideos:0},code:`RB${runId.replaceAll('-','')}`}));
+  await assert.rejects(model.create({owner:accounts[0].nguoi_dung_id,input:validatePost(rollbackInput),items:[{kind:'video',url:'https://example.test/never-committed.mp4'}],limits:{maxImages:0,maxVideos:0},code:`RB${runId.replaceAll('-','')}`}));
   const count=await pool.request().input('title',sql.NVarChar(300),rollbackInput.sach.ten_sach).query('SELECT COUNT(*) AS n FROM dbo.Sach WHERE ten_sach=@title');assert.equal(count.recordset[0].n,0);
   stage='upload PNG thật lên Cloudinary';
   const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPQDHUAAAFpAL/Yu1/IAAAAAElFTkSuQmCC','base64');

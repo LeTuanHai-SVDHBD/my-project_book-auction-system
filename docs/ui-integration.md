@@ -43,11 +43,25 @@ Phong cách tham chiếu: [frontend-book tại 83add59](https://github.com/LeTua
 
 ## Tìm kiếm
 
-`GET /api/posts/catalog?q=&genre=&phase=all&sort=newest&page=1`. Từ khóa tối đa 120 ký tự; thể loại tối đa 100; phase `all|live|scheduled|ended`; sort `newest|price|ending`; page 1–9999, 30 kết quả/trang. Phản hồi `{items,nextPage}`. Endpoint cũ không có bộ lọc vẫn hỗ trợ `before`/`nextBefore`; không trộn hai cơ chế phân trang.
+`GET /api/posts/catalog?q=&genre=&group=&phase=all&sort=newest&page=1`. Từ khóa tối đa 120 ký tự; thể loại/nhóm tối đa 100; phase `all|live|scheduled|ended`; sort `newest|price|ending`; page 1–9999, 30 kết quả/trang. Phản hồi `{items,nextPage}`. Endpoint cũ không có bộ lọc vẫn hỗ trợ `before`/`nextBefore`; không trộn hai cơ chế phân trang.
+
+Trang chủ lấy đúng bốn nhóm chính từ `BOOK_GENRE_GROUPS` trong `shared/bookGenres.js`. `group` phải là tên nhóm có trong danh mục; Backend mở rộng nhóm thành các thể loại con và truyền từng giá trị bằng tham số SQL. Bộ lọc giao diện chọn nhóm hoặc một thể loại cụ thể; chọn lại một loại sẽ bỏ điều kiện nhóm cũ.
 
 SQL dùng tham số, collation `Vietnamese_100_CI_AI` và quy đổi đ/d cho từ khóa; `%`, `_`, `[`, `~` trong từ khóa là ký tự thường. Tìm trong tên sách, tiêu đề, tác giả, ISBN và thể loại. Bộ lọc áp dụng trước phân trang. Sort là biểu thức máy chủ cố định; có ID phụ để thứ tự ổn định. Danh mục thay đổi trực tiếp có thể dịch vị trí giữa các trang; UI chống lặp ID và đọc lại trang đầu khi đồng bộ. Không tạo chỉ mục full-text hay dependency mới. Khi dữ liệu lớn cần đo truy vấn và cân nhắc full-text riêng.
 
 Danh sách công khai chỉ trả bài đã duyệt/đã công bố, thêm `anh_bia` thật từ HinhAnh; không có giá kết thúc sớm, rowversion, AI hay thông tin tài khoản. Không có ảnh thì hiển thị placeholder trung tính.
+
+## Media, ISBN và trình bày hồ sơ
+
+Bài đăng không còn giới hạn 12 ảnh. `GET /api/media/config` trả `maxImages: null`; cấu hình cũ `MEDIA_MAX_IMAGES` bị bỏ qua. Giữ giới hạn dung lượng mỗi ảnh (mặc định 10 MB), 3 video/50 MB mỗi video theo cấu hình, hạn vé và kiểm soát tài nguyên upload hiện có. Cả Backend và frontend đều kiểm tra số video gồm media giữ lại. JSON body và khả năng lưu trữ vẫn tuân giới hạn kỹ thuật của hạ tầng; không đổi schema hoặc thông số tải AI.
+
+Mỗi media vừa tải có nút × với tên truy cập theo tệp. Nút gọi DELETE vé của chính người dùng và chỉ gỡ khỏi danh sách sau thành công; vé đã bỏ không được gửi cùng bài. Media đã lưu trong lịch sử bài không bị xóa qua giao diện này. Thay đổi này chỉ áp dụng ảnh sách, không đổi quy tắc tối đa 5 ảnh bằng chứng khiếu nại.
+
+Chọn **Có ISBN** sẽ hiện ô bắt buộc kiểm tra định dạng 10/13 ký tự. Chọn **Không có ISBN** sẽ không gửi giá trị ISBN cũ đang gõ và Backend lưu NULL. ISBN của bản sách đã lưu vẫn bất biến khi gửi duyệt lại/đăng lại.
+
+Nút Tìm kiếm có chiều rộng gọn trên desktop, dành chỗ cho ô nhập; màn hình nhỏ xếp nút ở hàng riêng. Chuông chỉ có một huy hiệu chưa đọc, không chồng chấm đỏ; khách không có chuông. Hộp thông báo mở thành bảng bên phải, có vùng cuộn riêng, bộ lọc Tất cả/Chưa đọc, tải thêm, trạng thái rỗng/lỗi và thời gian; không thay quyền hay cách ghi nhận thông báo.
+
+Trong giao dịch, khiếu nại hiển thị dạng thẻ có mã, lý do, trạng thái và giờ gửi. **Xem hồ sơ và phản hồi** mở dialog tách rõ nội dung, ảnh bằng chứng và phản hồi Admin. **Gửi khiếu nại mới** mở biểu mẫu riêng; quyền xem hồ sơ và chat giữ nguyên.
 
 ## Thông báo
 

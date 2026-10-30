@@ -177,8 +177,9 @@ Thư mục rỗng được giữ bằng `.gitkeep`; file này không chứng min
 - `frontend/src/design.css`, `integration.css`, `styles/fonts.css`, `public/assets/`: màu/font/style và tài nguyên có giấy phép; không có fixture sách giả trong ứng dụng.
 - `frontend/src/services/apiBase.js`: chuẩn hóa tên host loopback cho HTTP/Socket để cookie phiên hoạt động khi web mở bằng localhost hoặc 127.0.0.1.
 - `frontend/src/services/navigation.js`: route hash; ID bài đăng tách biệt với ID phiên/giao dịch.
+- `frontend/src/components/UploadMediaCard.jsx`: thẻ tệp vừa tải lên và nút ×, không xóa media đã lưu trong lịch sử.
 - `frontend/src/components/Notifications.jsx`: đọc hộp thông báo của session, cập nhật 10 giây, đọc lại khi focus/online; không dùng room công khai.
-- `backend/src/services/catalogSearch.js`: giới hạn từ khóa/bộ lọc/sắp xếp; model bài đăng truy vấn SQL tham số hóa.
+- `backend/src/services/catalogSearch.js`: giới hạn từ khóa/bộ lọc/sắp xếp và xác minh nhóm thể loại theo danh mục dùng chung; model bài đăng truy vấn SQL tham số hóa.
 - `backend/src/models/notification.model.js`, `routes/notification.routes.js`: dựng hộp thông báo từ sự kiện SQL đã COMMIT, chống trùng theo người nhận/nguồn và API riêng có CSRF.
 - `backend/migrations/004_notifications.sql`: bảng ThongBao và index, có thể chạy lại, giữ dữ liệu.
 - `backend/test/catalogSearch.test.js`, `notificationHttp.test.js`, phần mở rộng `communitySql.test.js`/`scripts/smokeAfterSales.mjs`: quyền, tìm kiếm và nghiệm thu SQL thật khi môi trường sẵn sàng.

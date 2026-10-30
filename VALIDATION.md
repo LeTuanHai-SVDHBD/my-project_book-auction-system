@@ -2,8 +2,17 @@
 
 # Kết quả kiểm tra
 
-Cập nhật ngày 29/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
+Cập nhật ngày 30/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
+
+## Đồng bộ thể loại và sửa trải nghiệm biểu mẫu — 30/10/2026
+
+- Trang chủ dùng đúng bốn nhóm trong `shared/bookGenres.js`; bộ lọc công khai nhận `group` đã kiểm tra danh mục và mở rộng thành các tham số SQL cho thể loại con. Thêm bài kiểm tra nhóm hợp lệ/không hợp lệ; bài SQL tìm theo nhóm đã thêm vào bộ opt-in, chưa chạy với SQL Server thật.
+- Bỏ giới hạn số ảnh của bài đăng ở cấu hình, validator và model; giữ giới hạn dung lượng, số video và chính sách upload. Test 100 tham chiếu ảnh hợp lệ, ba video được chấp nhận và video thứ tư bị từ chối, kể cả video giữ lại. Biến cũ `MEDIA_MAX_IMAGES` không còn áp dụng. ISBN không có được gửi `null`, không sửa schema.
+- `npm run check`: **130 tệp PASS**; `npm test`: **124 PASS, 11 SKIP**, tổng 135 bài, không lỗi; `npm run build`: PASS. Không thêm dependency hoặc migration.
+- Chromium production build với HTTP/session/CSRF, route upload và kiểm tra MIME thật; model, vé media và provider dùng fixture: tải 13 ảnh PNG, bấm × xóa đúng vé rồi thay ảnh; tệp đã bỏ không có trong bài gửi. Chọn bốn WebM chỉ tải được ba; gửi bài có 13 ảnh/3 video và ISBN `null` qua validator API. Chọn có ISBN sai bị chặn, chuyển không có ISBN tiếp tục được.
+- Kiểm tra bốn nhóm thể loại/gọi bộ lọc, ô tìm kiếm người dùng và Admin, một huy hiệu 13 thông báo, drawer lọc/chuyển trang đích và đánh dấu đọc. Kiểm tra thẻ khiếu nại, hộp chi tiết có phản hồi Admin, bằng chứng trống và gửi khiếu nại mới.
+- Đã xem ảnh desktop/mobile và kiểm tra các chiều rộng **1440/1100/768/390/320px**; không tràn ngang hoặc lỗi JavaScript trong các luồng trên. Không coi fixture là nghiệm thu SQL/Redis/Cloudinary thật; các bài cần dịch vụ thật vẫn SKIP và cần kiểm tra trên môi trường nhóm.
 
 ## Sửa đăng nhập CSRF và header khách — 29/10/2026
 

@@ -59,6 +59,10 @@ Mỗi media vừa tải có nút × với tên truy cập theo tệp. Nút gọi
 
 Chọn **Có ISBN** sẽ hiện ô bắt buộc kiểm tra định dạng 10/13 ký tự. Chọn **Không có ISBN** sẽ không gửi giá trị ISBN cũ đang gõ và Backend lưu NULL. ISBN của bản sách đã lưu vẫn bất biến khi gửi duyệt lại/đăng lại.
 
+Biểu mẫu chỉ có một ô **Tình trạng, yếu tố quý hiếm và bằng chứng**, bắt buộc và tối đa 12.000 ký tự, lưu đầy đủ vào `BaiDang.mo_ta_tinh_trang`. Không còn ô nhập `tinh_trang_sach` riêng; **Giới thiệu sách** dành cho nội dung tác phẩm.
+
+API tạo sách chấp nhận bỏ `sach.tinh_trang_sach`. Để tương thích cột SQL `Sach.tinh_trang_sach NVARCHAR(1000) NOT NULL`, Backend tự lấy phần đầu tối đa 1.000 ký tự làm bản xem trước, không cắt toàn văn của bài. Client cũ vẫn có thể gửi trường riêng với giới hạn cũ. Không migration, không sửa dữ liệu sách đã lưu hoặc lịch sử khi gửi duyệt lại/đăng lại. Chi tiết bài và prompt Gemini dùng cùng hàm gộp: bỏ phần xem trước đã có trong mô tả, giữ tình trạng cũ khác biệt dưới nhãn **Tình trạng đã lưu trước đây**. Không biến thông tin thiếu thành một đánh giá tình trạng tự động.
+
 Nút Tìm kiếm có chiều rộng gọn trên desktop, dành chỗ cho ô nhập; màn hình nhỏ xếp nút ở hàng riêng. Chuông chỉ có một huy hiệu chưa đọc, không chồng chấm đỏ; khách không có chuông. Hộp thông báo mở thành bảng bên phải, có vùng cuộn riêng, bộ lọc Tất cả/Chưa đọc, tải thêm, trạng thái rỗng/lỗi và thời gian; không thay quyền hay cách ghi nhận thông báo.
 
 Trong giao dịch, khiếu nại hiển thị dạng thẻ có mã, lý do, trạng thái và giờ gửi. **Xem hồ sơ và phản hồi** mở dialog tách rõ nội dung, ảnh bằng chứng và phản hồi Admin. **Gửi khiếu nại mới** mở biểu mẫu riêng; quyền xem hồ sơ và chat giữ nguyên.

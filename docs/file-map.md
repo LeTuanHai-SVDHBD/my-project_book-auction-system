@@ -45,6 +45,7 @@
 | `docs/` | Tài liệu kỹ thuật theo chủ đề |
 | `academic/` | Hướng dẫn lưu báo cáo, slide, UML và bằng chứng được chọn |
 | `shared/bookGenres.js`, `shared/accountControl.js` | Danh mục thể loại chung và thông báo thay cửa sổ |
+| `shared/bookCondition.js` | Mô tả kiểm duyệt chung, giữ tình trạng cũ khác biệt và bản xem trước tương thích SQL |
 
 ## Quyền cửa sổ và đầu vào biểu mẫu
 
@@ -58,6 +59,7 @@
 | `frontend/src/components/MoneyInput.jsx` | Nhập số thuần, không đổi định dạng khi focus/gõ; xem trước nhóm nghìn và xử lý composition |
 | `backend/test/accountControl.test.js` | Hai API/Redis/Socket thật opt-in; takeover, reconnect, CSRF và heartbeat |
 | `backend/test/bookGenres.test.js` | Danh mục, tìm không dấu và kiểm tra bài mới/giữ sách cũ |
+| `backend/test/bookCondition.test.js` | Không lặp mô tả, giữ dữ liệu cũ và hash nguồn phân tích |
 | `docs/account-control.md` | Chính sách quyền, API, khôi phục và nghiệm thu |
 
 ## Giao dịch và tương tác sau phiên

@@ -36,6 +36,23 @@ test('không sửa sách dùng trong lịch sử khi đăng lại; reject vé me
   body.media=[];body.sach.ten_sach='x'.repeat(301);assert.throws(()=>validatePost(body));
   const relist=payload();delete relist.sach;relist.reuse_media=true;assert.equal(validatePost(relist,{mode:'relist'}).reuseMedia,true);
 });
+test('một mô tả chung đủ để đăng sách; giữ toàn văn và tương thích tình trạng sách cũ',()=>{
+  const body=payload();delete body.sach.tinh_trang_sach;
+  body.bai_dang.mo_ta_tinh_trang='Bìa sờn; ấn bản cần xác minh. '+ 'Giấy ngả màu. '.repeat(100);
+  const normalized=validatePost(body);
+  assert.equal(normalized.post.mo_ta_tinh_trang,body.bai_dang.mo_ta_tinh_trang.trim());
+  assert(normalized.book.tinh_trang_sach.length<=1000);
+  assert(normalized.post.mo_ta_tinh_trang.startsWith(normalized.book.tinh_trang_sach));
+  body.sach.tinh_trang_sach='Mô tả tình trạng đã lưu';
+  assert.equal(validatePost(body).book.tinh_trang_sach,'Mô tả tình trạng đã lưu');
+  body.sach.tinh_trang_sach='x'.repeat(1001);assert.throws(()=>validatePost(body),{status:400});
+  delete body.sach.tinh_trang_sach;
+  for(const value of [undefined,null,'','   ','x'.repeat(12001)]){
+    body.bai_dang.mo_ta_tinh_trang=value;assert.throws(()=>validatePost(body),{status:400});
+  }
+  body.bai_dang.mo_ta_tinh_trang='x'.repeat(12000);
+  assert.equal(validatePost(body).post.mo_ta_tinh_trang.length,12000);
+});
 test('Admin phải ghi lý do và xác nhận kiểm tra yếu tố quý hiếm khi duyệt; lịch cần múi giờ',()=>{
   assert.throws(()=>validateReview({quyet_dinh:'phe_duyet',ly_do:'Bìa đẹp',row_version:version}));
   assert.throws(()=>validateReview({quyet_dinh:'tu_choi',ly_do:'  ',row_version:version}));
@@ -98,9 +115,9 @@ async function serverFixture(t,{providerUpload,mediaOverrides={}}={}){
   const sessionMiddleware=createSessionMiddleware(authConfig,new session.MemoryStore());
   const rows=[{nguoi_dung_id:1,ho_ten:'A',email:'a@example.test',vai_tro:'nguoi_dung'},{nguoi_dung_id:2,ho_ten:'Admin',email:'admin@example.test',vai_tro:'admin'}];
   const users={findById:async id=>rows.find(x=>x.nguoi_dung_id===id),findByEmail:async email=>rows.find(x=>x.email===email)};
-  let writes=0,uploads=0;
+  let writes=0,uploads=0,createdInput=null;
   const model={list:async()=>[{bai_dang_id:7,gia_toi_thieu:'secret',gia_khoi_diem:'10'}],detail:async()=>({bai_dang_id:7,gia_toi_thieu:'secret',gia_khoi_diem:'10'})};
-  const service={create:async()=>{writes++;return {id:7};},review:async()=>{writes++;return {id:7};}};
+  const service={create:async(owner,input)=>{writes++;createdInput=input;return {id:7};},review:async()=>{writes++;return {id:7};}};
   const authRouter=createAuthRouter({authConfig,sessionMiddleware,users,passwords:{verify:async()=>true},limiter:{consume:async()=>0}});
   const postRouter=createPostRouter({sessionMiddleware,users,model,service,limits:mediaConfig});
   const mediaRouter=createMediaRouter({sessionMiddleware,users,config:{...mediaConfig,...mediaOverrides},provider:{upload:async()=>{uploads++;if(providerUpload)return providerUpload();return {url:'https://res.cloudinary.com/demo/image/upload/x.png'};}},ledger:{begin:async()=>({publicId:'test'}),ready:async()=>({upload_id:randomUUID()})}});
@@ -108,7 +125,7 @@ async function serverFixture(t,{providerUpload,mediaOverrides={}}={}){
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(async()=>{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));});
   const base=`http://127.0.0.1:${server.address().port}`;
   function client(){return {cookie:'',token:'',async call(path,method='GET',body,csrf=this.token,mime){const r=await fetch(base+'/api'+path,{method,headers:{...(this.cookie?{cookie:this.cookie}:{}),...(csrf?{'x-csrf-token':csrf}:{}),...(body?{'Content-Type':mime||'application/json'}:{})},body:body?(mime?body:JSON.stringify(body)):undefined});for(const c of r.headers.getSetCookie())if(c.startsWith('bookauction.sid='))this.cookie=c.split(';')[0];const data=await r.json();if(data.csrfToken)this.token=data.csrfToken;return {status:r.status,data};},async login(email){await this.call('/auth/csrf');assert.equal((await this.call('/auth/login','POST',{email,mat_khau:'test password'})).status,200);}};}
-  return {client,writes:()=>writes,uploads:()=>uploads};
+  return {client,writes:()=>writes,uploads:()=>uploads,createdInput:()=>createdInput};
 }
 test('HTTP M4: công khai lọc giá ẩn; API riêng yêu cầu login, vai trò hiện tại và CSRF',async t=>{
   const fixture=await serverFixture(t);const anonymous=fixture.client();
@@ -123,6 +140,10 @@ test('HTTP M4: công khai lọc giá ẩn; API riêng yêu cầu login, vai trò
   assert.equal((await user.call('/posts','POST',payload(),'')).status,403);
   assert.equal(fixture.writes(),0);
   assert.equal((await user.call('/posts','POST',payload())).status,201);assert.equal(fixture.writes(),1);
+  const single=payload();delete single.sach.tinh_trang_sach;
+  assert.equal((await user.call('/posts','POST',single)).status,201);
+  assert.equal(fixture.createdInput().post.mo_ta_tinh_trang,single.bai_dang.mo_ta_tinh_trang);
+  assert.equal(fixture.createdInput().book.tinh_trang_sach,single.bai_dang.mo_ta_tinh_trang);
 });
 test('HTTP upload: chặn chưa login, CSRF, MIME giả, magic sai trước khi gửi provider',async t=>{
   const fixture=await serverFixture(t);const c=fixture.client();const bytes=Buffer.from([255,216,255,1]);

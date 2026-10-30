@@ -143,7 +143,6 @@ export default function PostForm({
           "the_loai",
           "nha_xuat_ban",
           "isbn",
-          "tinh_trang_sach",
           "mo_ta",
         ]
           .map((key) => [key, data[key] || null])
@@ -298,10 +297,6 @@ export default function PostForm({
                   </div>
                 </div>
                 <label>
-                  Tình trạng sách
-                  <textarea name="tinh_trang_sach" required maxLength={1000} />
-                </label>
-                <label>
                   Giới thiệu sách
                   <textarea name="mo_ta" maxLength={12000} />
                 </label>
@@ -320,15 +315,19 @@ export default function PostForm({
               Tình trạng, yếu tố quý hiếm và bằng chứng
               <textarea
                 name="mo_ta_tinh_trang"
+                aria-label="Tình trạng, yếu tố quý hiếm và bằng chứng"
                 defaultValue={source?.mo_ta_tinh_trang || ""}
                 required
                 maxLength={12000}
-                rows={5}
+                rows={7}
+                aria-describedby="book-review-hint"
               />
             </label>
-            <p className="field-hint">
-              Nêu ấn bản, chữ ký, số lượng phát hành hoặc nguồn đối chiếu nếu
-              có; mô tả khuyết điểm và phần cần xác minh.
+            <p className="field-hint" id="book-review-hint">
+              Mô tả tình trạng bìa, gáy, trang giấy và các hư hỏng nếu có; nêu
+              đặc điểm quý hiếm như bản in đầu, chữ ký, số lượng giới hạn… và
+              chỉ rõ ảnh/video minh chứng. Nếu không biết thông tin nào, hãy
+              ghi rõ chưa xác định.
             </p>
           </div>
           <div data-step="1" hidden={step !== 1}>

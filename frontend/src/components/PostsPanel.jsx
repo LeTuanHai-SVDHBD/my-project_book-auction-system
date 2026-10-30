@@ -1,6 +1,7 @@
 /** Danh mục, bài của tôi, kiểm duyệt thủ công và luồng đặt giá/kết quả phiên. */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BOOK_GENRE_GROUPS } from "../../../shared/bookGenres.js";
+import { bookReviewDescription } from "../../../shared/bookCondition.js";
 import { navigate } from "../services/navigation.js";
 import BookCard from "./BookCard.jsx";
 import BookGallery from "./BookGallery.jsx";
@@ -96,11 +97,9 @@ function Detail({
               <dd>
                 {post.nam_xuat_ban || "Chưa rõ"} / {post.isbn || "Chưa rõ"}
               </dd>
-              <dt>Tình trạng</dt>
-              <dd>{post.tinh_trang_sach}</dd>
             </dl>
-            <h3>Yếu tố quý hiếm và bằng chứng</h3>
-            <p className="preserve-lines">{post.mo_ta_tinh_trang}</p>
+            <h3>Tình trạng, yếu tố quý hiếm và bằng chứng</h3>
+            <p className="preserve-lines">{bookReviewDescription(post)}</p>
           </section>
         </div>
         <div>

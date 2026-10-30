@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createGemini} from '../src/ai/gemini.js';
 import {parseAiConfig} from '../src/config/ai.js';
+import {conditionPreview} from '../../shared/bookCondition.js';
 const config=parseAiConfig({AI_ENABLED:'true',GEMINI_API_KEY:'fixture-only-key-123',CLOUDINARY_CLOUD_NAME:'demo'});
 const png=Buffer.from('89504e470d0a1a0a','hex');
 test('REST structured output, store=false, media bytes có nhãn và dữ liệu gửi không chứa giá/tài khoản',async()=>{
@@ -19,6 +20,20 @@ test('URL tùy ý không được fetch; thiếu media được ghi cảnh báo,
   let calls=0;
   const provider=createGemini({config,fetchImpl:async url=>{calls++;if(String(url).startsWith('https://res.cloudinary.com/'))return new Response(png,{headers:{'content-type':'image/png','content-length':String(config.mediaMaxBytes+1)}});assert(String(url).startsWith('https://generativelanguage.googleapis.com/'));return Response.json({status:'completed',steps:[{type:'model_output',content:[{type:'text',text:'{"criteria":[],"warnings":[]}'}]}]});}});
   const result=await provider.analyze({media:[{kind:'image',url:'http://127.0.0.1/private'},{kind:'image',url:'https://res.cloudinary.com/demo/image/upload/oversize.png'}]},AbortSignal.timeout(1000));assert.equal(calls,2);assert.equal(result.warnings.length,2);assert.deepEqual(result.mediaIds,[]);assert(result.manifest.every(x=>x.sent===false));
+});
+test('Gemini nhận một mô tả đầy đủ; vẫn thấy bằng chứng riêng của sách cũ',async()=>{
+  let sent;
+  const provider=createGemini({config,fetchImpl:async(url,options)=>{
+    sent=JSON.parse(JSON.parse(options.body).input[0].text);
+    return Response.json({status:'completed',steps:[{type:'model_output',content:[{type:'text',text:'{"criteria":[],"warnings":[]}'}]}]});
+  }});
+  const full='Bìa sờn, trang 10 rách; chưa xác minh ấn bản. '.repeat(100);
+  await provider.analyze({mo_ta_tinh_trang:full,tinh_trang_sach:conditionPreview(full)},AbortSignal.timeout(1000));
+  assert.equal(sent.book.mo_ta_tinh_trang,full.trim());
+  assert(!Object.hasOwn(sent.book,'tinh_trang_sach'));
+  await provider.analyze({mo_ta_tinh_trang:'Ấn bản cần đối chiếu.',tinh_trang_sach:'Thiếu trang; nguồn https://example.test/evidence'},AbortSignal.timeout(1000));
+  assert(sent.book.mo_ta_tinh_trang.includes('Thiếu trang; nguồn https://example.test/evidence'));
+  assert(sent.sourceUrls.includes('https://example.test/evidence'));
 });
 test('quota, kết quả chưa hoàn tất và JSON hỏng đều thành lỗi phân tích, không lộ provider body',async()=>{
   for(const response of [new Response('secret-provider-body',{status:429}),Response.json({status:'incomplete'}),Response.json({status:'completed',steps:[{type:'model_output',content:[{type:'text',text:'not json'}]}]})]){

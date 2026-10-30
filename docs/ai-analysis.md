@@ -114,6 +114,8 @@ Gemini trả quan sát, không trả quyết định hoặc điểm tổng. Back
 Chỉ gửi thông tin sách, mô tả bằng chứng và media của bài. Không gửi tài khoản/email, giá, lịch đấu giá,
 `gia_toi_thieu` hay nội dung kiểm duyệt. Văn bản bài đăng/media là dữ liệu không tin cậy, không phải chỉ dẫn cho mô hình.
 
+Prompt chỉ gửi một trường `mo_ta_tinh_trang` cho tình trạng, yếu tố quý hiếm và bằng chứng. Phần xem trước `tinh_trang_sach` trùng trong toàn văn không gửi lặp; tình trạng khác biệt của dữ liệu cũ vẫn được kèm với nhãn đã lưu trước đây. Hai điểm và các tiêu chí vẫn tính độc lập như trên. Hash nguồn tiếp tục dùng các trường gốc đầy đủ để giữ khả năng đối chiếu, phát hiện dữ liệu đổi và đọc kết quả phân tích cũ; không sửa hoặc tự gọi lại phân tích đã lưu chỉ vì đổi cách trình bày prompt.
+
 Worker chỉ tải HTTPS từ đúng `res.cloudinary.com/<cloud-name>/...` của dự án, không theo redirect.
 Kiểm tra loại media, MIME, magic bytes, kích thước và deadline trước khi gửi.
 Tổng bytes thô mặc định tối đa 12 MiB, ảnh/video nhỏ được gửi inline; base64 làm tăng kích thước khoảng một phần ba.

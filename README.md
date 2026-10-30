@@ -196,6 +196,9 @@ cấp CSRF 60 lần/IP/phút. Bộ đếm tính cả lần thành công. Khi b�
 ### Đăng sách, kiểm duyệt và kích hoạt
 
 1. Người dùng mở **Bài của tôi → Đăng sách mới**, nhập thông tin sách, tình trạng và bằng chứng quý hiếm.
+   Chỉ nhập một ô **Tình trạng, yếu tố quý hiếm và bằng chứng** (tối đa 12.000 ký tự);
+   mô tả bìa/gáy/trang giấy, khuyết điểm, đặc điểm quý hiếm và ảnh/video đối chiếu.
+   **Giới thiệu sách** vẫn riêng để giới thiệu nội dung tác phẩm.
    **Thể loại** là danh sách có tìm kiếm: gõ từ khóa có/không dấu, rồi chọn bằng chuột hoặc phím mũi tên/Enter.
    Chữ nhập chỉ dùng để lọc, không lưu thành thể loại mới; có thể để trống. Danh mục có nhóm văn học,
    phi hư cấu, độc giả và tư liệu/sách cổ; dữ liệu sách đã lưu không bị đổi.

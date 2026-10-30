@@ -5,6 +5,14 @@
 Cập nhật ngày 30/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
+## Gộp mô tả tình trạng và bằng chứng — 30/10/2026
+
+- Bỏ ô nhập riêng `tinh_trang_sach`; đăng mới/gửi duyệt lại dùng một ô bắt buộc **Tình trạng, yếu tố quý hiếm và bằng chứng** (12.000 ký tự). Giữ riêng **Giới thiệu sách**. Backend nhận được bài mới không có trường tình trạng cũ, giữ toàn văn và tự tạo bản xem trước tối đa 1.000 ký tự để đáp ứng cột SQL hiện có; không migration hoặc sửa dữ liệu lịch sử.
+- Prompt Gemini và màn hình chi tiết không lặp bản xem trước trong mô tả. Thông tin tình trạng cũ khác biệt vẫn hiện với nhãn đã lưu trước đây; giữ hash các trường nguồn để phân tích cũ vẫn đối chiếu được. Không đổi tiêu chí, trọng số hoặc hai điểm độc lập.
+- `npm run check`: **132 tệp PASS**; `npm test`: **128 PASS, 11 SKIP**, tổng 139 bài; `npm run build`: PASS. Test API/session/CSRF nhận bài không có `sach.tinh_trang_sach`; kiểm tra văn bản dài, dữ liệu thiếu/quá dài, tương thích client cũ, prompt Gemini qua HTTP stub và provenance.
+- Chromium production build, HTTP/session/CSRF/validator thật với model fixture: mô tả trống chặn bước tiếp theo; một mô tả dài hơn 1.000 ký tự gửi đủ và hiển thị một lần; biểu mẫu không gửi trường cũ. Gửi duyệt lại bài bị từ chối bằng một ô, giữ tình trạng sách đã lưu; chi tiết giữ cả bằng chứng cũ khác biệt. Đã xem ảnh desktop/mobile; các chiều rộng **1440/768/390/320px** không tràn ngang và không lỗi JavaScript trong luồng kiểm tra.
+- Không gọi Gemini thật hoặc chạy lại SQL Server/Redis/Cloudinary thật cho bản này. Các bài cần dịch vụ thật vẫn SKIP; kiểm tra model fixture không thay thế nghiệm thu lưu SQL trên máy nhóm.
+
 ## Đồng bộ thể loại và sửa trải nghiệm biểu mẫu — 30/10/2026
 
 - Trang chủ dùng đúng bốn nhóm trong `shared/bookGenres.js`; bộ lọc công khai nhận `group` đã kiểm tra danh mục và mở rộng thành các tham số SQL cho thể loại con. Thêm bài kiểm tra nhóm hợp lệ/không hợp lệ; bài SQL tìm theo nhóm đã thêm vào bộ opt-in, chưa chạy với SQL Server thật.

@@ -41,7 +41,14 @@ function databaseFixture(){
         else{state.row.trang_thai_phien='da_kich_hoat';state.row.thoi_gian_bat_dau=this.values.start;state.row.thoi_gian_ket_thuc=this.values.end;}
         bump();return {recordset:[{phien_dau_gia_id:state.row.phien_dau_gia_id}]};
       }
-      if(text.startsWith('INSERT dbo.KiemDuyet'))state.reviews.push({kiem_duyet_id:state.reviews.length+1,ket_qua:this.values.result,phan_hoi_admin:this.values.reason});
+      if(text.startsWith('INSERT dbo.KiemDuyet')){
+        const row={kiem_duyet_id:state.reviews.length+1,ket_qua:this.values.result,phan_hoi_admin:this.values.reason,ngay_kiem_duyet:new Date()};
+        state.reviews.push(row);return {recordset:[{kiem_duyet_id:row.kiem_duyet_id}]};
+      }
+      if(text.startsWith('UPDATE dbo.KiemDuyet SET ket_qua_snapshot')){
+        if(state.failSnapshot)throw Error('fixture snapshot failure');
+        state.reviews.find(row=>row.kiem_duyet_id===this.values.id).ket_qua_snapshot=this.values.snapshot;
+      }
       return {recordset:[]};
     }
   }
@@ -67,6 +74,14 @@ test('model dùng cùng encoder khi đọc khóa: duyệt thành công, bản c�
   await assert.rejects(model.review({admin:2,postId:7,input:validateReview({quyet_dinh:'phe_duyet',ly_do:'Thử lại bản cũ',xac_nhan_quy_hiem:true,row_version:before.row_version})}),{status:409});
   await model.activate({owner:1,postId:7,input:validateActivation(schedule(after.row_version))});
   assert.equal(state.reviews.length,1);assert.equal(state.row.phien_dau_gia_id,11);assert.equal(state.row.trang_thai_phien,'da_kich_hoat');assert.equal(state.commits,2);
+  assert.equal(JSON.parse(state.reviews[0].ket_qua_snapshot).review.ket_qua,'Phê duyệt');
+});
+test('model rollback cả quyết định và cặp trạng thái nếu lưu bản kết quả thất bại',async()=>{
+  const {model,state}=databaseFixture();state.failSnapshot=true;
+  await assert.rejects(model.review({admin:2,postId:7,input:validateReview({quyet_dinh:'tu_choi',ly_do:'Kiểm thử rollback',row_version:expected})}),/fixture snapshot failure/);
+  assert.equal(state.commits,0);assert.equal(state.rollbacks,1);assert.equal(state.reviews.length,0);
+  assert.equal(state.row.trang_thai_bai,'cho_kiem_duyet');assert.equal(state.row.trang_thai_phien,'cho_kiem_duyet');
+  assert.equal(encodeRowVersion(state.row.row_version),expected);
 });
 test('HTTP dùng model thật với SQL Buffer: dữ liệu chi tiết đi qua activation/duyệt mà không mất row_version',async t=>{
   const {model,state}=databaseFixture();const authConfig=parseAuthConfig({SESSION_SECRET:'rowversion-regression-'.repeat(4)});

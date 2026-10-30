@@ -22,7 +22,7 @@
     "ChiTietPhanTichAI",
     "ThongBao"
   ],
-  "columns": 161,
-  "checks": 98,
+  "columns": 162,
+  "checks": 99,
   "uniqueConstraints": 15
 }

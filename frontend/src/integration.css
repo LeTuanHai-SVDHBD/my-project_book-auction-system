@@ -2026,6 +2026,19 @@ figure.upload-media-card {
 .review-decision {
   overflow-wrap: anywhere;
 }
+.review-export {
+  margin-top: 18px;
+}
+.review-export > button {
+  width: auto;
+  max-width: 100%;
+  min-height: 44px;
+  white-space: normal;
+}
+.review-export .field-hint {
+  max-width: 680px;
+  margin-bottom: 0;
+}
 
 /* Review list uses the full content width; details open on their own page. */
 .pending-posts-heading {

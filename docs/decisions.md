@@ -270,3 +270,7 @@ giữ chuỗi nguyên/18 chữ số, không chuyển Number hoặc tự cắt ph
 Thể loại là một lựa chọn từ danh mục dùng chung ở shared/bookGenres.js, căn cứ tài liệu thể loại người dùng gửi,
 bổ sung nhóm sách cổ/tư liệu. Gõ có/không dấu chỉ lọc danh sách; API sách mới chặn tên ngoài danh mục.
 Giữ tùy chọn để trống và dữ liệu sách cũ, không migration hoặc tự ánh xạ lại lịch sử.
+
+## Bản kết quả kiểm duyệt cho người bán
+
+Người bán xuất PDF của lần đã được Admin phê duyệt/từ chối. Migration 005 thêm một cột `ket_qua_snapshot` vào bảng KiemDuyet hiện có, không thêm bảng hoặc dependency. Ghi bản kết quả trong cùng transaction với quyết định để không lẫn thông tin/media/AI khi gửi duyệt lại. Với dữ liệu cũ, chỉ dựng và lưu lại quyết định hiện tại còn phù hợp; vòng cũ không có snapshot không được tái tạo bằng dữ liệu mới. PDF dùng bản in A4 riêng và chức năng lưu PDF của trình duyệt, các media giữ dạng link Cloudinary.

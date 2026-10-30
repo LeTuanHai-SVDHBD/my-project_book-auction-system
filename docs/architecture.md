@@ -42,7 +42,7 @@ Luồng đấu giá: `HTTP → Redis Streams → Consumer → Redis lock → SQL
 Job hết hạn đọc đồng hồ SQL và xếp sự kiện chốt vào cùng stream nghiệp vụ.
 YeuCauDatGia lưu quyết định cuối; LuotDatGia chỉ lưu lượt hợp lệ.
 Cùng transaction ghi quyết định, lượt/giá/lịch sử, kết quả, giao dịch và phòng chat nếu có người thắng khi phiên kết thúc.
-SQL có 21 bảng/161 cột sau migration 004 (thêm hộp thông báo riêng); DDL nền được giữ để nâng cấp tại chỗ.
+SQL có 21 bảng/162 cột sau migration 005 (hộp thông báo và bản kết quả kiểm duyệt); DDL nền được giữ để nâng cấp tại chỗ.
 
 ## Xác thực theo tab
 
@@ -64,7 +64,7 @@ Tab cũ tự về đăng nhập, F5 không claim hoặc hồi sinh phiên. Khác
 
 - SQL Server là nguồn trạng thái quyết định quyền kích hoạt, lịch, giá và kết quả.
 - Tạo sách/bài/phiên/media/lịch sử trong cùng transaction SERIALIZABLE.
-- Duyệt và gửi lại cập nhật cặp trạng thái bài/phiên nguyên tử.
+- Duyệt và gửi lại cập nhật cặp trạng thái bài/phiên nguyên tử. Quyết định mới lưu kèm bản kết quả sách/media/AI trong cùng transaction; xuất lịch sử không lấy dữ liệu vòng mới. Xem [review-exports.md](review-exports.md).
 - Kiểm tra `row_version` sau khi lấy khóa; chuẩn hóa BINARY(8) thành hex 16 ký tự ở model.
 - UUID yêu cầu và UNIQUE bảo vệ retry; chỉ trả thành công sau COMMIT.
 - Giá DECIMAL(18,0) đi qua JSON dạng chuỗi, không chuyển thành JavaScript Number.

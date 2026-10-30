@@ -14,5 +14,6 @@ export function createPostRouter({sessionMiddleware,users,model,service,limits})
   router.post('/:id/resubmit',requireRole('nguoi_dung'),requireCsrf,c.resubmit);
   router.post('/:id/activate',requireRole('nguoi_dung'),requireCsrf,c.activate);
   router.post('/:id/review',requireRole('admin'),requireCsrf,c.review);
+  router.post('/:id/reviews/:reviewId/export',requireRole('nguoi_dung'),requireCsrf,c.exportReview);
   return router;
 }

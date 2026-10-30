@@ -62,15 +62,25 @@ try {
   check(await admin.call(`/posts/${postId}/review`,'POST',{quyet_dinh:'phe_duyet',ly_do:'Kiểm tra thử',row_version:oldVersion}),400);
   check(await admin.call(`/posts/${postId}/review`,'POST',{quyet_dinh:'tu_choi',ly_do:'Bổ sung nguồn đối chiếu (smoke)',row_version:oldVersion}),200);
   detail=check(await alice.call(`/posts/${postId}`),200);assert.equal(detail.trang_thai_bai,'tu_choi');assert.equal(detail.trang_thai_phien,'khong_dat_kiem_duyet');
+  stage='xuất quyết định từ chối và kiểm tra quyền';
+  const rejectedId=detail.kiem_duyet[0].kiem_duyet_id;
+  const exportPath=`/posts/${postId}/reviews/${rejectedId}/export`;
+  check(await bob.call(exportPath,'POST',{}),404);check(await alice.call(exportPath,'POST',{},{csrf:false}),403);
+  const rejectedReport=check(await alice.call(exportPath,'POST',{}),200);
+  assert.equal(rejectedReport.review.ket_qua,'Từ chối');assert.equal(rejectedReport.media[0].url,detail.media[0].url);
+  assert(!JSON.stringify(rejectedReport).includes('gia_toi_thieu'));
   const resubmit=body();delete resubmit.sach;delete resubmit.ma_yeu_cau;resubmit.row_version=detail.row_version;resubmit.reuse_media=true;
   check(await alice.call(`/posts/${postId}/resubmit`,'POST',resubmit),200);
   detail=check(await admin.call(`/posts/${postId}`),200);checkVersion(detail);assert.equal(detail.phien_dau_gia_id,auctionId);assert.equal(detail.media.length,1);assert.equal(detail.kiem_duyet.length,1);
+  assert.deepEqual(check(await alice.call(exportPath,'POST',{}),200),rejectedReport);
   stage='duyệt thủ công khi chưa tích hợp AI và chống dữ liệu cũ';
   check(await admin.call(`/posts/${postId}/review`,'POST',{quyet_dinh:'phe_duyet',ly_do:'Căn cứ smoke',xac_nhan_quy_hiem:true,row_version:oldVersion}),409);
   const reviewInput={quyet_dinh:'phe_duyet',ly_do:'Căn cứ giả lập để kiểm tra phần mềm; không phải thẩm định sách thật',xac_nhan_quy_hiem:true,row_version:detail.row_version};
   const reviews=await Promise.all([admin.call(`/posts/${postId}/review`,'POST',reviewInput),admin.call(`/posts/${postId}/review`,'POST',reviewInput)]);
   assert.deepEqual(reviews.map(x=>x.status).sort(),[200,409]);
   detail=check(await alice.call(`/posts/${postId}`),200);assert.equal(detail.trang_thai_bai,'da_duyet');assert.equal(detail.trang_thai_phien,'da_qua_kiem_duyet');assert.equal(detail.thoi_gian_bat_dau,null);
+  const approvedReport=check(await alice.call(`/posts/${postId}/reviews/${detail.kiem_duyet[0].kiem_duyet_id}/export`,'POST',{}),200);
+  assert.equal(approvedReport.review.ket_qua,'Phê duyệt');assert.notEqual(approvedReport.review.kiem_duyet_id,rejectedId);
   stage='kích hoạt đúng phiên và không lộ ngưỡng giá';
   check(await alice.call(`/posts/${postId}/activate`,'POST',{...schedule(),thoi_gian_bat_dau:new Date(Date.now()-60000).toISOString()}),409);
   check(await alice.call(`/posts/${postId}/activate`,'POST',schedule()),200);
@@ -132,4 +142,4 @@ finally {
   }
   await closeDatabase();
 }
-if(passed&&!process.exitCode)console.log('PASS M4: upload Cloudinary, quyền/CSRF, tạo nguyên tử, retry, từ chối/bổ sung/duyệt, lịch kích hoạt, ẩn ngưỡng giá, đăng lại giữ sách và chặn có người thắng.');
+if(passed&&!process.exitCode)console.log('PASS M4: upload Cloudinary, quyền/CSRF, tạo nguyên tử, retry, từ chối/bổ sung/duyệt, xuất kết quả đúng lần, lịch kích hoạt, ẩn ngưỡng giá, đăng lại giữ sách và chặn có người thắng.');

@@ -20,7 +20,7 @@ npm.cmd run build
 npm.cmd run dev:all
 ```
 
-Phần sau phiên không thêm dependency hoặc đổi xác thực. Migration 004 bổ sung hộp thông báo riêng; schema hiện tại 21 bảng/161 cột. Cấu hình và volume giữ nguyên. Xem [ui-integration.md](ui-integration.md).
+Phần sau phiên không thêm dependency hoặc đổi xác thực. Migration 004 bổ sung hộp thông báo riêng; migration 005 lưu bản kết quả kiểm duyệt; schema hiện tại 21 bảng/162 cột. Cấu hình và volume giữ nguyên. Xem [ui-integration.md](ui-integration.md).
 Các bảng GiaoDich, CuocTroChuyen, TinNhan, DanhGia, KhieuNai, BangChungKhieuNai và BinhLuan đã có từ schema nền.
 Phiên có người thắng mới tạo chat trong cùng transaction kết quả/giao dịch; replay không tạo thêm.
 Giao dịch cũ chưa có phòng có nút **Mở cuộc trò chuyện**, kiểm tra quyền và UNIQUE khi tạo bổ sung.

@@ -13,6 +13,7 @@ export function createPostController({model,service,limits}) {
     mine:async(req,res)=>listResponse(res,await model.list({owner:req.user.nguoi_dung_id,after:page(req)})),
     pending:async(req,res)=>listResponse(res,await model.list({pending:true,after:page(req)})),
     detail:async(req,res)=>res.json(await model.detail(id(req.params.id),options(req))),
+    exportReview:async(req,res)=>res.json(await model.exportReview(req.user.nguoi_dung_id,id(req.params.id),id(req.params.reviewId))),
     create:async(req,res)=>{ const result=await service.create(req.user.nguoi_dung_id,validatePost(req.body,limits));res.status(result.replayed?200:201).json(result); },
     relist:async(req,res)=>{const result=await service.create(req.user.nguoi_dung_id,validatePost(req.body,{...limits,mode:'relist'}),id(req.params.id));res.status(result.replayed?200:201).json(result);},
     resubmit:async(req,res)=>res.json(await service.resubmit(req.user.nguoi_dung_id,id(req.params.id),validatePost(req.body,{...limits,mode:'resubmit'}))),

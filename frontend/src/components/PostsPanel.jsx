@@ -12,6 +12,7 @@ import PostForm from "./PostForm.jsx";
 import AuctionPanel from "./AuctionPanel.jsx";
 import CommentsPanel from "./CommentsPanel.jsx";
 import AiPanel from "./AiPanel.jsx";
+import ReviewExportButton from "./ReviewExportButton.jsx";
 import { useAuctionRealtime } from "../services/auctionRealtime.js";
 const states = {
   cho_kiem_duyet: "Chờ kiểm duyệt",
@@ -24,7 +25,7 @@ const money = (value) =>
   value == null ? "Chưa có" : `${BigInt(value).toLocaleString("vi-VN")} đ`;
 const date = (value) =>
   value ? new Date(value).toLocaleString("vi-VN") : "Chưa đặt lịch";
-function ReviewDecision({ review }) {
+function ReviewDecision({ review, postId, canExport }) {
   return (
     <blockquote className="review-decision">
       <strong>
@@ -34,6 +35,15 @@ function ReviewDecision({ review }) {
       </strong>{" "}
       · {date(review.ngay_kiem_duyet)}
       <p className="preserve-lines">{review.phan_hoi_admin}</p>
+      {canExport && review.co_the_xuat && (
+        <ReviewExportButton postId={postId} review={review} />
+      )}
+      {canExport && !review.co_the_xuat && (
+        <p className="field-hint">
+          Lần kiểm duyệt cũ chưa lưu bản kết quả đầy đủ nên không thể xuất chính
+          xác.
+        </p>
+      )}
     </blockquote>
   );
 }
@@ -213,7 +223,13 @@ function Detail({
               quyết định.
             </p>
           )}
-          {decision && <ReviewDecision review={decision} />}
+          {decision && (
+            <ReviewDecision
+              review={decision}
+              postId={post.bai_dang_id}
+              canExport={mode === "mine" && !admin}
+            />
+          )}
           {!waiting && !decision && (
             <p>
               Chưa có quyết định kiểm duyệt phù hợp với trạng thái hiện tại.
@@ -223,7 +239,12 @@ function Detail({
             <details className="review-history">
               <summary>Lịch sử kiểm duyệt</summary>
               {post.kiem_duyet.slice(decision ? 1 : 0).map((item) => (
-                <ReviewDecision key={item.kiem_duyet_id} review={item} />
+                <ReviewDecision
+                  key={item.kiem_duyet_id}
+                  review={item}
+                  postId={post.bai_dang_id}
+                  canExport={mode === "mine" && !admin}
+                />
               ))}
             </details>
           )}

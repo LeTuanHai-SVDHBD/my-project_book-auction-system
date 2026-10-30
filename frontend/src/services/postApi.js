@@ -6,6 +6,7 @@ export const postApi={
   detail:(id,publicOnly=false)=>apiRequest(`/posts/${publicOnly?'catalog/':''}${id}`),
   save:(body,id,mode)=>apiPost(id?`/posts/${id}/${mode}`:'/posts',body),
   review:(id,body)=>apiPost(`/posts/${id}/review`,body),
+  exportReview:(id,reviewId)=>apiPost(`/posts/${id}/reviews/${reviewId}/export`),
   activate:(id,body)=>apiPost(`/posts/${id}/activate`,body),
   config:()=>apiRequest('/media/config'),
   async upload(file) {

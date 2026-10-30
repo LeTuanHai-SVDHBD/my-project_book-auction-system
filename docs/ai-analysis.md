@@ -18,7 +18,7 @@ npm.cmd run setup:ai
 
 Script bổ sung biến còn thiếu vào `.env`, giữ giá trị đang có và tắt AI mặc định.
 Với máy mới, hoàn thành cài đặt trong README trước. Bản AI không thêm dependency hoặc migration;
-schema phần AI giữ nguyên; toàn hệ thống có 21 bảng/161 cột sau migration thông báo 004.
+schema phần AI giữ nguyên; toàn hệ thống có 21 bảng/162 cột sau migration 005 lưu bản kết quả kiểm duyệt.
 
 Mở `.env` ở thư mục gốc trên máy phát triển:
 

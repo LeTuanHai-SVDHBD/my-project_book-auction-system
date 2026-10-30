@@ -72,7 +72,9 @@ npm.cmd run admin:create
 ```
 
 `setup` tạo `.env` và cấu hình Frontend khi chưa có; các script setup giữ nguyên giá trị đã tồn tại.
-`db:init` tạo schema nền rồi áp dụng các migration media và quyết định đấu giá. Schema hiện tại có **21 bảng, 161 cột**.
+`db:init` tạo schema nền rồi áp dụng các migration media, quyết định đấu giá, thông báo và bản kết quả kiểm duyệt. Schema hiện tại có **21 bảng, 162 cột**.
+Người bán xuất kết quả sau phê duyệt/từ chối tại **Bài của tôi → Kết quả kiểm duyệt**; xem [cách lưu PDF và nâng cấp bản kết quả](docs/review-exports.md).
+
 `admin:create` yêu cầu tên, email và mật khẩu kín trong terminal. Admin đã tồn tại được giữ nguyên mật khẩu;
 script không tự nâng quyền tài khoản người dùng thường.
 
@@ -345,7 +347,7 @@ xem [hướng dẫn](docs/after-sales.md). Bản giao dịch mới không thêm 
 | Hiện tượng | Kiểm tra |
 |---|---|
 | smoke:m5/m6/m8 dừng tại readiness | Giữ dev:all ở terminal khác; xem từng thành phần tại /api/health/ready và docker compose ps; [hướng dẫn chẩn đoán](docs/after-sales.md#dừng-tại-readiness) |
-| SQL readiness chưa đạt 21 bảng/161 cột | Kiểm tra đúng database, kết nối và chạy `npm.cmd run db:migrate` |
+| SQL readiness chưa đạt 21 bảng/162 cột | Kiểm tra đúng database, kết nối và chạy `npm.cmd run db:migrate` |
 | Không upload được | Kiểm tra ba biến Cloudinary, giới hạn tệp và khởi động lại API |
 | Lỗi CSRF hoặc phiên hết hạn | Frontend tự lấy token mới và thử lại đúng một lần khi Backend trả INVALID_CSRF; phiên đăng nhập đã hết hạn/thu hồi vẫn phải đăng nhập lại. Không tắt bảo vệ cookie/CSRF. |
 | HTTP 409 khi duyệt/kích hoạt | Tải lại chi tiết trước khi thao tác; không dùng `row_version` cũ |

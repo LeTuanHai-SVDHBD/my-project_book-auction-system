@@ -5,6 +5,15 @@
 Cập nhật ngày 30/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
+## Xuất kết quả kiểm duyệt cho người bán — 30/10/2026
+
+- Thêm bản in A4 riêng sau phê duyệt/từ chối, dùng hộp thoại **Lưu dưới dạng PDF** của trình duyệt; không phải endpoint trả PDF nhị phân. Nội dung Backend đã lưu, hai điểm/NULL/bằng chứng/cảnh báo/phép tính, danh sách ảnh/video là link Cloudinary, không nhúng media hoặc gọi lại AI. Cập nhật tài liệu tại [docs/review-exports.md](docs/review-exports.md).
+- Migration 005 thêm một cột JSON nullable và check trong KiemDuyet; schema **21 bảng/162 cột**. Ghi cùng transaction quyết định; giữ đúng lần khi gửi duyệt lại. Bản cũ chỉ dựng lần hiện tại còn phù hợp; không gán media mới vào lịch sử chưa có bản kết quả. Không thêm bảng, dependency hoặc đổi cấu hình cá nhân.
+- `npm run check`: **138 tệp PASS**; `npm test`: **138 PASS, 12 SKIP**, tổng 150; `npm run build`: PASS (87 modules). Sau điều chỉnh bố cục in, chạy lại 10 test xuất kết quả/rowversion: PASS; build lại PASS; `git diff --check`: PASS. HTTP/session/CSRF thật, model SQL fixture kiểm tra chủ sở hữu, vai trò, ID bài/quyết định, no-store, rollback cả quyết định/cặp trạng thái khi lưu bản kết quả lỗi, NULL và bản cũ không bị dữ liệu mới ghi đè.
+- Chromium production build với HTTP/session/CSRF/router thật, model/AI fixture: nút ở kết quả phê duyệt/từ chối, lịch sử đã lưu trong vòng đang chờ, ẩn khi chưa có quyết định, cảnh báo dữ liệu cũ, popup bị chặn không gọi API, lỗi API đóng cửa sổ đang tải, Admin không có nút người bán. Desktop/mobile **1440/1100/768/390/320px** không tràn ngang hoặc lỗi JavaScript trong lượt đạt. Lệnh print được theo dõi bằng stub trong trình duyệt headless, không coi đó là tương tác với hộp thoại in Windows thật.
+- PDF thực sự được Chromium tạo từ chính bản in: mẫu 32 ảnh + một video, phê duyệt/lịch sử **7 trang, 46 link bấm được** (37 Cloudinary gồm manifest); từ chối + AI thất bại **4 trang, 33 link Cloudinary**. Poppler render và xem trang; pypdf kiểm tra dấu tiếng Việt, đủ ảnh 32/video 01, bỏ `.00`, NULL, không có toolbar/giá riêng/chẩn đoán hoặc media nhúng. Không có chữ chồng hoặc trang chỉ chứa footer trong bản đạt.
+- **Chưa chạy migration 005 hoặc test SQL Server/Redis/Cloudinary/Gemini thật trong môi trường này**. Test `REVIEW_TEST_SQL` opt-in đã bổ sung; `smoke:m4` có thêm kiểm tra xuất đúng lần/quyền/CSRF nhưng chưa chạy lại. Máy nhóm cần migration trước `dev:all`, sau đó nghiệm thu nút/lưu PDF và liên kết media thật.
+
 ## Bố cục kiểm duyệt, chi tiết sách và định dạng điểm — 30/10/2026
 
 - Chỉ sửa frontend và tài liệu. Danh sách Admin dùng lưới thẻ toàn chiều rộng, giữ mã bài, trạng thái, mở chi tiết/quay lại và cursor tải thêm. Bỏ cột hàng đợi/khung chọn hồ sơ; giữ nguyên API/quyền/SQL và thao tác quyết định.

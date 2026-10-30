@@ -12,7 +12,7 @@ npm.cmd run db:migrate
 npm.cmd run dev:all
 ```
 
-Mở `http://localhost:5173`. Không cần pnpm, không đổi `.env` và không tạo lại database. Migration 004 chỉ thêm `ThongBao`/index, chạy lại được; schema mới 21 bảng/161 cột. Bản cũ 20/152 được init nhận diện để nâng cấp giữ dữ liệu.
+Mở `http://localhost:5173`. Không cần pnpm, không đổi `.env` và không tạo lại database. Migration 004 thêm `ThongBao`/index; migration 005 thêm `KiemDuyet.ket_qua_snapshot` để lưu bản kết quả theo từng quyết định. Chạy lại được; schema mới 21 bảng/162 cột. Các bản cũ 20/152 và 21/161 được init nhận diện để nâng cấp giữ dữ liệu.
 
 ## Phiên biểu mẫu và giao diện khách
 
@@ -111,3 +111,7 @@ Nghiệm thu SQL Server/Redis/Cloudinary thật chưa được thay bằng kiể
 ## Tài nguyên
 
 Ảnh thư viện lấy từ mã thiết kế gốc: [Unsplash](https://images.unsplash.com/photo-1600181982553-ce7d36051c01), lưu tại `frontend/public/assets/library.jpg`, dùng trang trí trang chủ. Inter và Playfair Display có giấy phép OFL trong `frontend/public/assets/fonts`. Ảnh/video của sách và bằng chứng chỉ lấy từ media thật của bài đăng, không thay bằng ảnh thư viện hoặc ảnh sinh cho bản thiết kế.
+
+## Xuất kết quả kiểm duyệt cho người bán
+
+Sau phê duyệt/từ chối, phần kết quả có nút **Xuất kết quả kiểm duyệt (PDF)**. Bản in A4 lấy đúng bản dữ liệu Backend đã lưu; chọn **Lưu dưới dạng PDF / Save as PDF** trong hộp thoại in. Ảnh/video là liên kết Cloudinary, không nhúng. Lịch sử có bản kết quả đã lưu cũng xuất được; không xuất kết quả của vòng đang chờ. Chi tiết, tương thích bài cũ và kiểm tra quyền tại [review-exports.md](review-exports.md).

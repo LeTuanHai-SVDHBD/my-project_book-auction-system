@@ -5,6 +5,14 @@
 Cập nhật ngày 30/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
+## Công bố kết quả AI cho người bán sau kiểm duyệt — 30/10/2026
+
+- Người bán chờ duyệt chỉ thấy tiến độ; không mount/gọi panel AI. Sau quyết định, kết quả/lý do Admin hiện trước **Kết quả AI tham khảo** thu gọn. Gửi duyệt lại ẩn AI, quyết định cũ nằm trong lịch sử. Admin giữ chẩn đoán/lịch sử và nút yêu cầu/phân tích lại khi bài còn chờ duyệt.
+- Chi tiết bài riêng và API AI đều lọc kết quả cho người bán: hash nguồn phải phù hợp, thời điểm phân tích nằm sau quyết định trước và không muộn hơn quyết định hiện tại. Không đủ thông tin thì không gán kết quả cũ vào lần mới. Người bán không nhận job/lịch sử AI hoặc mã lỗi provider; thất bại hiện thông báo dễ hiểu. Giữ hai điểm, dữ liệu lịch sử, schema, timeout và ngân sách media hiện có.
+- `npm run check`: **135 tệp PASS**; `npm test`: **132 PASS, 11 SKIP**, tổng 143 bài; `npm run build`: PASS. Test model dùng SQL fixture, HTTP/session/CSRF thật: quyền xem, trạng thái pending/quyết định/gửi lại, lịch sử theo vai trò, 404 với ID chưa công bố và mốc thời gian dạng SQL Date có mili giây.
+- Chromium production build với HTTP/session/CSRF/router/service thật, model/job fixture: pending không gọi AI; từ chối có lỗi thân thiện; phê duyệt hiển thị hai điểm; gửi lại ẩn AI; lần duyệt mới không nhận kết quả vòng trước. Admin xem mã lỗi/lịch sử, phân tích lại từ màn hình lịch sử quay về mới nhất và chờ job; duyệt thủ công vẫn hoạt động. Đã xem ảnh desktop/mobile, kiểm tra **1440/768/390/320px**, không tràn ngang hoặc lỗi JavaScript trong các luồng trên.
+- Đã sửa `smoke:ai` theo chính sách mới: trước quyết định chủ bài không thấy AI; Admin từ chối fixture thiếu ảnh, sau đó chủ bài thấy cùng kết quả. Bổ sung cleanup quyết định/thông báo riêng của fixture. **Chưa chạy smoke với SQL/Redis/Gemini thật** trong môi trường này. Bản này không xác nhận đã xử lý lỗi timeout của bài 32 ảnh.
+
 ## Gộp mô tả tình trạng và bằng chứng — 30/10/2026
 
 - Bỏ ô nhập riêng `tinh_trang_sach`; đăng mới/gửi duyệt lại dùng một ô bắt buộc **Tình trạng, yếu tố quý hiếm và bằng chứng** (12.000 ký tự). Giữ riêng **Giới thiệu sách**. Backend nhận được bài mới không có trường tình trạng cũ, giữ toàn văn và tự tạo bản xem trước tối đa 1.000 ký tự để đáp ứng cột SQL hiện có; không migration hoặc sửa dữ liệu lịch sử.

@@ -15,7 +15,8 @@ test('HTTP phân tích giữ quyền sở hữu/Admin, CSRF, version, key ở ba
   const rows=[1,2,3].map(id=>({nguoi_dung_id:id,email:`a${id}@example.test`,ho_ten:'Fixture',vai_tro:id===3?'admin':'nguoi_dung'}));
   const users={findById:async id=>rows.find(x=>x.nguoi_dung_id===id),findByEmail:async email=>rows.find(x=>x.email===email)};
   let enqueued=0;
-  const posts={detail:async(id,options)=>{if(id!==7||!options.admin&&options.owner!==1)throw new HttpError(404,'POST_NOT_FOUND','Không tìm thấy.');return {row_version:'0000000000000001',trang_thai_phien:'cho_kiem_duyet',ai:null};}};
+  const post={row_version:'0000000000000001',trang_thai_bai:'cho_kiem_duyet',trang_thai_phien:'cho_kiem_duyet',ai:null};
+  const posts={detail:async(id,options)=>{if(id!==7||!options.admin&&options.owner!==1)throw new HttpError(404,'POST_NOT_FOUND','Không tìm thấy.');return post;}};
   const config={configured:true,key:'never-send-this-secret'},service=createAiService({posts,config,model:{history:async()=>[],get:async()=>null},queue:{status:async()=>null,enqueue:async()=>{enqueued++;return {requestId:'fixture',state:'queued'};}}});
   const authRouter=createAuthRouter({authConfig,sessionMiddleware,users,passwords:{verify:async()=>true},limiter:{consume:async()=>0}}),aiRouter=createAiRouter({sessionMiddleware,users,service});
   const server=createServer(createApp({config:{mode:'development',origins:[],probeToken:'x'},deps:{},probes:{},authRouter,aiRouter}));await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -32,4 +33,15 @@ test('HTTP phân tích giữ quyền sở hữu/Admin, CSRF, version, key ở ba
   assert.equal((await admin.call('/ai/7','POST',{row_version:'0000000000000001'})).status,202);assert.equal(enqueued,1);
   assert.equal((await owner.call('/ai/7?analysis=10')).status,404);
   config.configured=false;assert.equal((await admin.call('/ai/7','POST',{row_version:'0000000000000001'})).status,503);
+  config.configured=true;
+  post.ai={phan_tich_id:10,trang_thai:'that_bai',diem_do_hiem:null,diem_tinh_trang:null,loi_thoi:false,ngay_phan_tich:'2026-10-30T02:00:00Z',chi_tiet:[],thong_tin:{error_code:'AI_TIMEOUT',warnings:['AI_TIMEOUT diagnostic']}};
+  assert.equal((await owner.call('/ai/7')).data.analysis,null);
+  assert.equal((await owner.call('/ai/7?analysis=10')).status,404);
+  assert.equal((await admin.call('/ai/7')).data.analysis.thong_tin.error_code,'AI_TIMEOUT');
+  Object.assign(post,{trang_thai_bai:'tu_choi',trang_thai_phien:'khong_dat_kiem_duyet',kiem_duyet:[{kiem_duyet_id:1,ket_qua:'Từ chối',ngay_kiem_duyet:'2026-10-30T03:00:00Z'}]});
+  const published=await owner.call('/ai/7');assert.equal(published.data.analysis.phan_tich_id,10);assert.equal(published.data.job,null);assert.deepEqual(published.data.history,[]);assert(!JSON.stringify(published).includes('AI_TIMEOUT'));
+  assert.equal((await owner.call('/ai/7?analysis=10')).status,200);
+  assert.equal((await admin.call('/ai/7','POST',{row_version:'0000000000000001'})).status,409);
+  Object.assign(post,{trang_thai_bai:'cho_kiem_duyet',trang_thai_phien:'cho_kiem_duyet'});
+  assert.equal((await owner.call('/ai/7')).data.analysis,null);
 });

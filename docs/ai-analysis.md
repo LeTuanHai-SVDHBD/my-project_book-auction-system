@@ -155,10 +155,13 @@ Redis mất dữ liệu được bù bài pending từ SQL; không tự khôi ph
 
 - `GET /api/ai/:id?analysis=<id>`: chủ bài hoặc Admin; lần phân tích phải thuộc đúng bài.
 - `POST /api/ai/:id`: chỉ Admin, đăng nhập + CSRF, body chỉ có `row_version` hiện tại; trả 202 khi xếp hàng.
-- Chủ bài xem phân tích trong **Bài của tôi**; Admin xem trong **Kiểm duyệt**. Người mua/khách không có API phân tích riêng.
-- Hiển thị chờ xử lý, đang phân tích, thành công/chưa đầy đủ/thất bại; tự đọc lại sau mỗi lần tải xong và chờ ba giây.
-- Hai điểm, lý do NULL, trọng số, bằng chứng, nguồn, cảnh báo, manifest, model/quy tắc, phép tính và lịch sử có thể đối chiếu.
+- Admin xem AI trong **Kiểm duyệt**, đọc lại mỗi ba giây, có trạng thái chờ/đang chạy/kết quả, chẩn đoán kỹ thuật, lịch sử và nút phân tích lại khi bài đang chờ duyệt. Chỉ Admin được POST yêu cầu phân tích; quyết định duyệt/từ chối vẫn độc lập.
+- Chủ bài đang chờ duyệt chỉ thấy tiến độ và lịch sử quyết định trước đó (nếu có), không hiện/gọi panel AI. Sau phê duyệt hoặc từ chối, quyết định/lý do hiện trước, phần **Kết quả AI tham khảo** thu gọn bên dưới. Gửi duyệt lại sẽ ẩn AI cho tới quyết định mới. Người mua/khách không có API phân tích riêng.
+- Backend cũng lọc `ai` trong chi tiết riêng và `GET /api/ai/:id`: người bán không nhận job/lịch sử phân tích chưa công bố hoặc mã lỗi provider. Chỉ công bố kết quả có hash đầu vào hiện tại và thời điểm nằm sau quyết định trước, không muộn hơn quyết định hiện tại. Không đủ metadata/mốc thời gian thì báo chưa có kết quả phù hợp, không gán kết quả cũ vào lần mới. Query `analysis` của người bán chỉ nhận ID đã công bố hiện tại; Admin vẫn xem lịch sử riêng.
+- Người bán thấy hai điểm, lý do NULL, tiêu chí, bằng chứng, nguồn và phép tính của kết quả phù hợp. Nếu phân tích thất bại, hiện **AI chưa phân tích thành công. Vui lòng xem quyết định và lý do kiểm duyệt của Admin.**, không hiện `AI_TIMEOUT` hoặc hướng dẫn cấu hình. Không đổi cách tính điểm hay dữ liệu phân tích đã lưu.
 - Nút duyệt/từ chối hiện tại tiếp tục hoạt động khi AI tắt, thiếu dữ liệu hoặc lỗi. Phê duyệt vẫn cần xác nhận bằng chứng quý hiếm.
+
+Thay đổi hiển thị theo vai trò không sửa thời gian chờ hoặc việc chuẩn bị 32 ảnh: ngân sách media và timeout hiện có vẫn áp dụng; `ai:check` PASS với văn bản không chứng minh phân tích đầy đủ ảnh đã đạt.
 
 ## Chẩn đoán khi smoke báo AI_PROVIDER_ERROR
 
@@ -219,8 +222,9 @@ Khi API/worker/SQL/Redis thật đang chạy, Gemini đã bật và có quota:
 npm.cmd run smoke:ai
 ```
 
-Smoke dùng một lượt Gemini thật cho bài mẫu không có ảnh: kiểm tra JSON/SQL, giữ hai điểm NULL,
-chủ bài/Admin thấy cùng bản ghi và bài vẫn chờ quyết định. Dọn đúng tài khoản/bài SQL của lần chạy;
+Smoke dùng một lượt Gemini thật cho bài mẫu không có ảnh: kiểm tra JSON/SQL, giữ hai điểm NULL;
+chủ bài chưa thấy AI khi đang chờ. Admin từ chối fixture thiếu ảnh rồi chủ bài mới xem cùng kết quả.
+Dọn đúng tài khoản/bài/quyết định SQL của lần chạy;
 job chưa rõ hoàn tất giữ fixture và báo FAIL để đối soát. Redis job hết TTL, không FLUSHDB.
 Smoke này không thay nghiệm thu chất lượng thẩm định ảnh/video thật hoặc xác thực nguồn.
 Nếu chỉ nghiệm thu đấu giá/media mà không muốn phát sinh lượt Gemini cho fixture, tắt AI rồi khởi động lại API/worker.

@@ -2065,3 +2065,24 @@ figure.upload-media-card {
     width: 100%;
   }
 }
+
+/* Seller moderation: the Admin decision precedes optional AI evidence. */
+.seller-ai-results,
+.review-history {
+  margin-top: 24px;
+  border-top: 1px solid #e3e4df;
+  padding-top: 20px;
+}
+.seller-ai-results > summary,
+.review-history > summary {
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 700;
+  color: #142d4e;
+}
+.seller-ai-results > .ai-review {
+  padding-top: 12px;
+}
+.review-decision {
+  overflow-wrap: anywhere;
+}

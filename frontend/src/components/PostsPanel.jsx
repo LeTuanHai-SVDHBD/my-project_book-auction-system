@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BOOK_GENRE_GROUPS } from "../../../shared/bookGenres.js";
 import { bookReviewDescription } from "../../../shared/bookCondition.js";
+import { currentReview } from "../../../shared/aiVisibility.js";
 import { navigate } from "../services/navigation.js";
 import BookCard from "./BookCard.jsx";
 import BookGallery from "./BookGallery.jsx";
@@ -23,6 +24,19 @@ const money = (value) =>
   value == null ? "Chưa có" : `${BigInt(value).toLocaleString("vi-VN")} đ`;
 const date = (value) =>
   value ? new Date(value).toLocaleString("vi-VN") : "Chưa đặt lịch";
+function ReviewDecision({ review }) {
+  return (
+    <blockquote className="review-decision">
+      <strong>
+        {review.ket_qua === "Phê duyệt"
+          ? "Phê duyệt bài đăng"
+          : "Từ chối bài đăng"}
+      </strong>{" "}
+      · {date(review.ngay_kiem_duyet)}
+      <p className="preserve-lines">{review.phan_hoi_admin}</p>
+    </blockquote>
+  );
+}
 function Detail({
   post,
   mode,
@@ -69,6 +83,16 @@ function Detail({
   }
   const published = ["da_kich_hoat", "da_ket_thuc"].includes(
     post.trang_thai_phien,
+  );
+  const admin = user?.vai_tro === "admin",
+    decision = currentReview(post);
+  const waiting = post.trang_thai_phien === "cho_kiem_duyet";
+  const ai = (
+    <AiPanel
+      key={`${post.bai_dang_id}-${post.row_version}`}
+      post={post}
+      user={user}
+    />
   );
   return (
     <article className="live-detail">
@@ -178,15 +202,34 @@ function Detail({
       </div>
       {mode !== "catalog" && (
         <section className="panel live-review">
-          <AiPanel post={post} user={user} />
-          <h2>Kiểm duyệt và căn cứ</h2>
-          {!post.kiem_duyet?.length && <p>Chưa có quyết định kiểm duyệt.</p>}
-          {post.kiem_duyet?.map((item) => (
-            <blockquote key={item.kiem_duyet_id}>
-              <strong>{item.ket_qua}</strong> · {date(item.ngay_kiem_duyet)}
-              <p className="preserve-lines">{item.phan_hoi_admin}</p>
-            </blockquote>
-          ))}
+          {admin && ai}
+          <h2>{waiting ? "Tiến độ kiểm duyệt" : "Kết quả kiểm duyệt"}</h2>
+          {!admin && waiting && (
+            <p className="notice" role="status">
+              Bài đăng đang chờ Admin kiểm duyệt. Kết quả sẽ hiển thị sau khi có
+              quyết định.
+            </p>
+          )}
+          {decision && <ReviewDecision review={decision} />}
+          {!waiting && !decision && (
+            <p>
+              Chưa có quyết định kiểm duyệt phù hợp với trạng thái hiện tại.
+            </p>
+          )}
+          {post.kiem_duyet?.length > (decision ? 1 : 0) && (
+            <details className="review-history">
+              <summary>Lịch sử kiểm duyệt</summary>
+              {post.kiem_duyet.slice(decision ? 1 : 0).map((item) => (
+                <ReviewDecision key={item.kiem_duyet_id} review={item} />
+              ))}
+            </details>
+          )}
+          {!admin && decision && (
+            <details className="seller-ai-results">
+              <summary>Kết quả AI tham khảo</summary>
+              {ai}
+            </details>
+          )}
           {mode === "pending" && post.trang_thai_phien === "cho_kiem_duyet" && (
             <form onSubmit={(event) => act(event, "review")}>
               <fieldset disabled={busy}>

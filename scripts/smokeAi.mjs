@@ -23,14 +23,20 @@ try{
   while(Date.now()<deadline){data=await admin.call(`/ai/${postId}`);if(data.analysis&&(!data.job||data.job.state==='done')){cleanupSafe=true;break;}await delay(1000);}
   assert(data?.analysis,'Hết thời gian chờ kết quả AI.');assert.notEqual(data.analysis.trang_thai,'that_bai',`Gemini chưa hoàn tất: ${formatAiFailure(data.analysis.thong_tin)}`);
   assert.equal(data.analysis.diem_do_hiem,null);assert.equal(data.analysis.diem_tinh_trang,null);assert.equal(data.analysis.chi_tiet.length,9);
-  const owner=await seller.call(`/ai/${postId}`);assert.equal(owner.analysis.phan_tich_id,data.analysis.phan_tich_id);
-  assert.equal((await admin.call(`/posts/${postId}`)).trang_thai_phien,'cho_kiem_duyet');assert(!JSON.stringify(data).includes(process.env.GEMINI_API_KEY));
+  const waitingOwner=await seller.call(`/ai/${postId}`);assert.equal(waitingOwner.analysis,null);assert.equal(waitingOwner.job,null);assert.deepEqual(waitingOwner.history,[]);
+  assert.equal((await seller.call(`/posts/${postId}`)).ai,null);
+  const pendingPost=await admin.call(`/posts/${postId}`);assert.equal(pendingPost.trang_thai_phien,'cho_kiem_duyet');assert(!JSON.stringify(data).includes(process.env.GEMINI_API_KEY));
+  stage='Admin quyết định và công bố kết quả cho chủ bài';
+  await admin.call(`/posts/${postId}/review`,'POST',{quyet_dinh:'tu_choi',ly_do:'Fixture smoke thiếu ảnh: từ chối thử để kiểm tra công bố kết quả, không thẩm định sách thật.',row_version:pendingPost.row_version});
+  const owner=await seller.call(`/ai/${postId}`);assert.equal(owner.analysis?.phan_tich_id,data.analysis.phan_tich_id);
+  assert.equal(owner.analysis.diem_do_hiem,null);assert.equal(owner.analysis.diem_tinh_trang,null);assert.equal(owner.job,null);assert.deepEqual(owner.history,[]);
+  assert.equal((await seller.call(`/posts/${postId}`)).trang_thai_phien,'khong_dat_kiem_duyet');
   finished=true;
 }catch(error){console.error(`FAIL AI tại ${stage}, run=${runId}: ${error.message}`);process.exitCode=1;}
 finally{
-  try{if(pool&&cleanupSafe){const req=pool.request();accounts.forEach((row,i)=>req.input('u'+i,sql.Int,row.nguoi_dung_id));if(postId)await req.input('post',sql.Int,postId).query(`SET XACT_ABORT ON;BEGIN TRANSACTION;DECLARE @book INT;SELECT @book=sach_id FROM dbo.BaiDang WITH (UPDLOCK,HOLDLOCK) WHERE bai_dang_id=@post;DELETE dbo.ChiTietPhanTichAI WHERE phan_tich_id IN(SELECT phan_tich_id FROM dbo.PhanTichAI WHERE bai_dang_id=@post);DELETE dbo.PhanTichAI WHERE bai_dang_id=@post;DELETE dbo.LichSuDauGia WHERE phien_dau_gia_id IN(SELECT phien_dau_gia_id FROM dbo.PhienDauGia WHERE bai_dang_id=@post);DELETE dbo.PhienDauGia WHERE bai_dang_id=@post;DELETE dbo.BaiDang WHERE bai_dang_id=@post;DELETE dbo.Sach WHERE sach_id=@book;COMMIT TRANSACTION;`);if(accounts.length)await pool.request().query(`DELETE dbo.NguoiDung WHERE nguoi_dung_id IN(${accounts.map(x=>x.nguoi_dung_id).join(',')})`);console.log('Đã dọn đúng dữ liệu SQL thử AI. Job Redis tự hết hạn.');}
+  try{if(pool&&cleanupSafe){const req=pool.request();accounts.forEach((row,i)=>req.input('u'+i,sql.Int,row.nguoi_dung_id));if(postId)await req.input('post',sql.Int,postId).query(`SET XACT_ABORT ON;BEGIN TRANSACTION;DECLARE @book INT;SELECT @book=sach_id FROM dbo.BaiDang WITH (UPDLOCK,HOLDLOCK) WHERE bai_dang_id=@post;DELETE dbo.ThongBao WHERE loai IN('pending','mine','catalog') AND doi_tuong_id=@post;DELETE dbo.KiemDuyet WHERE bai_dang_id=@post;DELETE dbo.ChiTietPhanTichAI WHERE phan_tich_id IN(SELECT phan_tich_id FROM dbo.PhanTichAI WHERE bai_dang_id=@post);DELETE dbo.PhanTichAI WHERE bai_dang_id=@post;DELETE dbo.LichSuDauGia WHERE phien_dau_gia_id IN(SELECT phien_dau_gia_id FROM dbo.PhienDauGia WHERE bai_dang_id=@post);DELETE dbo.PhienDauGia WHERE bai_dang_id=@post;DELETE dbo.BaiDang WHERE bai_dang_id=@post;DELETE dbo.Sach WHERE sach_id=@book;COMMIT TRANSACTION;`);if(accounts.length)await pool.request().query(`DELETE dbo.NguoiDung WHERE nguoi_dung_id IN(${accounts.map(x=>x.nguoi_dung_id).join(',')})`);console.log('Đã dọn đúng dữ liệu SQL thử AI. Job Redis tự hết hạn.');}
     else if(postId){console.error(`Job còn chờ; giữ fixture bài #${postId}, run=${runId} để worker/nhóm đối soát.`);process.exitCode=1;}}
   catch{console.error(`Chưa dọn xong fixture AI, bài #${postId}, run=${runId}.`);process.exitCode=1;}
   await closeDatabase();
 }
-if(finished&&!process.exitCode)console.log('PASS AI thật: Gemini JSON → Backend kiểm tra/tính điểm → SQL, thiếu ảnh giữ NULL, chủ bài/Admin cùng kết quả và bài vẫn chờ Admin.');
+if(finished&&!process.exitCode)console.log('PASS AI thật: Gemini JSON → Backend kiểm tra/tính điểm → SQL, thiếu ảnh giữ NULL; chủ bài chỉ thấy kết quả sau quyết định Admin.');

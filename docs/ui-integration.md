@@ -67,6 +67,8 @@ Nút Tìm kiếm có chiều rộng gọn trên desktop, dành chỗ cho ô nh�
 
 Trong giao dịch, khiếu nại hiển thị dạng thẻ có mã, lý do, trạng thái và giờ gửi. **Xem hồ sơ và phản hồi** mở dialog tách rõ nội dung, ảnh bằng chứng và phản hồi Admin. **Gửi khiếu nại mới** mở biểu mẫu riêng; quyền xem hồ sơ và chat giữ nguyên.
 
+Trong **Bài của tôi**, chủ sách đang chờ duyệt không thấy phần AI. Sau quyết định, lý do Admin hiện trước **Kết quả AI tham khảo** dạng thu gọn; gửi duyệt lại ẩn AI và giữ quyết định cũ dưới lịch sử. Khi tải lại trạng thái/F5 sau quyết định, lấy kết quả phù hợp của lần hiện tại; dữ liệu cũ/không xác định không hiện như kết quả mới. Admin vẫn có AI, lịch sử, mã lỗi và nút yêu cầu/phân tích lại khi bài chờ duyệt. Chi tiết hợp đồng công bố: [ai-analysis.md](ai-analysis.md).
+
 ## Thông báo
 
 - `GET /api/notifications?before=id`: session hiện hành, tối đa 30 mục, `{items,unread,nextBefore}`; `Cache-Control: no-store`.

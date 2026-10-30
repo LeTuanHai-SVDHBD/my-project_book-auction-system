@@ -1,6 +1,7 @@
 /** Admission/đọc phân tích riêng; Gemini chạy ở worker, không trong giao dịch đăng sách. */
 import {HttpError} from '../middlewares/errorHandler.js';
 import {analysisView} from '../ai/input.js';
+import {ownerAiResult} from './aiPresentation.js';
 export function createAiService({posts,model,queue,config}) {
   async function enqueue(postId){if(!config.configured)return null;const row=await posts.detail(postId,{admin:true});return row.trang_thai_phien==='cho_kiem_duyet'?queue.enqueue(row):null;}
   return {enqueue,
@@ -12,6 +13,11 @@ export function createAiService({posts,model,queue,config}) {
     },
     async status(postId,user,analysisId=null){
       const row=await posts.detail(postId,{owner:user.nguoi_dung_id,admin:user.vai_tro==='admin'});
+      if(user.vai_tro!=='admin'){
+        const analysis=ownerAiResult(row.ai,row);
+        if(analysisId&&analysis?.phan_tich_id!==analysisId)throw new HttpError(404,'AI_NOT_FOUND','Không tìm thấy kết quả AI đã công bố cho lần kiểm duyệt này.');
+        return {configured:config.configured,job:null,analysis,history:[]};
+      }
       let raw=analysisId?await model.get(postId,analysisId):row.ai;
       if(analysisId&&!raw)throw new HttpError(404,'AI_NOT_FOUND','Không tìm thấy lần phân tích của bài này.');
       let job=null;try{job=await queue.status(postId);}catch{/* SQL và kiểm duyệt thủ công vẫn dùng được khi Redis lỗi. */}

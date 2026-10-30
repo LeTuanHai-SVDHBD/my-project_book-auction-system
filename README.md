@@ -216,6 +216,8 @@ cấp CSRF 60 lần/IP/phút. Bộ đếm tính cả lần thành công. Khi b�
 
 Khi đã bật Gemini, worker tự phân tích bài mới/gửi duyệt lại, lưu hai điểm độc lập cùng bằng chứng, cảnh báo và lịch sử.
 Admin xem **AI hỗ trợ kiểm duyệt**, mở từng tiêu chí/phép tính hoặc yêu cầu phân tích lại.
+Người bán đang chờ duyệt chỉ thấy tiến độ. Sau phê duyệt/từ chối, xem quyết định/lý do của Admin
+và mở **Kết quả AI tham khảo** bên dưới; gửi duyệt lại sẽ ẩn AI cho tới quyết định mới.
 Thiếu dữ liệu giữ NULL; lỗi AI không từ chối bài. Khi AI tắt, kiểm duyệt thủ công vẫn hoạt động.
 Tình trạng đẹp không thay thế điều kiện quý hiếm. Cấu hình và nghiệm thu tại [Phân tích AI](docs/ai-analysis.md).
 Giờ được lưu theo UTC và kiểm tra bằng đồng hồ SQL Server.

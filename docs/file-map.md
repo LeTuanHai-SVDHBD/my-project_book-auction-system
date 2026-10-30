@@ -46,6 +46,8 @@
 | `academic/` | Hướng dẫn lưu báo cáo, slide, UML và bằng chứng được chọn |
 | `shared/bookGenres.js`, `shared/accountControl.js` | Danh mục thể loại chung và thông báo thay cửa sổ |
 | `shared/bookCondition.js` | Mô tả kiểm duyệt chung, giữ tình trạng cũ khác biệt và bản xem trước tương thích SQL |
+| `shared/aiVisibility.js`, `backend/src/services/aiPresentation.js` | Quyết định kiểm duyệt hiện tại và kết quả AI được công bố cho người bán, tách chẩn đoán Admin |
+| `backend/test/aiVisibility.test.js` | Công bố đúng vòng kiểm duyệt, dữ liệu nguồn và thời gian SQL; projection riêng theo vai trò |
 
 ## Quyền cửa sổ và đầu vào biểu mẫu
 

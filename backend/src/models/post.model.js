@@ -3,6 +3,7 @@ import {BOOK_GENRE_GROUPS} from '../../../shared/bookGenres.js';
 import {searchPattern,catalogOrders} from '../services/catalogSearch.js';
 import { HttpError } from '../middlewares/errorHandler.js';
 import {analysisView} from '../ai/input.js';
+import {ownerAiResult} from '../services/aiPresentation.js';
 import {withRowVersion} from '../utils/rowVersion.js';
 import {assertVersion,assertStatePair,assertRelistable,assertVideoLimit} from '../services/postPolicy.js';
 const conflict = message => { throw new HttpError(409,'POST_CONFLICT',message); };
@@ -106,6 +107,7 @@ export function createPostModel({ getPool, sql }) {
       row.ai=(await request(pool).input('id',sql.Int,postId).query('SELECT TOP(1) phan_tich_id,diem_do_hiem,diem_tinh_trang,trang_thai,ngay_phan_tich FROM dbo.PhanTichAI WHERE bai_dang_id=@id ORDER BY phan_tich_id DESC')).recordset[0]||null;
       if (row.ai) row.ai.chi_tiet=(await request(pool).input('id',sql.Int,row.ai.phan_tich_id).query('SELECT tieu_chi,diem,bang_chung,do_tin_cay,canh_bao,nhom_tieu_chi,trang_thai_danh_gia,trong_so,nguon_doi_chieu FROM dbo.ChiTietPhanTichAI WHERE phan_tich_id=@id ORDER BY chi_tiet_id')).recordset;
       row.ai=analysisView(row.ai,row);
+      if(!admin)row.ai=ownerAiResult(row.ai,row);
       row.co_the_dang_lai=(await request(pool).input('id',sql.Int,postId).query(`SELECT CASE WHEN p.trang_thai='da_ket_thuc' AND k.trang_thai='khong_co_nguoi_thang' AND k.nguoi_thang_dau_id IS NULL
         AND NOT EXISTS(SELECT 1 FROM dbo.BaiDang newer WHERE newer.sach_id=b.sach_id AND newer.bai_dang_id>b.bai_dang_id) THEN 1 ELSE 0 END AS allowed
         FROM dbo.BaiDang b JOIN dbo.PhienDauGia p ON p.bai_dang_id=b.bai_dang_id LEFT JOIN dbo.KetQuaDauGia k ON k.phien_dau_gia_id=p.phien_dau_gia_id WHERE b.bai_dang_id=@id`)).recordset[0].allowed===1;

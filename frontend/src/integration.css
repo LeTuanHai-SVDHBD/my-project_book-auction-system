@@ -443,7 +443,7 @@ button,
 }
 .live-detail-grid {
   display: grid;
-  grid-template-columns: 1.05fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 32px;
   align-items: start;
 }
@@ -489,9 +489,16 @@ button,
 .gallery-thumbnails {
   display: flex;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 4px 2px 12px;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
 }
 .gallery-thumbnails button {
+  flex-shrink: 0;
+  scroll-snap-align: start;
   width: 90px;
   height: 100px;
   display: grid;
@@ -579,61 +586,6 @@ button,
 }
 .ai-criterion summary {
   font-size: 18px;
-}
-.live-moderation {
-  display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  gap: 24px;
-  align-items: start;
-}
-.moderation-queue {
-  position: sticky;
-  top: 24px;
-  padding: 20px;
-  max-height: calc(100dvh - 48px);
-  overflow: auto;
-}
-.moderation-queue h2 {
-  font-size: 28px;
-}
-.moderation-queue > a {
-  display: flex;
-  gap: 12px;
-  border: 1px solid #ddd;
-  margin: 16px 0;
-  padding: 14px 10px;
-  border-radius: 12px;
-}
-.moderation-queue > a[aria-current="page"] {
-  border-color: #d9a441;
-  background: #fbf3df;
-}
-.moderation-queue img {
-  width: 40px;
-  height: 60px;
-  object-fit: contain;
-}
-.moderation-queue span {
-  min-width: 0;
-}
-.moderation-queue b {
-  font-size: 17px;
-  overflow-wrap: anywhere;
-}
-.moderation-queue small {
-  display: block;
-}
-.moderation-queue svg {
-  flex: none;
-}
-.live-moderation .live-detail-grid {
-  grid-template-columns: 1fr;
-}
-.live-moderation .gallery-stage img {
-  height: 400px;
-}
-.live-moderation .live-auction-summary h1 {
-  font-size: 36px;
 }
 .live-form-steps {
   list-style: none;
@@ -816,11 +768,13 @@ button,
 .home-book-grid .book-card:nth-child(n + 4) {
   display: none;
 }
-.live-moderation .panel {
-  border-radius: 18px;
-}
 .live-detail .breadcrumb {
   overflow-wrap: anywhere;
+}
+.live-detail .breadcrumb .text-button {
+  width: auto;
+  flex: none;
+  margin: 0;
 }
 .admin-mobile-menu {
   margin-bottom: 0;
@@ -829,9 +783,6 @@ button,
   overflow-wrap: anywhere;
 }
 @media (min-width: 1101px) {
-  .admin-content-wrap .live-moderation .live-detail-grid {
-    grid-template-columns: 1fr;
-  }
   .admin-content-wrap .book-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -857,16 +808,6 @@ button,
   }
 }
 @media (max-width: 1100px) {
-  .live-moderation {
-    grid-template-columns: 1fr;
-  }
-  .moderation-queue {
-    position: static;
-    max-height: 360px;
-  }
-  .live-moderation .live-detail-grid {
-    grid-template-columns: 1fr 1fr;
-  }
   .book-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -888,8 +829,7 @@ button,
   }
 }
 @media (max-width: 768px) {
-  .live-detail-grid,
-  .live-moderation .live-detail-grid {
+  .live-detail-grid {
     grid-template-columns: 1fr;
   }
   .posts-page {
@@ -2084,5 +2024,66 @@ figure.upload-media-card {
   padding-top: 12px;
 }
 .review-decision {
+  overflow-wrap: anywhere;
+}
+
+/* Review list uses the full content width; details open on their own page. */
+.pending-posts-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-bottom: 28px;
+}
+.pending-posts-heading h2 {
+  margin: 0;
+  font-size: 30px;
+}
+.pending-posts-heading > span {
+  color: #62676f;
+  font-size: 17px;
+}
+.pending-post-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 28px;
+  margin-bottom: 28px;
+}
+.pending-post-grid .book-card {
+  min-width: 0;
+}
+.gallery-browser {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 32px;
+  gap: 10px;
+  align-items: center;
+}
+.gallery-scroll {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 44px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid #deded6;
+  border-radius: 10px;
+  background: #fff;
+  color: #142d4e;
+}
+.gallery-scroll-back svg {
+  transform: rotate(180deg);
+}
+.live-auction-summary .book-facts {
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e3e4df;
+}
+.live-auction-summary .auction-facts-heading {
+  font-size: 22px;
+  margin: 24px 0 16px;
+}
+.book-description-copy {
+  max-width: 92ch;
+  margin-inline: auto;
   overflow-wrap: anywhere;
 }

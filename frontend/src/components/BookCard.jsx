@@ -23,7 +23,7 @@ export default function BookCard({ post, mode = "catalog" }) {
       <a
         className="book-art"
         href={`#/${mode}/${post.bai_dang_id}`}
-        aria-label={`Xem ${post.ten_sach}`}
+        aria-label={`Xem ${post.ten_sach}${mode === "pending" ? `, bài #${post.bai_dang_id}` : ""}`}
       >
         <span className="book-card-status">
           <span className="badge badge-gold">{phase}</span>
@@ -58,13 +58,16 @@ export default function BookCard({ post, mode = "catalog" }) {
         </strong>
         <div className="book-card-footer">
           <span>
-            <Icon name="clock" size={18} />
-            {post.thoi_gian_ket_thuc
-              ? new Date(post.thoi_gian_ket_thuc).toLocaleString("vi-VN")
-              : "Chưa đặt lịch"}
+            <Icon name={mode === "pending" ? "file" : "clock"} size={18} />
+            {mode === "pending"
+              ? `Bài #${post.bai_dang_id}`
+              : post.thoi_gian_ket_thuc
+                ? new Date(post.thoi_gian_ket_thuc).toLocaleString("vi-VN")
+                : "Chưa đặt lịch"}
           </span>
           <a className="text-link" href={`#/${mode}/${post.bai_dang_id}`}>
-            Xem chi tiết <Icon name="arrow" size={18} />
+            {mode === "pending" ? "Xem bài đăng" : "Xem chi tiết"}{" "}
+            <Icon name="arrow" size={18} />
           </a>
         </div>
       </div>

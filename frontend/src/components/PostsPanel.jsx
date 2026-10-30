@@ -106,25 +106,6 @@ function Detail({
       <div className="live-detail-grid">
         <div>
           <BookGallery items={post.media} />
-          <section className="panel live-book-description">
-            <span className="eyebrow">Thông tin bản sách</span>
-            <h2>Giới thiệu và tình trạng</h2>
-            <p className="preserve-lines">{post.mo_ta}</p>
-            <dl className="post-info">
-              <dt>Tác giả</dt>
-              <dd>{post.tac_gia || "Chưa rõ"}</dd>
-              <dt>Thể loại</dt>
-              <dd>{post.the_loai || "Chưa rõ"}</dd>
-              <dt>Nhà xuất bản</dt>
-              <dd>{post.nha_xuat_ban || "Chưa rõ"}</dd>
-              <dt>Năm / ISBN</dt>
-              <dd>
-                {post.nam_xuat_ban || "Chưa rõ"} / {post.isbn || "Chưa rõ"}
-              </dd>
-            </dl>
-            <h3>Tình trạng, yếu tố quý hiếm và bằng chứng</h3>
-            <p className="preserve-lines">{bookReviewDescription(post)}</p>
-          </section>
         </div>
         <div>
           <section className="panel live-auction-summary">
@@ -134,6 +115,19 @@ function Detail({
             <p className="field-hint">
               Bài #{post.bai_dang_id} · Một bản sách vật lý
             </p>
+            <dl className="post-info book-facts">
+              <dt>Tác giả</dt>
+              <dd>{post.tac_gia || "Chưa rõ"}</dd>
+              <dt>Thể loại</dt>
+              <dd>{post.the_loai || "Chưa rõ"}</dd>
+              <dt>Nhà xuất bản</dt>
+              <dd>{post.nha_xuat_ban || "Chưa rõ"}</dd>
+              <dt>Năm xuất bản</dt>
+              <dd>{post.nam_xuat_ban || "Chưa rõ"}</dd>
+              <dt>ISBN</dt>
+              <dd>{post.isbn || "Không có ISBN"}</dd>
+            </dl>
+            <h2 className="auction-facts-heading">Thông số đấu giá</h2>
             <dl className="post-info">
               <dt>Giá khởi điểm</dt>
               <dd>{money(post.gia_khoi_diem)}</dd>
@@ -200,6 +194,15 @@ function Detail({
           </section>
         </div>
       </div>
+      <section className="panel live-book-description">
+        <div className="book-description-copy">
+          <span className="eyebrow">Thông tin bản sách</span>
+          <h2>Giới thiệu và tình trạng</h2>
+          {post.mo_ta && <p className="preserve-lines">{post.mo_ta}</p>}
+          <h3>Tình trạng, yếu tố quý hiếm và bằng chứng</h3>
+          <p className="preserve-lines">{bookReviewDescription(post)}</p>
+        </div>
+      </section>
       {mode !== "catalog" && (
         <section className="panel live-review">
           {admin && ai}
@@ -425,7 +428,7 @@ export default function PostsPanel({
   );
   return (
     <main className="posts-page page-container">
-      {(!post || mode === "pending") && (
+      {!post && (
         <header className="posts-heading">
           <div>
             <span className="eyebrow">
@@ -478,45 +481,33 @@ export default function PostsPanel({
           }}
         />
       ) : mode === "pending" ? (
-        <div className="live-moderation">
-          <aside className="panel moderation-queue">
-            <h2>Hàng đợi</h2>
-            <span>{items.length} bài đang tải trong danh sách</span>
-            {items.map((item) => (
-              <a
-                key={item.bai_dang_id}
-                href={`#/pending/${item.bai_dang_id}`}
-                aria-current={
-                  post?.bai_dang_id === item.bai_dang_id ? "page" : undefined
-                }
-              >
-                {item.anh_bia && <img src={item.anh_bia} alt="" />}
-                <span>
-                  <b>{item.ten_sach}</b>
-                  <small>Bài #{item.bai_dang_id}</small>
-                </span>
-                <Icon name="chevron" />
-              </a>
-            ))}
-            {!items.length && !loading && <p>Không còn bài chờ duyệt.</p>}
+        post ? (
+          detail
+        ) : (
+          <section className="pending-posts" aria-label="Bài đăng chờ duyệt">
+            <div className="pending-posts-heading">
+              <h2>Bài đăng chờ duyệt</h2>
+              <span>{items.length} bài đang hiển thị</span>
+            </div>
+            <div className="pending-post-grid">
+              {items.map((item) => (
+                <BookCard key={item.bai_dang_id} post={item} mode="pending" />
+              ))}
+            </div>
+            {!items.length && !loading && (
+              <p className="notice">Không có bài đăng chờ duyệt.</p>
+            )}
             {next && (
-              <button onClick={() => load(true)} disabled={loading}>
-                Xem thêm
+              <button
+                className="secondary"
+                onClick={() => load(true)}
+                disabled={loading}
+              >
+                Xem thêm bài chờ duyệt
               </button>
             )}
-          </aside>
-          <div>
-            {detail || (
-              <div className="panel empty-state">
-                <Icon name="shield" size={48} />
-                <h2>Chọn hồ sơ để kiểm duyệt</h2>
-                <p>
-                  Thông tin sách, ảnh/video và phân tích AI hiển thị tại đây.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
+          </section>
+        )
       ) : post ? (
         detail
       ) : (

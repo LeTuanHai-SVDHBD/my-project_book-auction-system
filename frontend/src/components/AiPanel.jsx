@@ -10,7 +10,7 @@ const states = {
 const score = (value) =>
   value === null || value === undefined
     ? "Chưa đủ dữ liệu"
-    : `${Number(value).toFixed(2)} / 100`;
+    : `${Number(value)} / 100`;
 function Sources({ value }) {
   let refs;
   try {
@@ -247,7 +247,7 @@ export default function AiPanel({ post, user }) {
                     {key === "do_hiem" ? "Độ hiếm" : "Tình trạng"}:{" "}
                     {item.diem === null
                       ? item.ly_do_null
-                      : `${item.tong_diem_co_trong_so} / ${item.tong_trong_so_ap_dung} = ${item.diem.toFixed(2)}`}
+                      : `${item.tong_diem_co_trong_so} / ${item.tong_trong_so_ap_dung} = ${Number(item.diem.toFixed(2))}`}
                   </p>
                 ))}
               </details>

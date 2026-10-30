@@ -33,13 +33,19 @@ Phong cách tham chiếu: [frontend-book tại 83add59](https://github.com/LeTua
 | `#/catalog/:postId` | Chi tiết công khai, ảnh/video thật cùng bản sách, đặt giá/lịch sử/kết quả |
 | `#/create` | Đăng sách bốn bước, upload Cloudinary, gửi kiểm duyệt |
 | `#/mine`, `#/mine/:postId` | Bài của mình, AI riêng, bổ sung, kích hoạt/đăng lại |
-| `#/pending`, `#/pending/:postId` | Admin: hàng đợi, bằng chứng, AI, quyết định |
+| `#/pending`, `#/pending/:postId` | Admin: danh sách bài chờ duyệt, chi tiết bằng chứng/AI/quyết định |
 | `#/trades`, `#/trades/:tradeId` | Hai bên giao dịch/chat/xác nhận/đánh giá/khiếu nại |
 | `#/complaints`, `#/complaints/:complaintId` | Hồ sơ người gửi/Admin, chat chỉ đọc đúng người xử lý |
 | `#/account` | Đăng ký/đăng nhập/tài khoản/đăng xuất thật |
 | `#/infra` | Công cụ hạ tầng hiện có |
 
 `postId` khác `auctionId`; API phiên vẫn nhận `phien_dau_gia_id` từ chi tiết bài, không suy đoán hai ID bằng nhau. Điều hướng hash giữ được F5 và Back. Thông báo chỉ điều hướng; Backend đích kiểm tra quyền như cũ.
+
+Trang kiểm duyệt hiển thị bài chờ duyệt bằng lưới thẻ dùng toàn chiều rộng, có ảnh, tên sách, mã bài và liên kết xem bài. Không còn cột **Hàng đợi** hoặc khung **Chọn hồ sơ để kiểm duyệt**. Mở bài sẽ hiển thị chi tiết riêng, **Về danh sách** quay lại các thẻ; giữ API/cursor và nút tải thêm hiện có, số đếm là số bài đang hiển thị.
+
+Chi tiết sách dùng hai cột cân nhau trên desktop: ảnh/video bên trái, thông tin sách và giá bên phải. Mô tả dài cùng tình trạng/bằng chứng nằm trong phần toàn chiều rộng phía dưới; mobile xếp một cột. Ảnh thu nhỏ nằm trong một hàng cuộn ngang, có nút cuộn và vẫn chọn được mọi ảnh/video của cùng bản sách, không cắt danh sách media.
+
+Điểm AI chỉ bỏ số 0 thừa khi hiển thị: `100.00` → `100 / 100`, `75.50` → `75.5 / 100`; `76.39` và NULL được giữ đúng nghĩa. Cách hiển thị này áp dụng cho cả hai điểm và phần đối chiếu phép tính; không sửa giá trị lưu SQL hoặc bộ chấm điểm.
 
 ## Tìm kiếm
 

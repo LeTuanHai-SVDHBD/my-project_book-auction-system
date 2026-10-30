@@ -5,6 +5,13 @@
 Cập nhật ngày 30/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
+## Bố cục kiểm duyệt, chi tiết sách và định dạng điểm — 30/10/2026
+
+- Chỉ sửa frontend và tài liệu. Danh sách Admin dùng lưới thẻ toàn chiều rộng, giữ mã bài, trạng thái, mở chi tiết/quay lại và cursor tải thêm. Bỏ cột hàng đợi/khung chọn hồ sơ; giữ nguyên API/quyền/SQL và thao tác quyết định.
+- Ảnh/video và thông tin chính/giá nằm hai cột cân nhau; mô tả dài dùng toàn chiều rộng bên dưới. Bộ 32 ảnh không xếp thành nhiều hàng thu nhỏ; cuộn ngang bằng nút, touch hoặc bàn phím và vẫn chọn đầy đủ media. Điểm nguyên bỏ `.00`, phần lẻ có giá trị vẫn giữ, không chuyển NULL thành 0.
+- `npm run build`: PASS (85 modules); `git diff --check`: PASS. Chromium production build với HTTP/session/CSRF/router thật, model/AI response fixture: sáu thẻ ban đầu, mở bài/quay lại, rỗng và cursor 30 → 36 bài; `100 / 100`, `75.5 / 100`, `76.39 / 100`, phép tính và NULL. Chọn được cả 32 ảnh và video trong cùng hàng; đo hai cột bằng nhau, mô tả không còn bị giới hạn trong cột trái.
+- Kiểm tra và xem ảnh desktop/mobile; các chiều rộng **1440/1100/768/390/320px** không tràn ngang hoặc lỗi JavaScript trong các luồng trên. Trạng thái người bán chờ duyệt vẫn ẩn AI; nút đặt lịch của bài đã duyệt vẫn hiện. Không chạy lại smoke SQL/Redis/Gemini thật cho thay đổi trình bày này; không thêm dependency/migration hoặc sửa xử lý AI.
+
 ## Công bố kết quả AI cho người bán sau kiểm duyệt — 30/10/2026
 
 - Người bán chờ duyệt chỉ thấy tiến độ; không mount/gọi panel AI. Sau quyết định, kết quả/lý do Admin hiện trước **Kết quả AI tham khảo** thu gọn. Gửi duyệt lại ẩn AI, quyết định cũ nằm trong lịch sử. Admin giữ chẩn đoán/lịch sử và nút yêu cầu/phân tích lại khi bài còn chờ duyệt.

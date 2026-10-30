@@ -1,7 +1,8 @@
 /** All media belong to one post/physical copy. The video player uses the stored real URL. */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Icon } from "./DesignUi.jsx";
 export default function BookGallery({ items = [] }) {
+  const thumbnails = useRef(null);
   const [selected, setSelected] = useState(0),
     media = items[selected] || items[0];
   if (!media)
@@ -37,25 +38,58 @@ export default function BookGallery({ items = [] }) {
         {items.filter((i) => i.kind === "video").length} video · Cùng một bản
         sách
       </p>
-      <div className="gallery-thumbnails">
-        {items.map((item, i) => (
-          <button
-            key={item.url + "-" + i}
-            type="button"
-            aria-label={`${item.kind === "video" ? "Video" : "Ảnh"} ${i + 1}: ${item.title || "bản sách"}`}
-            aria-pressed={selected === i}
-            onClick={() => setSelected(i)}
-          >
-            {item.kind === "image" ? (
-              <img src={item.url} alt="" />
-            ) : (
-              <>
-                <Icon name="play" size={30} />
-                <span>Video</span>
-              </>
-            )}
-          </button>
-        ))}
+      <div className="gallery-browser">
+        <button
+          className="gallery-scroll gallery-scroll-back"
+          type="button"
+          aria-label="Cuộn danh sách ảnh về trước"
+          onClick={() =>
+            thumbnails.current?.scrollBy({
+              left: -thumbnails.current.clientWidth * 0.8,
+              behavior: "smooth",
+            })
+          }
+        >
+          <Icon name="arrow" size={20} />
+        </button>
+        <div
+          className="gallery-thumbnails"
+          ref={thumbnails}
+          role="group"
+          aria-label="Chọn ảnh hoặc video"
+        >
+          {items.map((item, i) => (
+            <button
+              key={item.url + "-" + i}
+              type="button"
+              aria-label={`${item.kind === "video" ? "Video" : "Ảnh"} ${i + 1}: ${item.title || "bản sách"}`}
+              aria-pressed={selected === i}
+              onClick={() => setSelected(i)}
+            >
+              {item.kind === "image" ? (
+                <img src={item.url} alt="" loading="lazy" />
+              ) : (
+                <>
+                  <Icon name="play" size={30} />
+                  <span>Video</span>
+                </>
+              )}
+            </button>
+          ))}
+        </div>
+        <button
+          className="gallery-scroll"
+          type="button"
+          aria-label="Cuộn danh sách ảnh tiếp theo"
+          onClick={() =>
+            thumbnails.current?.scrollBy({
+              left: thumbnails.current.clientWidth * 0.8,
+              behavior: "smooth",
+            })
+          }
+        >
+          <Icon name="arrow" size={20} />
+        </button>
       </div>
     </section>
   );

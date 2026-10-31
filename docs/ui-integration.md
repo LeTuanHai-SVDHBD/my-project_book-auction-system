@@ -65,6 +65,10 @@ Bỏ bóng đổ/hiệu ứng xoay của mô phỏng bìa sách cũ; hover khôn
 Nhãn trạng thái có khoảng riêng phía trên; ảnh dọc, ngang, vuông dùng cùng khung, chưa có ảnh giữ placeholder.
 Không sửa file ảnh, URL Cloudinary, dữ liệu media hoặc cách chọn ảnh/video ở chi tiết.
 
+Hai nút **← / →** cạnh ảnh nhỏ chuyển sang media trước/tiếp theo (ảnh hoặc video), không chỉ cuộn dải ảnh. Đầu/cuối danh sách thì nút tương ứng bị vô hiệu, không quay vòng. Có số vị trí hiện tại/tổng media; ảnh nhỏ đang chọn tự cuộn ngang vào vùng nhìn thấy, giữ vị trí cuộn dọc của trang và tôn trọng reduced-motion.
+
+Khi focus trong thư viện ảnh, **Home** chọn media đầu, **End** chọn media cuối; ở dải ảnh nhỏ, **← / →** cũng đổi media và đưa focus đến ảnh nhỏ đang chọn. Tab chỉ dừng ở ảnh nhỏ đang chọn thay vì đi qua mọi tệp. Ở ảnh lớn, mũi tên vẫn điều khiển kính lúp; trong video, Home/End/mũi tên vẫn thuộc controls gốc của trình phát, không bị thư viện chiếm. Chuột/chạm cũng dùng cùng hai nút chuyển media ở cả Admin và người dùng.
+
 Ảnh lớn ở chi tiết dùng `ImageZoom`: desktop từ 960px và còn đủ chỗ bên phải có kính lúp khi rê chuột lên vùng ảnh thật, khung soi bên cạnh với mức phóng mặc định 2,5 lần (tăng thêm khi ảnh quá hẹp để khung không trống). Vùng soi bỏ phần đệm của `object-fit: contain`, không đổi tỷ lệ hay ảnh nguồn. Khung soi là lớp phủ tạm trên cột thông tin, không làm dịch bố cục; rời ảnh, cuộn, resize hoặc đổi ảnh/video thì ẩn.
 
 Tab vào ảnh mở kính lúp ở giữa; mũi tên di chuyển, Escape tắt, Enter mở ảnh gốc ở tab mới. Điện thoại/chạm hoặc không đủ chỗ chỉ dùng **Phóng to ảnh** để mở đúng ảnh gốc trong trình duyệt và thu phóng bằng thao tác của trình duyệt. Chưa tải được ảnh thì không tạo kính lúp; báo lỗi xem trước và giữ liên kết ảnh gốc. Áp dụng cùng component ở chi tiết công khai, chủ sách và Admin; video giữ controls, thẻ danh sách giữ khung thẳng 4:3 đã chốt.

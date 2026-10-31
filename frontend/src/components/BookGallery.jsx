@@ -1,11 +1,74 @@
 /** All media belong to one post/physical copy. The video player uses the stored real URL. */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ImageZoom from "./ImageZoom.jsx";
 import { Icon } from "./DesignUi.jsx";
 export default function BookGallery({ items = [] }) {
-  const thumbnails = useRef(null);
-  const [selected, setSelected] = useState(0),
-    media = items[selected] || items[0];
+  const thumbnails = useRef(null),
+    gallery = useRef(null),
+    selectionAction = useRef(null);
+  const [selected, setSelected] = useState(0);
+  const current = Math.min(selected, Math.max(0, items.length - 1)),
+    media = items[current];
+  useEffect(() => {
+    const action = selectionAction.current;
+    if (!action) return;
+    selectionAction.current = null;
+    const strip = thumbnails.current,
+      active = strip?.querySelectorAll("button")[current];
+    if (active) {
+      const bounds = strip.getBoundingClientRect(),
+        item = active.getBoundingClientRect();
+      const offset =
+        item.left < bounds.left
+          ? item.left - bounds.left
+          : item.right > bounds.right
+            ? item.right - bounds.right
+            : 0;
+      if (offset)
+        strip.scrollBy({
+          left: offset,
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
+            .matches
+            ? "auto"
+            : "smooth",
+        });
+      if (action === "thumbnail") active.focus({ preventScroll: true });
+    }
+    if (action === "stage")
+      gallery.current
+        ?.querySelector(".image-zoom-target, video")
+        ?.focus({ preventScroll: true });
+  }, [current]);
+  function choose(index, focus = "keep") {
+    const next = Math.max(0, Math.min(items.length - 1, index));
+    if (next === current) return;
+    selectionAction.current = focus;
+    setSelected(next);
+  }
+  function keyboard(event) {
+    if (
+      event.defaultPrevented ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.target.closest("video")
+    )
+      return;
+    const withinStrip = event.target.closest(".gallery-browser");
+    const next =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? items.length - 1
+          : withinStrip && event.key === "ArrowLeft"
+            ? current - 1
+            : withinStrip && event.key === "ArrowRight"
+              ? current + 1
+              : null;
+    if (next === null) return;
+    event.preventDefault();
+    choose(next, withinStrip ? "thumbnail" : "stage");
+  }
   if (!media)
     return (
       <div className="gallery-empty">
@@ -16,7 +79,10 @@ export default function BookGallery({ items = [] }) {
   return (
     <section
       className="live-book-gallery"
+      ref={gallery}
+      onKeyDown={keyboard}
       aria-label="Ảnh và video cùng bản sách"
+      aria-keyshortcuts="Home End"
     >
       <div className="gallery-stage">
         {media.kind === "video" ? (
@@ -35,8 +101,8 @@ export default function BookGallery({ items = [] }) {
           />
         )}
       </div>
-      <p className="field-hint">
-        {media.title || `Media ${selected + 1}`} ·{" "}
+      <p className="field-hint" aria-live="polite" aria-atomic="true">
+        {current + 1}/{items.length} · {media.title || `Media ${current + 1}`} ·{" "}
         {items.filter((i) => i.kind === "image").length} ảnh /{" "}
         {items.filter((i) => i.kind === "video").length} video · Cùng một bản
         sách
@@ -45,13 +111,10 @@ export default function BookGallery({ items = [] }) {
         <button
           className="gallery-scroll gallery-scroll-back"
           type="button"
-          aria-label="Cuộn danh sách ảnh về trước"
-          onClick={() =>
-            thumbnails.current?.scrollBy({
-              left: -thumbnails.current.clientWidth * 0.8,
-              behavior: "smooth",
-            })
-          }
+          aria-label="Ảnh hoặc video trước"
+          title="Ảnh/video trước (←)"
+          disabled={current === 0}
+          onClick={() => choose(current - 1)}
         >
           <Icon name="arrow" size={20} />
         </button>
@@ -66,8 +129,9 @@ export default function BookGallery({ items = [] }) {
               key={item.url + "-" + i}
               type="button"
               aria-label={`${item.kind === "video" ? "Video" : "Ảnh"} ${i + 1}: ${item.title || "bản sách"}`}
-              aria-pressed={selected === i}
-              onClick={() => setSelected(i)}
+              aria-pressed={current === i}
+              tabIndex={current === i ? 0 : -1}
+              onClick={() => choose(i)}
             >
               {item.kind === "image" ? (
                 <img src={item.url} alt="" loading="lazy" />
@@ -83,13 +147,10 @@ export default function BookGallery({ items = [] }) {
         <button
           className="gallery-scroll"
           type="button"
-          aria-label="Cuộn danh sách ảnh tiếp theo"
-          onClick={() =>
-            thumbnails.current?.scrollBy({
-              left: thumbnails.current.clientWidth * 0.8,
-              behavior: "smooth",
-            })
-          }
+          aria-label="Ảnh hoặc video tiếp theo"
+          title="Ảnh/video tiếp theo (→)"
+          disabled={current === items.length - 1}
+          onClick={() => choose(current + 1)}
         >
           <Icon name="arrow" size={20} />
         </button>

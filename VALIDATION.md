@@ -5,6 +5,13 @@
 Cập nhật ngày 31/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
+## Nút và phím đổi ảnh/video — 31/10/2026
+
+- Hai nút ←/→ đổi media được chọn, tự cuộn thumbnail vào vùng nhìn thấy, khóa đúng nút ở đầu/cuối và không quay vòng. Thêm vị trí hiện tại/tổng, live announcement, roving Tab và giữ focus khi dùng bàn phím. Home/End chọn đầu/cuối trong gallery; mũi tên ở thumbnails đổi media, mũi tên soi ảnh lớn và phím native của video không bị chiếm. Chỉ thay BookGallery và tài liệu, không đổi Backend/schema/media URL hoặc thêm dependency.
+- `npm run check`: **144 tệp PASS**; `npm test`: **155 PASS, 12 SKIP**, tổng 167; `npm run build`: PASS (91 modules); `git diff --check`: PASS. Không thêm unit test chỉ lặp bảng phím đơn giản; kiểm tra hành vi thực ở trình duyệt.
+- Chromium production build với HTTP/session/router thật, model fixture, **32 ảnh + một video**: trước/tiếp theo đổi ảnh lớn; Home/End, mũi tên thumbnails, focus, biên đầu/cuối, chọn ảnh số 32 và video số 33; thumbnail luôn trong viewport của dải, không kéo trang theo chiều dọc. Soi ảnh lớn giữ mũi tên và lens được dọn khi chuyển video; Home khi focus video giữ trình phát. Mẫu một ảnh/cả hai nút khóa và mẫu không media đều đạt. Admin/người mua/touch, **1440/1100/768/390/320px** không tràn ngang hoặc lỗi JavaScript; xem ảnh chụp desktop/mobile.
+- 12 test dịch vụ thật vẫn SKIP; không chạy lại SQL/Redis/Gemini hay video phát thật cho thay đổi điều hướng này. Test giao diện dùng media fixture (ảnh sách thật tải từ Cloudinary được phục vụ cục bộ); không coi kiểm tra controls video là nghiệm thu streaming thực tế.
+
 ## Kính lúp ảnh chi tiết cho Admin/người dùng — 31/10/2026
 
 - Component ImageZoom dùng chung qua BookGallery: vùng lens trên ảnh thật và panel phóng bên phải ở desktop đủ chỗ; ảnh contain dọc/ngang không soi phần đệm, giữ đúng tỷ lệ và vùng tương ứng. Portal tránh bị overflow gallery cắt, panel trong viewport (loại chiều rộng scrollbar), ẩn khi rời/cuộn/resize/đổi media. Không thêm dependency, Backend/schema, ảnh giả, công cụ AI hoặc biến đổi ảnh nguồn.

@@ -1,5 +1,6 @@
 /** All media belong to one post/physical copy. The video player uses the stored real URL. */
 import { useRef, useState } from "react";
+import ImageZoom from "./ImageZoom.jsx";
 import { Icon } from "./DesignUi.jsx";
 export default function BookGallery({ items = [] }) {
   const thumbnails = useRef(null);
@@ -27,9 +28,11 @@ export default function BookGallery({ items = [] }) {
             aria-label={media.title || "Video bản sách"}
           />
         ) : (
-          <a href={media.url} target="_blank" rel="noreferrer">
-            <img src={media.url} alt={media.title || "Ảnh bản sách"} />
-          </a>
+          <ImageZoom
+            key={media.url}
+            src={media.url}
+            alt={media.title || "Ảnh bản sách"}
+          />
         )}
       </div>
       <p className="field-hint">

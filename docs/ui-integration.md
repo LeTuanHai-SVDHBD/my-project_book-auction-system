@@ -65,6 +65,10 @@ Bỏ bóng đổ/hiệu ứng xoay của mô phỏng bìa sách cũ; hover khôn
 Nhãn trạng thái có khoảng riêng phía trên; ảnh dọc, ngang, vuông dùng cùng khung, chưa có ảnh giữ placeholder.
 Không sửa file ảnh, URL Cloudinary, dữ liệu media hoặc cách chọn ảnh/video ở chi tiết.
 
+Ảnh lớn ở chi tiết dùng `ImageZoom`: desktop từ 960px và còn đủ chỗ bên phải có kính lúp khi rê chuột lên vùng ảnh thật, khung soi bên cạnh với mức phóng mặc định 2,5 lần (tăng thêm khi ảnh quá hẹp để khung không trống). Vùng soi bỏ phần đệm của `object-fit: contain`, không đổi tỷ lệ hay ảnh nguồn. Khung soi là lớp phủ tạm trên cột thông tin, không làm dịch bố cục; rời ảnh, cuộn, resize hoặc đổi ảnh/video thì ẩn.
+
+Tab vào ảnh mở kính lúp ở giữa; mũi tên di chuyển, Escape tắt, Enter mở ảnh gốc ở tab mới. Điện thoại/chạm hoặc không đủ chỗ chỉ dùng **Phóng to ảnh** để mở đúng ảnh gốc trong trình duyệt và thu phóng bằng thao tác của trình duyệt. Chưa tải được ảnh thì không tạo kính lúp; báo lỗi xem trước và giữ liên kết ảnh gốc. Áp dụng cùng component ở chi tiết công khai, chủ sách và Admin; video giữ controls, thẻ danh sách giữ khung thẳng 4:3 đã chốt.
+
 Bài đăng không còn giới hạn 12 ảnh. `GET /api/media/config` trả `maxImages: null`; cấu hình cũ `MEDIA_MAX_IMAGES` bị bỏ qua. Giữ giới hạn dung lượng mỗi ảnh (mặc định 10 MB), 3 video/50 MB mỗi video theo cấu hình, hạn vé và kiểm soát tài nguyên upload hiện có. Cả Backend và frontend đều kiểm tra số video gồm media giữ lại. JSON body và khả năng lưu trữ vẫn tuân giới hạn kỹ thuật của hạ tầng; không đổi schema hoặc thông số tải AI.
 
 Mỗi media vừa tải có nút × với tên truy cập theo tệp. Nút gọi DELETE vé của chính người dùng và chỉ gỡ khỏi danh sách sau thành công; vé đã bỏ không được gửi cùng bài. Media đã lưu trong lịch sử bài không bị xóa qua giao diện này. Thay đổi này chỉ áp dụng ảnh sách, không đổi quy tắc tối đa 5 ảnh bằng chứng khiếu nại.

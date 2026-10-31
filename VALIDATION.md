@@ -5,6 +5,14 @@
 Cập nhật ngày 31/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
+## Kính lúp ảnh chi tiết cho Admin/người dùng — 31/10/2026
+
+- Component ImageZoom dùng chung qua BookGallery: vùng lens trên ảnh thật và panel phóng bên phải ở desktop đủ chỗ; ảnh contain dọc/ngang không soi phần đệm, giữ đúng tỷ lệ và vùng tương ứng. Portal tránh bị overflow gallery cắt, panel trong viewport (loại chiều rộng scrollbar), ẩn khi rời/cuộn/resize/đổi media. Không thêm dependency, Backend/schema, ảnh giả, công cụ AI hoặc biến đổi ảnh nguồn.
+- Tab/mũi tên/Escape/Enter hoạt động; ảnh là liên kết nguồn gốc với nhãn **Phóng to ảnh**. Điện thoại/chạm mở ảnh gốc ở tab mới để dùng thu phóng trình duyệt; không triển khai bộ pinch riêng trong ứng dụng. Ảnh lỗi hiện trạng thái rõ, không tạo kính lúp; không ảnh vẫn có trạng thái rỗng. Video/thumbnails/card 4:3 giữ nguyên.
+- `npm run check`: **144 tệp PASS**; `npm test`: **155 PASS, 12 SKIP**, tổng 167; `npm run build`: PASS (91 modules). Ba test hình học mới kiểm tra contain, phần đệm, giữa/bốn góc của ảnh ngang/dọc/vuông/rất hẹp, không tạo vùng trống trong panel, tỷ lệ lens/panel, thiếu chỗ và sát đáy viewport.
+- Chromium production build, HTTP/session/router/controller thật với model fixture: ảnh sách thật tải từ link Cloudinary người dùng rồi phục vụ cục bộ, ảnh dọc SVG mẫu. Khách xem phiên/Admin xem bài chờ: lens/panel di chuyển cùng vùng, ra phần đệm thì ẩn; ảnh dọc, chuyển video, Tab/mũi tên tới sát mép/Escape/Enter, cuộn/resize đều đạt. Touch context mở đúng ảnh gốc, không sinh hover; lỗi 404 và media rỗng có trạng thái đúng. **1440/1100/768/390/320px** không tràn ngang hoặc lỗi JavaScript; xem ảnh chụp desktop/mobile/Admin.
+- 12 test cần dịch vụ thật vẫn SKIP; không gọi lại SQL Server/Redis/Gemini hoặc kiểm chứng thao tác pinch trên điện thoại vật lý. Mức chi tiết phóng phụ thuộc ảnh gốc; không tạo thêm chi tiết hay xác thực tình trạng sách bằng hiệu ứng này.
+
 ## Khung ảnh sách đồng nhất Admin/người dùng — 31/10/2026
 
 - Chỉ sửa stylesheet tích hợp: khung thẻ 4:3 trên Trang chủ/Đấu giá/Kiểm duyệt; bỏ giới hạn 72%, padding trên ảnh, xoay và bóng đổ bị kế thừa từ thiết kế cũ. Ảnh canh giữa, giữ tỷ lệ/đầy đủ nội dung, nền trung tính; nhãn trạng thái có khoảng riêng. Các selector phủ cả quy tắc riêng của Home/catalog và breakpoint mobile. Không thay Backend, schema, URL hoặc tệp ảnh/video.

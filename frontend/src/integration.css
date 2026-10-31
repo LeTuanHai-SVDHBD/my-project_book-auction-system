@@ -2172,3 +2172,108 @@ figure.upload-media-card {
   margin: 6px 0 0;
   color: inherit;
 }
+
+/* Kính lúp dùng cùng nguồn ảnh; portal giúp khung soi không bị gallery cắt. */
+.image-zoom {
+  width: 100%;
+  min-width: 0;
+}
+.image-zoom-target {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 540px;
+  padding: 20px 20px 56px;
+  border-radius: 22px;
+  cursor: zoom-in;
+}
+.image-zoom-target:focus-visible {
+  outline: 3px solid #c18b2e;
+  outline-offset: -4px;
+}
+.image-zoom-target > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  padding: 0;
+  object-fit: contain;
+}
+.image-zoom-action {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid #dbd7cc;
+  border-radius: 999px;
+  background: #fff;
+  color: #1f3a5f;
+  font-size: 15px;
+  font-weight: 700;
+}
+.image-zoom-hint {
+  margin: 0;
+  padding: 12px 18px;
+  border-top: 1px solid #deded6;
+  color: #62676f;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.image-zoom-unavailable {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+  color: #62676f;
+}
+.image-zoom-overlay {
+  pointer-events: none;
+}
+.image-zoom-lens,
+.image-zoom-detail {
+  position: fixed;
+  z-index: 140;
+  pointer-events: none;
+}
+.image-zoom-lens {
+  border: 1px solid #1f3a5f;
+  background: #fff6;
+}
+.image-zoom-detail {
+  box-sizing: content-box;
+  overflow: hidden;
+  border: 2px solid #1f3a5f;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 35px #10253c30;
+}
+.image-zoom-detail > img {
+  position: absolute;
+  display: block;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+@media (max-width: 768px) {
+  .image-zoom-target {
+    height: 400px;
+  }
+}
+@media (max-width: 550px) {
+  .image-zoom-target {
+    height: 340px;
+    padding: 14px 14px 54px;
+  }
+}
+@media (hover: none), (pointer: coarse), (max-width: 959px) {
+  .image-zoom-desktop-hint {
+    display: none;
+  }
+}

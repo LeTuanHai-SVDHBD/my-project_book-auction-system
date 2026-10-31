@@ -206,3 +206,5 @@ Thư mục rỗng được giữ bằng `.gitkeep`; file này không chứng min
 - `backend/migrations/006_isbn_input.sql`: mở rộng Sach.isbn giữ dữ liệu, bỏ ép 10/13 và giữ chỉ mục/check không rỗng.
 
 Bộ lọc/cursor riêng của trang Kiểm duyệt nằm ở `backend/src/services/moderationList.js`; model bài đăng lấy lý do/ngày từ KiemDuyet hiện có.
+
+Ảnh chi tiết dùng `frontend/src/components/ImageZoom.jsx`; hình học kính lúp/ảnh contain tách ở `frontend/src/utils/imageZoom.js`. `BookGallery.jsx` tiếp tục quản lý lựa chọn ảnh/video; không đổi nguồn media hoặc endpoint.

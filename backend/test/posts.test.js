@@ -16,6 +16,7 @@ import {canRelist,assertStatePair,assertVersion,assertVideoLimit} from '../src/s
 import {createPostService} from '../src/services/post.service.js';
 import {publicPost} from '../src/controllers/post.controller.js';
 import {createCloudinary,verifyMedia} from '../src/services/cloudinary.service.js';
+import {ISBN_MAX_LENGTH} from '../../shared/bookIdentifiers.js';
 const version='0000000000000001';
 const payload=()=>({ma_yeu_cau:randomUUID(),sach:{ten_sach:'Bản sách thử',tinh_trang_sach:'Bìa sờn'},bai_dang:{tieu_de:'Ấn bản đầu',mo_ta_tinh_trang:'Thông tin và nguồn đối chiếu'},phien:{gia_khoi_diem:'100000',gia_toi_thieu:'999999999999999999',buoc_gia:'1000'},media:[]});
 const mediaConfig=parseMediaConfig({CLOUDINARY_CLOUD_NAME:'demo',CLOUDINARY_API_KEY:'testkey',CLOUDINARY_API_SECRET:'testsecret'});
@@ -184,5 +185,25 @@ test('listing images have no count cap; videos still include reused media in the
  const body=payload();body.media=Array.from({length:100},()=>({upload_id:randomUUID()}));assert.equal(validatePost(body,config).media.length,100);
  const images=body.media.map(()=>({kind:'image'}));assert.doesNotThrow(()=>assertVideoLimit([...images,...Array.from({length:3},()=>({kind:'video'}))],3));
  assert.throws(()=>assertVideoLimit([...images,...Array.from({length:4},()=>({kind:'video'}))],3),{status:400,code:'MEDIA_COUNT'});
- body.sach.isbn=null;assert.equal(validatePost(body).book.isbn,null);body.sach.isbn='123';assert.throws(()=>validatePost(body),{status:400});
+ body.sach.isbn=null;assert.equal(validatePost(body).book.isbn,null);
+});
+
+test('ISBN do người bán nhập không ép 10/13; giữ mã dài, dấu phân cách và số 0 đầu',()=>{
+ for(const value of ['123','0306406152','9780306406157','978-604-123-456-7','ISBN 978 604 123 456 7','00012345678901234567890123456789','Mã in trên sách: 978–604–123–456–7','0'.repeat(ISBN_MAX_LENGTH)]){
+  const body=payload();body.sach.isbn=' '+value+' ';assert.equal(validatePost(body).book.isbn,value);
+ }
+ for(const value of [null,undefined,'']){
+  const body=payload();body.sach.isbn=value;assert.equal(validatePost(body).book.isbn,null);
+ }
+ for(const value of ['1'.repeat(ISBN_MAX_LENGTH+1),'   ',123456789012345,{},'978\u0000bad']){
+  const body=payload();body.sach.isbn=value;assert.throws(()=>validatePost(body),{status:400,code:'INVALID_POST_INPUT'});
+ }
+});
+test('HTTP tạo bài giữ nguyên mã dài; chặn vượt ngưỡng trước ghi dữ liệu và vẫn nhận NULL',async t=>{
+ const f=await serverFixture(t),owner=f.client();await owner.login('a@example.test');
+ const body=payload();body.sach.isbn='ISBN 000-123-456-789-012-345-678-X';
+ assert.equal((await owner.call('/posts','POST',body)).status,201);assert.equal(f.createdInput().book.isbn,body.sach.isbn);
+ const before=f.writes();body.sach.isbn='9'.repeat(ISBN_MAX_LENGTH+1);
+ assert.equal((await owner.call('/posts','POST',body)).status,400);assert.equal(f.writes(),before);
+ body.sach.isbn=null;assert.equal((await owner.call('/posts','POST',body)).status,201);assert.equal(f.createdInput().book.isbn,null);
 });

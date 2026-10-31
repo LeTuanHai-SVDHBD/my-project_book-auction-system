@@ -63,7 +63,7 @@ Bài đăng không còn giới hạn 12 ảnh. `GET /api/media/config` trả `ma
 
 Mỗi media vừa tải có nút × với tên truy cập theo tệp. Nút gọi DELETE vé của chính người dùng và chỉ gỡ khỏi danh sách sau thành công; vé đã bỏ không được gửi cùng bài. Media đã lưu trong lịch sử bài không bị xóa qua giao diện này. Thay đổi này chỉ áp dụng ảnh sách, không đổi quy tắc tối đa 5 ảnh bằng chứng khiếu nại.
 
-Chọn **Có ISBN** sẽ hiện ô bắt buộc kiểm tra định dạng 10/13 ký tự. Chọn **Không có ISBN** sẽ không gửi giá trị ISBN cũ đang gõ và Backend lưu NULL. ISBN của bản sách đã lưu vẫn bất biến khi gửi duyệt lại/đăng lại.
+Chọn **Có ISBN** sẽ hiện ô **Mã ISBN**, bắt buộc khi đã chọn, tối đa 100 ký tự và không ép độ dài 10/13. Giữ nguyên dấu gạch nối, khoảng trắng bên trong, số 0 đầu và chữ hoa/thường; Backend chỉ bỏ khoảng trắng ở hai đầu và không xác thực chuẩn/checksum ISBN. Admin đối chiếu mã người bán nhập. Chọn **Không có ISBN** sẽ không gửi giá trị ISBN cũ đang gõ và Backend lưu NULL. ISBN của bản sách đã lưu vẫn bất biến khi gửi duyệt lại/đăng lại.
 
 Biểu mẫu chỉ có một ô **Tình trạng, yếu tố quý hiếm và bằng chứng**, bắt buộc và tối đa 12.000 ký tự, lưu đầy đủ vào `BaiDang.mo_ta_tinh_trang`. Không còn ô nhập `tinh_trang_sach` riêng; **Giới thiệu sách** dành cho nội dung tác phẩm.
 
@@ -115,3 +115,9 @@ Nghiệm thu SQL Server/Redis/Cloudinary thật chưa được thay bằng kiể
 ## Xuất kết quả kiểm duyệt cho người bán
 
 Sau phê duyệt/từ chối, phần kết quả có nút **Xuất kết quả kiểm duyệt (PDF)**. Bản in A4 lấy đúng bản dữ liệu Backend đã lưu; chọn **Lưu dưới dạng PDF / Save as PDF** trong hộp thoại in. Ảnh/video là liên kết Cloudinary, không nhúng. Lịch sử có bản kết quả đã lưu cũng xuất được; không xuất kết quả của vòng đang chờ. Chi tiết, tương thích bài cũ và kiểm tra quyền tại [review-exports.md](review-exports.md).
+
+## Cập nhật ô ISBN ngày 31/10/2026
+
+Dừng dev:all, pull feat/Hai rồi chạy `npm.cmd run db:migrate` trước khi khởi động lại. Migration 006 đổi `Sach.isbn` từ VARCHAR(13) sang NVARCHAR(100), bỏ check ép định dạng 10/13, giữ check không rỗng và chỉ mục IX_Sach_isbn. Không thêm bảng/cột; schema vẫn 21 bảng/162 cột, còn 98 check. Dữ liệu cũ không được cắt, đổi mã hoặc chuẩn hóa lại. Chạy lại migration được; nếu phát hiện dữ liệu vượt sức chứa thì dừng và rollback.
+
+ISBN chuẩn gồm 10 ký tự ở bản cũ hoặc 13 chữ số ở bản mới; dấu phân cách làm chuỗi hiển thị dài hơn. Theo yêu cầu của người dùng, đây là trường nhập theo thông tin trên sách, có thể nhận mã ngoài định dạng đó; lưu được không đồng nghĩa đã xác minh ISBN hợp lệ. Nguồn: [International ISBN Agency](https://www.isbn-international.org/index.php/content/what-isbn/10). Chọn Không có ISBN tiếp tục lưu NULL; không sửa ISBN của sách đã lưu khi gửi duyệt lại/đăng lại.

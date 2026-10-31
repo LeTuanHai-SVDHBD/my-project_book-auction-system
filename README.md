@@ -72,7 +72,7 @@ npm.cmd run admin:create
 ```
 
 `setup` tạo `.env` và cấu hình Frontend khi chưa có; các script setup giữ nguyên giá trị đã tồn tại.
-`db:init` tạo schema nền rồi áp dụng các migration media, quyết định đấu giá, thông báo và bản kết quả kiểm duyệt. Schema hiện tại có **21 bảng, 162 cột**.
+`db:init` tạo schema nền rồi áp dụng các migration media, quyết định đấu giá, thông báo, bản kết quả kiểm duyệt và mở rộng ô ISBN. Schema hiện tại có **21 bảng, 162 cột**.
 Người bán xuất kết quả sau phê duyệt/từ chối tại **Bài của tôi → Kết quả kiểm duyệt**; xem [cách lưu PDF và nâng cấp bản kết quả](docs/review-exports.md).
 
 `admin:create` yêu cầu tên, email và mật khẩu kín trong terminal. Admin đã tồn tại được giữ nguyên mật khẩu;
@@ -137,7 +137,7 @@ Dùng `127.0.0.1` nhất quán cho Frontend và API để cookie hoạt động 
 
 Điều chỉnh bằng `MEDIA_MAX_VIDEOS`, `MEDIA_IMAGE_MAX_MB`, `MEDIA_VIDEO_MAX_MB`. `MEDIA_MAX_IMAGES` cũ không còn được áp dụng; không cần sửa `.env` riêng. Ảnh vừa tải lên có nút × để bỏ trước khi gửi bài, chỉ gửi các vé còn giữ. Giới hạn video tính cả video giữ lại khi bổ sung/đăng lại.
 
-ISBN là tùy chọn: chọn **Có ISBN** để nhập ISBN-10/13, hoặc **Không có ISBN** để lưu NULL. Trang chủ dùng đúng bốn nhóm từ `shared/bookGenres.js`; chọn nhóm sẽ lọc các thể loại con, không tìm nhóm bằng từ khóa tự đặt.
+ISBN là tùy chọn: chọn **Có ISBN** để nhập mã theo sách (tối đa 100 ký tự, giữ dấu gạch nối/khoảng trắng, không ép 10/13), hoặc **Không có ISBN** để lưu NULL. Trang chủ dùng đúng bốn nhóm từ `shared/bookGenres.js`; chọn nhóm sẽ lọc các thể loại con, không tìm nhóm bằng từ khóa tự đặt.
 API kiểm tra MIME, magic bytes và kích thước; tối đa hai upload đang xử lý mỗi tiến trình và 60 lần thử/tài khoản/giờ.
 Đây là giới hạn tài nguyên của bản triển khai. Chưa có kiểm tra thời lượng video.
 

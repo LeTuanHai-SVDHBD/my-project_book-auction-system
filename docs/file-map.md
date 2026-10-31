@@ -107,7 +107,7 @@ Các đường dẫn bên dưới tương đối với `backend/`.
 | Hạ tầng | `src/constants/infrastructure.js`, `src/controllers/health.controller.js`, `src/services/infrastructure.service.js` | Readiness, heartbeat và hằng số probe |
 | Sự kiện | `src/events/eventPublisher.js`, `eventConsumer.js`, `src/processors/systemProbe.processor.js` | Xuất bản, đọc/nhận lại/xác nhận và xử lý probe |
 | Utility | `src/utils/rowVersion.js`, `logger.js`, `src/middlewares/errorHandler.js` | Mã hóa version, log che bí mật và lỗi HTTP |
-| Schema | `migrations/001_schema.sql`, `002_cloudinary_metadata.sql`, `003_auction_decisions.sql`, `004_notifications.sql`, `005_review_exports.sql`, `schema-manifest.json` | DDL nền, migration media/quyết định/thông báo/bản kết quả và cấu trúc dự kiến |
+| Schema | `migrations/001_schema.sql`, `002_cloudinary_metadata.sql`, `003_auction_decisions.sql`, `004_notifications.sql`, `005_review_exports.sql`, `006_isbn_input.sql`, `schema-manifest.json` | DDL nền, migration media/quyết định/thông báo/bản kết quả và cấu trúc dự kiến |
 | CLI | `scripts/initDatabase.js`, `migrateDatabase.js`, `createAdmin.js` | Tạo/nâng schema và tạo Admin qua terminal |
 
 `src/concurrency/`, `src/jobs/` và `src/ai/` có logic phối hợp, tác vụ và phân tích đang dùng.
@@ -197,3 +197,8 @@ Thư mục rỗng được giữ bằng `.gitkeep`; file này không chứng min
 - `frontend/src/services/reviewDocument.js`: bản in A4 có tiếng Việt, liên kết Cloudinary/nguồn được kiểm tra và nội dung được escape.
 - `backend/test/reviewExport*.test.js`: hợp đồng/quyền, snapshot, bản in và SQL Server opt-in.
 - `docs/review-exports.md`: cách cập nhật, xuất PDF, giới hạn dữ liệu cũ và nghiệm thu.
+
+## Ô ISBN
+
+- `shared/bookIdentifiers.js`: ngưỡng kỹ thuật ISBN dùng chung cho input, validator và tham số SQL.
+- `backend/migrations/006_isbn_input.sql`: mở rộng Sach.isbn giữ dữ liệu, bỏ ép 10/13 và giữ chỉ mục/check không rỗng.

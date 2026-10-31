@@ -274,3 +274,7 @@ Giữ tùy chọn để trống và dữ liệu sách cũ, không migration ho�
 ## Bản kết quả kiểm duyệt cho người bán
 
 Người bán xuất PDF của lần đã được Admin phê duyệt/từ chối. Migration 005 thêm một cột `ket_qua_snapshot` vào bảng KiemDuyet hiện có, không thêm bảng hoặc dependency. Ghi bản kết quả trong cùng transaction với quyết định để không lẫn thông tin/media/AI khi gửi duyệt lại. Với dữ liệu cũ, chỉ dựng và lưu lại quyết định hiện tại còn phù hợp; vòng cũ không có snapshot không được tái tạo bằng dữ liệu mới. PDF dùng bản in A4 riêng và chức năng lưu PDF của trình duyệt, các media giữ dạng link Cloudinary.
+
+## Ô ISBN nhận chuỗi do người bán cung cấp
+
+Theo yêu cầu ngày 31/10/2026, bỏ ràng buộc chính xác 10/13 ký tự ở frontend, Backend và SQL. Dùng chung ISBN_MAX_LENGTH=100; giữ nội dung và dấu phân cách, không ép uppercase hoặc chuyển Number. Migration 006 mở rộng cột hiện có thành NVARCHAR(100), bỏ check định dạng cũ, giữ check không rỗng và chỉ mục. Không tự xác nhận mã người đăng nhập là ISBN chuẩn; Admin tiếp tục đối chiếu. Không sửa dữ liệu hay hash nguồn của phân tích AI cũ.

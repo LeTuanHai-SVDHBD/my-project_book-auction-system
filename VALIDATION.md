@@ -5,6 +5,14 @@
 Cập nhật ngày 30/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
+## Ô ISBN không ép 10 hoặc 13 ký tự — 31/10/2026
+
+- Bỏ pattern 10/13 và giới hạn 13 ở biểu mẫu/validator; dùng ngưỡng kỹ thuật chung **100 ký tự**. Giữ mã, dấu phân cách, Unicode, chữ hoa/thường và số 0 đầu; Backend chỉ trim hai đầu. Có ISBN vẫn bắt buộc nhập; Không có ISBN gửi NULL. Không tự xác minh chuẩn/checksum hoặc sửa ISBN của sách đã lưu.
+- Migration 006 đổi cột `Sach.isbn` thành `NVARCHAR(100)`, bỏ check định dạng, giữ check không rỗng và chỉ mục tìm kiếm; không thêm bảng/cột. Migration chạy trong transaction, không cắt dữ liệu, chạy lại được; schema vẫn 21 bảng/162 cột, còn 98 check. Các script init/migrate và test SQL dùng bản nâng cấp mới.
+- `npm run check`: **139 tệp PASS**; `npm test`: **140 PASS, 12 SKIP**, tổng 152; `npm run build`: PASS (88 modules); `git diff --check`: PASS. Test validator/HTTP/session/CSRF kiểm tra chuỗi dài, có dấu phân cách/Unicode/0 đầu, 100/101 ký tự, kiểu dữ liệu sai, control character, NULL và chặn đầu vào lỗi trước ghi.
+- Chromium production build với HTTP/session/CSRF/router/validator thật, model SQL fixture: nhập mã dài hơn 13, dấu phân cách/Unicode, 100 ký tự; ký tự thứ 101 khi gõ bị chặn; đổi Có/Không có rồi đổi lại giữ draft, dữ liệu cuối gửi đúng nguyên chuỗi hoặc NULL. Bước xem lại không tràn ở **1440/768/390/320px**, không lỗi JavaScript trong lượt đạt.
+- **Chưa chạy migration 006 trên SQL Server thật** tại môi trường này. Test `REVIEW_TEST_SQL` đã mở rộng kiểm tra giữ mã ISBN cũ qua migration chạy hai lần, lưu/đọc mã Unicode dài và đưa đúng mã vào bản kết quả; các test dịch vụ thật vẫn SKIP. Máy nhóm cần chạy `npm.cmd run db:migrate` sau pull rồi khởi động lại dev:all.
+
 ## Xuất kết quả kiểm duyệt cho người bán — 30/10/2026
 
 - Thêm bản in A4 riêng sau phê duyệt/từ chối, dùng hộp thoại **Lưu dưới dạng PDF** của trình duyệt; không phải endpoint trả PDF nhị phân. Nội dung Backend đã lưu, hai điểm/NULL/bằng chứng/cảnh báo/phép tính, danh sách ảnh/video là link Cloudinary, không nhúng media hoặc gọi lại AI. Cập nhật tài liệu tại [docs/review-exports.md](docs/review-exports.md).

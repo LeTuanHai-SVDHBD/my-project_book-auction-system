@@ -4,6 +4,7 @@ import { postApi } from "../services/postApi.js";
 import UploadMediaCard from "./UploadMediaCard.jsx";
 import MoneyInput from "./MoneyInput.jsx";
 import GenreSelect from "./GenreSelect.jsx";
+import { ISBN_MAX_LENGTH } from "../../../shared/bookIdentifiers.js";
 export default function PostForm({
   source,
   mode = "create",
@@ -270,22 +271,20 @@ export default function PostForm({
                     </fieldset>
                     {isbnMode === "has" ? (
                       <label>
-                        ISBN (10 hoặc 13 ký tự)
+                        Mã ISBN
                         <input
                           name="isbn"
-                          aria-label="ISBN (10 hoặc 13 ký tự)"
+                          aria-label="Mã ISBN"
                           value={isbn}
-                          onChange={(event) =>
-                            setIsbn(event.target.value.toUpperCase())
-                          }
-                          maxLength={13}
-                          pattern="(?:[0-9]{13}|[0-9]{9}[0-9X])"
-                          title="Nhập 13 chữ số hoặc ISBN-10 (có thể kết thúc bằng X)."
+                          onChange={(event) => setIsbn(event.target.value)}
+                          maxLength={ISBN_MAX_LENGTH}
                           required
                           autoComplete="off"
                         />
                         <small className="field-hint">
-                          Nhập liền, không có dấu gạch nối.
+                          Nhập theo thông tin trên sách, có thể giữ dấu gạch nối
+                          và khoảng trắng. Tối đa {ISBN_MAX_LENGTH} ký tự; Admin
+                          sẽ đối chiếu mã khi kiểm duyệt.
                         </small>
                       </label>
                     ) : (

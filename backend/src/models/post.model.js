@@ -1,5 +1,6 @@
 /** SQL bài đăng/phiên: khóa cặp trạng thái và sách vật lý, tiền được truyền/đọc bằng chuỗi. */
 import {BOOK_GENRE_GROUPS} from '../../../shared/bookGenres.js';
+import {ISBN_MAX_LENGTH} from '../../../shared/bookIdentifiers.js';
 import {searchPattern,catalogOrders} from '../services/catalogSearch.js';
 import { HttpError } from '../middlewares/errorHandler.js';
 import {analysisView} from '../ai/input.js';
@@ -162,7 +163,7 @@ export function createPostModel({ getPool, sql }) {
         } else {
           const book=input.book; const req=request(tx);
           for (const [key,size] of Object.entries({ten_sach:300,tac_gia:200,the_loai:100,nha_xuat_ban:200,tinh_trang_sach:1000,mo_ta:sql.MAX})) req.input(key,sql.NVarChar(size),book[key]);
-          req.input('year',sql.SmallInt,book.nam_xuat_ban).input('isbn',sql.VarChar(13),book.isbn);
+          req.input('year',sql.SmallInt,book.nam_xuat_ban).input('isbn',sql.NVarChar(ISBN_MAX_LENGTH),book.isbn);
           bookId=(await req.query('INSERT dbo.Sach(ten_sach,tac_gia,the_loai,nha_xuat_ban,nam_xuat_ban,isbn,tinh_trang_sach,mo_ta) OUTPUT INSERTED.sach_id VALUES(@ten_sach,@tac_gia,@the_loai,@nha_xuat_ban,@year,@isbn,@tinh_trang_sach,@mo_ta)')).recordset[0].sach_id;
         }
         const postId=(await request(tx).input('owner',sql.Int,owner).input('book',sql.Int,bookId).input('code',sql.VarChar(40),code)

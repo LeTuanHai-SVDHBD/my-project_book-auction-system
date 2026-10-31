@@ -2,6 +2,7 @@
 import { HttpError } from '../middlewares/errorHandler.js';
 import {BOOK_GENRES} from '../../../shared/bookGenres.js';
 import {conditionPreview} from '../../../shared/bookCondition.js';
+import {ISBN_MAX_LENGTH} from '../../../shared/bookIdentifiers.js';
 const bad = message => { throw new HttpError(400, 'INVALID_POST_INPUT', message); };
 export function object(value, allowed, name) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) bad(`${name} không hợp lệ.`);
@@ -55,9 +56,8 @@ export function validatePost(body, { mode = 'create' } = {}) {
     normalizedBook = { ten_sach: text(book.ten_sach, 300, 'Tên sách', true), tac_gia: text(book.tac_gia, 200, 'Tác giả'),
       the_loai: text(book.the_loai, 100, 'Thể loại'), nha_xuat_ban: text(book.nha_xuat_ban, 200, 'Nhà xuất bản'),
       tinh_trang_sach: text(book.tinh_trang_sach, 1000, 'Tình trạng sách') ?? conditionPreview(normalizedPost.mo_ta_tinh_trang), mo_ta: text(book.mo_ta, 12000, 'Mô tả sách'),
-      nam_xuat_ban: book.nam_xuat_ban ?? null, isbn: text(book.isbn, 13, 'ISBN') };
+      nam_xuat_ban: book.nam_xuat_ban ?? null, isbn: text(book.isbn, ISBN_MAX_LENGTH, 'ISBN') };
     if (normalizedBook.nam_xuat_ban !== null && (!Number.isInteger(normalizedBook.nam_xuat_ban) || normalizedBook.nam_xuat_ban < 1 || normalizedBook.nam_xuat_ban > 9999)) bad('Năm xuất bản phải từ 1 đến 9999.');
-    if (normalizedBook.isbn && !/^(?:\d{13}|\d{9}[\dX])$/.test(normalizedBook.isbn)) bad('ISBN cần 13 chữ số hoặc ISBN-10 hợp lệ về định dạng.');
   }
   return { requestId: mode === 'resubmit' ? null : uuid(body.ma_yeu_cau), book: normalizedBook,
     post: normalizedPost,

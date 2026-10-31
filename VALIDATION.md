@@ -5,6 +5,13 @@
 Cập nhật ngày 31/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
+## Danh sách kiểm duyệt gồm chờ và từ chối — 31/10/2026
+
+- API Admin `/posts/pending` mặc định trả bài/phiên chờ và bài/phiên bị từ chối; lọc `status=all|pending|rejected`. SQL xếp nhóm chờ trước, ID giảm dần trong nhóm; cursor chứa nhóm/ID để không bỏ nhóm chờ khi có nhiều bài từ chối ID cao. Thẻ từ chối lấy lý do/ngày xử lý mới nhất từ KiemDuyet. Không thêm schema/dependency, không đổi lịch sử, quyền hoặc điều kiện duyệt/gửi lại/kích hoạt.
+- `npm run check`: **143 tệp PASS**; `npm test`: **152 PASS, 12 SKIP**, tổng 164; `npm run build`: PASS (89 modules); `git diff --check`: PASS. Test parser/cursor và HTTP/session/Admin với 75 bài qua ba trang: chờ trước từ chối, không lặp/thiếu, loại bài đã duyệt, bộ lọc, chuyển về chờ và trả 400 cho cursor sai; khách 401/người dùng 403. Đã mở rộng SQL opt-in để kiểm tra chờ → từ chối (lý do/ngày) → gửi lại → phê duyệt và ranh giới cursor.
+- Chromium production build với HTTP/session/CSRF/router/controller thật, model SQL fixture: **74 bài** qua ba trang và ranh giới nhóm, lọc trạng thái, giữ bộ lọc khi quay lại từ chi tiết, đọc lý do/ngày từ chối, không có form duyệt lại bài đã từ chối. POST kiểm duyệt thật tới service fixture: từ chối còn trong danh sách; gửi lại về chờ; phê duyệt rời danh sách và ở trạng thái chờ đặt lịch. Khi hết bài chờ, Tất cả vẫn hiện từ chối. **1440/768/390/320px** không tràn ngang hoặc lỗi JavaScript; xem ảnh desktop/mobile.
+- **Chưa chạy truy vấn/SQL opt-in trên SQL Server thật cho bản sửa này**; 12 kiểm thử dịch vụ thật vẫn SKIP. Fixture kiểm tra HTTP/giao diện không thay thế nghiệm thu dữ liệu SQL thực tế. Cập nhật API và frontend cùng bản, Ctrl+F5 sau pull để dùng cursor mới; không cần migration.
+
 ## AI_TIMEOUT với bài nhiều media — 31/10/2026
 
 - Thay tải tuần tự bằng tối đa bốn tải media song song theo lô, deadline chuẩn bị riêng 45 giây, giữ thứ tự/mã bằng chứng và ngân sách 12 MiB. Dừng tải lô mới khi hết ngân sách/thời gian; không coi media chưa gửi là đã quan sát. Không đổi model, hash đầu vào, tiêu chí/hai điểm, schema hoặc dependency.

@@ -2,7 +2,7 @@
 import {apiRequest,apiPost,ensureCsrf} from './authApi.js';
 export const postApi={
   search:filters=>apiRequest(`/posts/catalog?${new URLSearchParams(filters)}`),
-  list:(mode,before)=>apiRequest(`/posts/${mode}${before?`?before=${before}`:''}`),
+  list:(mode,before,status)=>{const params=new URLSearchParams();if(before)params.set('before',before);if(mode==='pending')params.set('status',status||'all');return apiRequest(`/posts/${mode}${params.size?'?'+params:''}`);},
   detail:(id,publicOnly=false)=>apiRequest(`/posts/${publicOnly?'catalog/':''}${id}`),
   save:(body,id,mode)=>apiPost(id?`/posts/${id}/${mode}`:'/posts',body),
   review:(id,body)=>apiPost(`/posts/${id}/review`,body),

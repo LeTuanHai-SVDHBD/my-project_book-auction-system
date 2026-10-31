@@ -112,7 +112,22 @@ export function createPostModel({ getPool, sql }) {
           ORDER BY ${catalogOrders[sort]} OFFSET @skip ROWS FETCH NEXT 31 ROWS ONLY`);
       const items=result.recordset.slice(0,30);return {items,nextPage:result.recordset.length>30?page+1:null};
     },
-    async list({owner=null,pending=false,publicOnly=false,after=2147483647}) {
+    async list({owner=null,pending=false,publicOnly=false,after=2147483647,reviewStatus='all',reviewCursorRank=null}) {
+      if(pending){
+        const rank="CASE WHEN b.trang_thai='cho_kiem_duyet' THEN 0 ELSE 1 END";
+        const rows=await request(await getPool()).input('status',sql.VarChar(10),reviewStatus).input('rank',sql.Int,reviewCursorRank).input('after',sql.Int,after)
+          .query(`SELECT TOP(30) ${projection},
+            (SELECT TOP(1) duong_dan_img FROM dbo.HinhAnh WHERE bai_dang_id=b.bai_dang_id ORDER BY thu_tu_img) AS anh_bia,
+            CASE WHEN b.trang_thai='tu_choi' THEN review.phan_hoi_admin END AS ly_do_tu_choi,
+            CASE WHEN b.trang_thai='tu_choi' THEN review.ngay_kiem_duyet END AS ngay_tu_choi
+            ${joins} OUTER APPLY (SELECT TOP(1) phan_hoi_admin,ngay_kiem_duyet FROM dbo.KiemDuyet
+              WHERE bai_dang_id=b.bai_dang_id ORDER BY kiem_duyet_id DESC) review
+            WHERE ((@status IN ('all','pending') AND b.trang_thai='cho_kiem_duyet' AND p.trang_thai='cho_kiem_duyet')
+              OR (@status IN ('all','rejected') AND b.trang_thai='tu_choi' AND p.trang_thai='khong_dat_kiem_duyet'))
+              AND (@rank IS NULL OR ${rank}>@rank OR (${rank}=@rank AND b.bai_dang_id<@after))
+            ORDER BY ${rank},b.bai_dang_id DESC`);
+        return rows.recordset.map(withRowVersion);
+      }
       const result=await request(await getPool()).input('owner',sql.Int,owner).input('pending',sql.Bit,pending).input('public',sql.Bit,publicOnly).input('after',sql.Int,after)
         .query(`SELECT TOP(30) ${projection},(SELECT TOP(1) duong_dan_img FROM dbo.HinhAnh WHERE bai_dang_id=b.bai_dang_id ORDER BY thu_tu_img) AS anh_bia ${joins} WHERE b.bai_dang_id<@after AND (@owner IS NULL OR b.nguoi_dung_id=@owner)
           AND (@pending=0 OR (b.trang_thai='cho_kiem_duyet' AND p.trang_thai='cho_kiem_duyet'))

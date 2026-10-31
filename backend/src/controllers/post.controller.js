@@ -1,4 +1,5 @@
 /** HTTP bài đăng: đầu vào hợp đồng chặt chẽ, dữ liệu công khai dùng danh sách trường cho phép. */
+import {moderationQuery,moderationPage} from '../services/moderationList.js';
 import {catalogSearch} from '../services/catalogSearch.js';
 import { id, validatePost, validateReview, validateActivation } from '../services/postValidation.js';
 const publicFields=['bai_dang_id','sach_id','ma_san_pham','tieu_de','mo_ta_tinh_trang','ten_sach','tac_gia','the_loai','nha_xuat_ban','nam_xuat_ban','isbn','tinh_trang_sach','mo_ta','phien_dau_gia_id','trang_thai_phien','thoi_gian_bat_dau','thoi_gian_ket_thuc','gia_khoi_diem','gia_hien_tai','buoc_gia','thoi_gian_cho_dat_lai','media','anh_bia'];
@@ -11,7 +12,7 @@ export function createPostController({model,service,limits}) {
     catalog:async(req,res)=>{if(Object.keys(req.query).some(key=>key!=='before')){const result=await model.search(catalogSearch(req.query));return res.json({...result,items:result.items.map(publicPost)});}return listResponse(res,(await model.list({publicOnly:true,after:page(req)})).map(publicPost));},
     publicDetail:async(req,res)=>res.json(publicPost(await model.detail(id(req.params.id),{publicOnly:true}))),
     mine:async(req,res)=>listResponse(res,await model.list({owner:req.user.nguoi_dung_id,after:page(req)})),
-    pending:async(req,res)=>listResponse(res,await model.list({pending:true,after:page(req)})),
+    pending:async(req,res)=>res.json(moderationPage(await model.list(moderationQuery(req.query)))),
     detail:async(req,res)=>res.json(await model.detail(id(req.params.id),options(req))),
     exportReview:async(req,res)=>res.json(await model.exportReview(req.user.nguoi_dung_id,id(req.params.id),id(req.params.reviewId))),
     create:async(req,res)=>{ const result=await service.create(req.user.nguoi_dung_id,validatePost(req.body,limits));res.status(result.replayed?200:201).json(result); },

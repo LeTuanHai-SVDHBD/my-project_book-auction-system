@@ -4,7 +4,7 @@ export const money = (value) =>
   value == null
     ? "Chưa có lượt giá"
     : `${BigInt(value).toLocaleString("vi-VN")} đ`;
-export default function BookCard({ post, mode = "catalog" }) {
+export default function BookCard({ post, mode = "catalog", query = "" }) {
   const state = post.trang_thai_phien,
     phase =
       state === "da_ket_thuc"
@@ -18,11 +18,12 @@ export default function BookCard({ post, mode = "catalog" }) {
             : state === "da_qua_kiem_duyet"
               ? "Đã duyệt · Chờ kích hoạt"
               : "Chờ kiểm duyệt";
+  const href = `#/${mode}/${post.bai_dang_id}${query ? `?${query}` : ""}`;
   return (
     <article className="book-card">
       <a
         className="book-art"
-        href={`#/${mode}/${post.bai_dang_id}`}
+        href={href}
         aria-label={`Xem ${post.ten_sach}${mode === "pending" ? `, bài #${post.bai_dang_id}` : ""}`}
       >
         <span className="book-card-status">
@@ -44,7 +45,7 @@ export default function BookCard({ post, mode = "catalog" }) {
       <div className="book-card-body">
         <span className="eyebrow">{post.the_loai || "Bản sách sưu tầm"}</span>
         <h2>
-          <a href={`#/${mode}/${post.bai_dang_id}`}>{post.ten_sach}</a>
+          <a href={href}>{post.ten_sach}</a>
         </h2>
         <p>
           {post.tac_gia || "Chưa rõ tác giả"}
@@ -56,6 +57,19 @@ export default function BookCard({ post, mode = "catalog" }) {
         <strong className="card-price">
           {money(post.gia_hien_tai ?? post.gia_khoi_diem)}
         </strong>
+        {mode === "pending" && state === "khong_dat_kiem_duyet" && (
+          <div className="moderation-rejection">
+            <strong>Đã từ chối</strong>
+            {post.ngay_tu_choi && (
+              <time dateTime={post.ngay_tu_choi}>
+                {new Date(post.ngay_tu_choi).toLocaleString("vi-VN")}
+              </time>
+            )}
+            <p>
+              {post.ly_do_tu_choi || "Xem chi tiết để đọc kết quả kiểm duyệt."}
+            </p>
+          </div>
+        )}
         <div className="book-card-footer">
           <span>
             <Icon name={mode === "pending" ? "file" : "clock"} size={18} />
@@ -65,7 +79,7 @@ export default function BookCard({ post, mode = "catalog" }) {
                 ? new Date(post.thoi_gian_ket_thuc).toLocaleString("vi-VN")
                 : "Chưa đặt lịch"}
           </span>
-          <a className="text-link" href={`#/${mode}/${post.bai_dang_id}`}>
+          <a className="text-link" href={href}>
             {mode === "pending" ? "Xem bài đăng" : "Xem chi tiết"}{" "}
             <Icon name="arrow" size={18} />
           </a>

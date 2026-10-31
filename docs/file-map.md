@@ -204,3 +204,5 @@ Thư mục rỗng được giữ bằng `.gitkeep`; file này không chứng min
 
 - `shared/bookIdentifiers.js`: ngưỡng kỹ thuật ISBN dùng chung cho input, validator và tham số SQL.
 - `backend/migrations/006_isbn_input.sql`: mở rộng Sach.isbn giữ dữ liệu, bỏ ép 10/13 và giữ chỉ mục/check không rỗng.
+
+Bộ lọc/cursor riêng của trang Kiểm duyệt nằm ở `backend/src/services/moderationList.js`; model bài đăng lấy lý do/ngày từ KiemDuyet hiện có.

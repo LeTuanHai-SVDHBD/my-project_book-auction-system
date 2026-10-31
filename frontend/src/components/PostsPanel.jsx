@@ -352,7 +352,11 @@ export default function PostsPanel({
               sort: filters.get("sort") || "newest",
               page: append ? next : 1,
             })
-          : await postApi.list(mode, append ? next : null);
+          : await postApi.list(
+              mode,
+              append ? next : null,
+              filters.get("status") || "all",
+            );
       if (seq === listSequence.current) {
         setItems((old) =>
           append
@@ -441,7 +445,7 @@ export default function PostsPanel({
       onRefresh={refresh}
       onClose={() => {
         setPost(null);
-        navigate(mode);
+        navigate(mode, null, query);
       }}
       onForm={setForm}
       onAuctionChange={auctionChanged}
@@ -505,18 +509,54 @@ export default function PostsPanel({
         post ? (
           detail
         ) : (
-          <section className="pending-posts" aria-label="Bài đăng chờ duyệt">
+          <section className="pending-posts" aria-label="Danh sách kiểm duyệt">
             <div className="pending-posts-heading">
-              <h2>Bài đăng chờ duyệt</h2>
+              <h2>Bài đăng cần theo dõi</h2>
               <span>{items.length} bài đang hiển thị</span>
             </div>
+            <div
+              className="moderation-filters"
+              role="group"
+              aria-label="Lọc trạng thái kiểm duyệt"
+            >
+              {[
+                ["all", "Tất cả"],
+                ["pending", "Chờ kiểm duyệt"],
+                ["rejected", "Đã từ chối"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className="secondary"
+                  aria-pressed={(filters.get("status") || "all") === value}
+                  onClick={() =>
+                    navigate(
+                      "pending",
+                      null,
+                      value === "all" ? "" : `status=${value}`,
+                    )
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="field-hint">
+              Bài chờ kiểm duyệt được ưu tiên trước. Bài đã từ chối giữ lại để
+              xem kết quả; khi người bán gửi lại sẽ chuyển về chờ kiểm duyệt.
+            </p>
             <div className="pending-post-grid">
               {items.map((item) => (
-                <BookCard key={item.bai_dang_id} post={item} mode="pending" />
+                <BookCard
+                  key={item.bai_dang_id}
+                  post={item}
+                  mode="pending"
+                  query={query}
+                />
               ))}
             </div>
             {!items.length && !loading && (
-              <p className="notice">Không có bài đăng chờ duyệt.</p>
+              <p className="notice">Không có bài đăng phù hợp với bộ lọc.</p>
             )}
             {next && (
               <button
@@ -524,7 +564,7 @@ export default function PostsPanel({
                 onClick={() => load(true)}
                 disabled={loading}
               >
-                Xem thêm bài chờ duyệt
+                Xem thêm bài đăng
               </button>
             )}
           </section>

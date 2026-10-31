@@ -33,6 +33,12 @@ Hiện không có luồng xóa bài; xóa bản ghi SQL thủ công không kích
 
 ## Kiểm duyệt, bổ sung và kích hoạt
 
+Trang Admin **Kiểm duyệt** mặc định hiển thị hai nhóm: chờ kiểm duyệt trước, đã từ chối sau;
+trong từng nhóm sắp ID bài giảm dần. Bộ lọc **Tất cả / Chờ kiểm duyệt / Đã từ chối** được giữ trong URL.
+Thẻ từ chối có lý do/ngày xử lý gần nhất; mở chi tiết để đọc đầy đủ và lịch sử, không duyệt lại trực tiếp bài đã từ chối.
+Chủ bài gửi lại thì chuyển về nhóm chờ và được kiểm duyệt lượt mới. Bài phê duyệt rời danh sách này;
+quyết định/snapshot/lịch sử vẫn được giữ. Phê duyệt chưa tự kích hoạt đấu giá: chủ sách còn đặt lịch/kích hoạt.
+
 | Thao tác | Điều kiện | Kết quả nguyên tử |
 |---|---|---|
 | Duyệt | Admin, bài/phiên pending, version hiện tại, lý do và xác nhận bằng chứng quý hiếm | Bài `da_duyet`, phiên `da_qua_kiem_duyet`, lưu quyết định/lịch sử |
@@ -79,7 +85,7 @@ hoặc đã có người thắng không được đăng lại, kể cả giao d�
 |---|---|---|
 | GET | `/api/posts/catalog`, `/api/posts/catalog/:id` | Công khai; projection không có giá ẩn hoặc dữ liệu nội bộ |
 | GET | `/api/posts/mine` | Người dùng, chỉ bài của mình |
-| GET | `/api/posts/pending` | Admin |
+| GET | `/api/posts/pending?status=all` | Admin; `status=all` (mặc định), `pending` hoặc `rejected` |
 | GET | `/api/posts/:id` | Chủ bài hoặc Admin |
 | POST | `/api/posts` | Người dùng + CSRF |
 | POST | `/api/posts/:id/resubmit` | Chủ bài bị từ chối + CSRF |
@@ -161,3 +167,14 @@ Chỉ Admin được phân công, hồ sơ đang xử lý, mới đọc chat li�
 Không tự thay đổi người thắng hoặc trạng thái giao dịch chỉ vì có khiếu nại.
 Bình luận chỉ nhận khi phiên đã công bố và đang trong [bắt đầu, kết thúc) theo giờ SQL; sau đó giữ lịch sử đọc.
 Hợp đồng `/api/community`, quyền, phân trang, retry và nghiệm thu tại [after-sales.md](after-sales.md).
+
+
+### Phân trang danh sách kiểm duyệt Admin
+
+`GET /api/posts/pending` giữ đường dẫn cũ nhưng trả cả chờ và từ chối mặc định. Mỗi trang tối đa 30 bài.
+`nextBefore` là cursor chứa nhóm và ID cuối (`pending:123` hoặc `rejected:123`), hoặc NULL.
+Client gửi nguyên cursor đã URL-encode vào `before`, giữ cùng `status` khi xem thêm; không tự tính cursor theo ID đơn lẻ.
+Bộ lọc/cursor sai trả 400; người dùng thường/khách không có quyền xem. Cursor theo cặp nhóm/ID giúp chuyển nhóm
+đúng dù ID các bài từ chối lớn hơn ID đang chờ. Khi dữ liệu đổi giữa các lượt tải, tải lại trang để có danh sách hiện tại;
+đây không phải snapshot SQL cố định. Danh mục công khai/Bài của tôi giữ cursor và hợp đồng cũ.
+Lý do/ngày từ chối lấy từ KiemDuyet hiện có, không thêm schema hoặc sửa quyết định đã lưu.

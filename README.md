@@ -210,7 +210,7 @@ cấp CSRF 60 lần/IP/phút. Bộ đếm tính cả lần thành công. Khi b�
    API nhận chuỗi nguyên `1500000`, giữ chính xác đến 18 chữ số. Giá hiện tại là dữ liệu từ lượt đặt giá, không phải ô chủ sách tự nhập.
    Ô **Chờ đặt lại** chỉ nhận chữ số khi gõ hoặc dán; nhập số nguyên từ 10 đến 30 giây, mặc định 20 giây.
 4. Gửi kiểm duyệt: bài và phiên cùng chờ duyệt, chưa có lịch.
-5. Admin mở **Kiểm duyệt**, xem thông tin/media và nguồn đối chiếu. Ghi lý do;
+5. Admin mở **Kiểm duyệt**: danh sách gồm bài chờ duyệt và đã từ chối, ưu tiên chờ duyệt; có bộ lọc Tất cả/Chờ kiểm duyệt/Đã từ chối. Bài từ chối giữ lý do/ngày xử lý và xem lại lịch sử; bài phê duyệt rời danh sách này. Xem thông tin/media và nguồn đối chiếu. Ghi lý do;
    phê duyệt yêu cầu xác nhận đã kiểm tra bằng chứng quý hiếm. Có thể từ chối và chỉ rõ phần cần bổ sung.
 6. Chủ sách bổ sung bài bị từ chối rồi gửi lại; giữ ID bài/phiên, media đã lưu và lịch sử kiểm duyệt.
 7. Sau khi được duyệt, chủ sách đặt giờ bắt đầu trong tương lai và giờ kết thúc sau đó, rồi kích hoạt đúng phiên hiện có.

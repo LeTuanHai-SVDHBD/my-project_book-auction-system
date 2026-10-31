@@ -5,6 +5,7 @@ import {randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {applyMigrations} from '../scripts/schemaMigrations.js';
 import {createPostModel} from '../src/models/post.model.js';
+import {moderationQuery} from '../src/services/moderationList.js';
 import {validatePost,validateReview} from '../src/services/postValidation.js';
 
 test('SQL xuất kết quả: quyết định và snapshot cùng COMMIT, hai vòng không lẫn media',
@@ -38,8 +39,12 @@ test('SQL xuất kết quả: quyết định và snapshot cùng COMMIT, hai vò
     ({id:postId}=await model.create({owner,input,items:[{kind:'image',url:'https://res.cloudinary.com/demo/image/upload/first.jpg'}],limits:{maxVideos:3},code:'EX'+run.replaceAll('-','')}));
     let detail=await model.detail(postId,{owner});bookId=detail.sach_id;auctionId=detail.phien_dau_gia_id;assert.equal(detail.isbn,input.book.isbn);
     const review=async decision=>model.review({admin,postId,input:validateReview({quyet_dinh:decision,ly_do:'Quyết định kiểm thử',xac_nhan_quy_hiem:true,row_version:(await model.detail(postId,{owner})).row_version})});
+    assert((await model.list({...moderationQuery({status:'pending'}),owner})).some(p=>p.bai_dang_id===postId));
     await review('tu_choi');detail=await model.detail(postId,{owner});const firstId=detail.kiem_duyet[0].kiem_duyet_id;
     assert(detail.kiem_duyet[0].co_the_xuat);
+    const rejected=await model.list(moderationQuery({status:'rejected'}));const card=rejected.find(p=>p.bai_dang_id===postId);assert(card);assert.equal(card.ly_do_tu_choi,'Quyết định kiểm thử');assert(card.ngay_tu_choi);
+    assert(!(await model.list(moderationQuery({status:'pending'}))).some(p=>p.bai_dang_id===postId));
+    assert(!(await model.list(moderationQuery({before:`rejected:${postId}`}))).some(p=>p.bai_dang_id===postId));
     const [first,again]=await Promise.all([model.exportReview(owner,postId,firstId),model.exportReview(owner,postId,firstId)]);
     assert.deepEqual(first,again);assert.equal(first.media.length,1);assert.equal(first.book.isbn,input.book.isbn);
     const raw=(await pool.request().input('id',sql.Int,firstId).query('SELECT ket_qua_snapshot FROM dbo.KiemDuyet WHERE kiem_duyet_id=@id')).recordset[0];
@@ -48,7 +53,8 @@ test('SQL xuất kết quả: quyết định và snapshot cùng COMMIT, hai vò
     const next=structuredClone(input);next.post.tieu_de='Đã bổ sung';next.post.mo_ta_tinh_trang='Thông tin mới';next.rowVersion=detail.row_version;
     await model.resubmit({owner,postId,input:next,items:[{kind:'video',url:'https://res.cloudinary.com/demo/video/upload/second.mp4'}],limits:{maxVideos:3}});
     assert.deepEqual(await model.exportReview(owner,postId,firstId),first);
-    await review('phe_duyet');const secondId=(await model.detail(postId,{owner})).kiem_duyet[0].kiem_duyet_id;
+    assert((await model.list(moderationQuery({status:'pending'}))).some(p=>p.bai_dang_id===postId));
+    await review('phe_duyet');assert(!(await model.list(moderationQuery({}))).some(p=>p.bai_dang_id===postId));const secondId=(await model.detail(postId,{owner})).kiem_duyet[0].kiem_duyet_id;
     const second=await model.exportReview(owner,postId,secondId);assert.equal(second.media.length,2);assert.equal(second.review.ket_qua,'Phê duyệt');assert.equal(second.post.tieu_de,'Đã bổ sung');
     // Legacy records: capture only a still-current decision; never invent old-round media.
     await pool.request().input('post',sql.Int,postId).query('UPDATE dbo.KiemDuyet SET ket_qua_snapshot=NULL WHERE bai_dang_id=@post');

@@ -16,6 +16,7 @@ import {canRelist,assertStatePair,assertVersion,assertVideoLimit} from '../src/s
 import {createPostService} from '../src/services/post.service.js';
 import {publicPost} from '../src/controllers/post.controller.js';
 import {createCloudinary,verifyMedia} from '../src/services/cloudinary.service.js';
+import {moderationQuery,moderationPage} from '../src/services/moderationList.js';
 import {ISBN_MAX_LENGTH} from '../../shared/bookIdentifiers.js';
 const version='0000000000000001';
 const payload=()=>({ma_yeu_cau:randomUUID(),sach:{ten_sach:'Bản sách thử',tinh_trang_sach:'Bìa sờn'},bai_dang:{tieu_de:'Ấn bản đầu',mo_ta_tinh_trang:'Thông tin và nguồn đối chiếu'},phien:{gia_khoi_diem:'100000',gia_toi_thieu:'999999999999999999',buoc_gia:'1000'},media:[]});
@@ -111,13 +112,21 @@ test('nhận diện ảnh/video theo magic bytes; Cloudinary REST không lộ se
   const unavailable=createCloudinary({config:mediaConfig,fetchImpl:async()=>{throw Error('testsecret');}});
   await assert.rejects(unavailable.destroy({kind:'image',publicId}),error=>!error.message.includes('testsecret'));
 });
-async function serverFixture(t,{providerUpload,mediaOverrides={}}={}){
+async function serverFixture(t,{providerUpload,mediaOverrides={},moderationRows}={}){
   const authConfig=parseAuthConfig({SESSION_SECRET:'tests-only-'.repeat(8)});
   const sessionMiddleware=createSessionMiddleware(authConfig,new session.MemoryStore());
   const rows=[{nguoi_dung_id:1,ho_ten:'A',email:'a@example.test',vai_tro:'nguoi_dung'},{nguoi_dung_id:2,ho_ten:'Admin',email:'admin@example.test',vai_tro:'admin'}];
   const users={findById:async id=>rows.find(x=>x.nguoi_dung_id===id),findByEmail:async email=>rows.find(x=>x.email===email)};
   let writes=0,uploads=0,createdInput=null;
-  const model={list:async()=>[{bai_dang_id:7,gia_toi_thieu:'secret',gia_khoi_diem:'10'}],detail:async()=>({bai_dang_id:7,gia_toi_thieu:'secret',gia_khoi_diem:'10'})};
+  const model={list:async options=>{
+    if(!moderationRows)return [{bai_dang_id:7,gia_toi_thieu:'secret',gia_khoi_diem:'10'}];
+    const rank=row=>row.trang_thai_phien==='cho_kiem_duyet'?0:1;
+    return moderationRows.filter(row=>options.pending&&(
+      options.reviewStatus!=='rejected'&&row.trang_thai_bai==='cho_kiem_duyet'&&row.trang_thai_phien==='cho_kiem_duyet'||
+      options.reviewStatus!=='pending'&&row.trang_thai_bai==='tu_choi'&&row.trang_thai_phien==='khong_dat_kiem_duyet'))
+      .filter(row=>options.reviewCursorRank===null||rank(row)>options.reviewCursorRank||rank(row)===options.reviewCursorRank&&row.bai_dang_id<options.after)
+      .sort((a,b)=>rank(a)-rank(b)||b.bai_dang_id-a.bai_dang_id).slice(0,30);
+  },detail:async()=>({bai_dang_id:7,gia_toi_thieu:'secret',gia_khoi_diem:'10'})};
   const service={create:async(owner,input)=>{writes++;createdInput=input;return {id:7};},review:async()=>{writes++;return {id:7};}};
   const authRouter=createAuthRouter({authConfig,sessionMiddleware,users,passwords:{verify:async()=>true},limiter:{consume:async()=>0}});
   const postRouter=createPostRouter({sessionMiddleware,users,model,service,limits:mediaConfig});
@@ -206,4 +215,28 @@ test('HTTP tạo bài giữ nguyên mã dài; chặn vượt ngưỡng trước 
  const before=f.writes();body.sach.isbn='9'.repeat(ISBN_MAX_LENGTH+1);
  assert.equal((await owner.call('/posts','POST',body)).status,400);assert.equal(f.writes(),before);
  body.sach.isbn=null;assert.equal((await owner.call('/posts','POST',body)).status,201);assert.equal(f.createdInput().book.isbn,null);
+});
+
+test('bộ lọc kiểm duyệt/cursor giữ thứ tự nhóm và chặn giá trị không hợp lệ',()=>{
+  assert.deepEqual(moderationQuery({}),{pending:true,reviewStatus:'all',after:2147483647,reviewCursorRank:null});
+  assert.equal(moderationQuery({before:'rejected:99'}).reviewCursorRank,1);
+  assert.equal(moderationQuery({status:'pending',before:'pending:10'}).after,10);
+  for(const query of [{status:'approved'},{status:['all']},{before:'1'},{before:'pending:0'},{before:'pending:2147483648'},
+    {before:['pending:1']},{status:'rejected',before:'pending:1'},{other:'x'}])assert.throws(()=>moderationQuery(query),{status:400});
+  assert.equal(moderationPage([]).nextBefore,null);
+});
+test('HTTP Admin: tất cả/chờ/từ chối, phân trang qua hai nhóm và bài duyệt rời danh sách',async t=>{
+  const moderationRows=Array.from({length:75},(_,i)=>({bai_dang_id:i+1,trang_thai_bai:i<34?'cho_kiem_duyet':'tu_choi',trang_thai_phien:i<34?'cho_kiem_duyet':'khong_dat_kiem_duyet',ly_do_tu_choi:i<34?null:'Cần bằng chứng ấn bản'}));
+  moderationRows.push({bai_dang_id:1000,trang_thai_bai:'da_duyet',trang_thai_phien:'da_qua_kiem_duyet'});
+  const f=await serverFixture(t,{moderationRows}),guest=f.client(),user=f.client(),admin=f.client();
+  assert.equal((await guest.call('/posts/pending')).status,401);await user.login('a@example.test');assert.equal((await user.call('/posts/pending?status=rejected')).status,403);
+  await admin.login('admin@example.test');const ids=[];let cursor=null;
+  do{const response=await admin.call('/posts/pending'+(cursor?'?before='+encodeURIComponent(cursor):''));assert.equal(response.status,200);ids.push(...response.data.items.map(x=>x.bai_dang_id));cursor=response.data.nextBefore;}while(cursor);
+  assert.deepEqual(ids,[...Array.from({length:34},(_,i)=>34-i),...Array.from({length:41},(_,i)=>75-i)]);assert.equal(new Set(ids).size,75);
+  const rejected=await admin.call('/posts/pending?status=rejected');assert(rejected.data.items.every(x=>x.trang_thai_bai==='tu_choi'));assert.match(rejected.data.items[0].ly_do_tu_choi,/bằng chứng/);
+  assert((await admin.call('/posts/pending?status=pending')).data.items.every(x=>x.trang_thai_bai==='cho_kiem_duyet'));
+  moderationRows[0].trang_thai_bai='da_duyet';moderationRows[0].trang_thai_phien='da_qua_kiem_duyet';
+  moderationRows[34].trang_thai_bai='cho_kiem_duyet';moderationRows[34].trang_thai_phien='cho_kiem_duyet';
+  assert.equal((await admin.call('/posts/pending?status=pending')).data.items[0].bai_dang_id,35);
+  for(const suffix of ['?status=approved','?before=invalid','?status=rejected&before=pending:10'])assert.equal((await admin.call('/posts/pending'+suffix)).status,400);
 });

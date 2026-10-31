@@ -292,3 +292,13 @@ Lease AI 60 giây được gia hạn mỗi 15 giây suốt tác vụ; mất leas
 không lưu kết quả giả. Replay SQL dùng cache/receipt cũ. Có thể gọi provider lại sau crash trước cache;
 không cam kết đúng một lượt hay hết mọi sự cố Gemini/mạng. Admin thấy tiến độ và thống kê an toàn;
 kết quả cũ được đánh dấu khi phân tích lại. Không đổi schema/dependency/hash nguồn, nhà cung cấp hoặc cấu hình riêng.
+
+
+## Danh sách kiểm duyệt giữ bài đã từ chối
+
+Theo xác nhận ngày 31/10/2026, trang Admin hiển thị chờ duyệt và từ chối mặc định, ưu tiên nhóm chờ.
+Phê duyệt loại khỏi danh sách theo trạng thái hiện tại, không xóa lịch sử hoặc tự kích hoạt phiên.
+Từ chối chỉ đọc lại quyết định; chỉ sau khi người bán gửi lại mới có thể duyệt lượt mới.
+Dùng bộ lọc/cursor nhóm + ID phía server để bài chờ không bị chìm sau nhiều bài từ chối khi phân trang.
+Giữ route /posts/pending và quyền Admin; chỉ endpoint này dùng nextBefore dạng nhóm:ID.
+Không thêm bảng/cột/dependency hoặc đổi hợp đồng danh mục/người bán. Xem flows.md để tra bộ lọc/cursor.

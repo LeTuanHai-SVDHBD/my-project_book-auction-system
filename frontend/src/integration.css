@@ -2100,3 +2100,40 @@ figure.upload-media-card {
   margin-inline: auto;
   overflow-wrap: anywhere;
 }
+
+/* Admin theo dõi cả bài chờ và từ chối; lý do đầy đủ đọc ở chi tiết. */
+.moderation-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 20px 0 12px;
+}
+.moderation-filters .secondary {
+  width: auto;
+  min-height: 44px;
+}
+.moderation-filters [aria-pressed="true"] {
+  background: var(--navy);
+  color: white;
+}
+.moderation-rejection {
+  padding: 12px;
+  border-left: 3px solid #bd785e;
+  border-radius: 4px;
+  background: #fbf1eb;
+  color: #713b2d;
+  overflow-wrap: anywhere;
+}
+.moderation-rejection time {
+  display: block;
+  margin: 4px 0;
+  font-size: 0.85em;
+}
+.moderation-rejection p {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 6px 0 0;
+  color: inherit;
+}

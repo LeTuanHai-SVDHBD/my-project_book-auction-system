@@ -5,6 +5,12 @@
 Cập nhật ngày 31/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 
+## Khung ảnh sách đồng nhất Admin/người dùng — 31/10/2026
+
+- Chỉ sửa stylesheet tích hợp: khung thẻ 4:3 trên Trang chủ/Đấu giá/Kiểm duyệt; bỏ giới hạn 72%, padding trên ảnh, xoay và bóng đổ bị kế thừa từ thiết kế cũ. Ảnh canh giữa, giữ tỷ lệ/đầy đủ nội dung, nền trung tính; nhãn trạng thái có khoảng riêng. Các selector phủ cả quy tắc riêng của Home/catalog và breakpoint mobile. Không thay Backend, schema, URL hoặc tệp ảnh/video.
+- `npm run build`: PASS (89 modules); `git diff --check`: PASS. Chromium production build với HTTP/session/router/model fixture: dùng một ảnh sách thật từ Cloudinary do người dùng cung cấp, ảnh dọc/vuông SVG mẫu và placeholder; kiểm tra khung 4:3, object-fit contain, transform none, box-shadow none, kích thước nằm trong khung cả khi hover. Trang chủ/Đấu giá/người bán xem chi tiết/Admin từ chối; **1440/1100/768/390/320px** không tràn ngang/lỗi JavaScript trong lượt đạt. Đã xem ảnh chụp thẻ desktop/mobile/Admin; chọn ảnh và chuyển sang video ở chi tiết vẫn hoạt động.
+- Không thêm test unit cho thay đổi CSS này và không chạy lại toàn bộ test Backend/dịch vụ thật; kiểm tra trình duyệt dùng API/model fixture, không xác nhận lưu SQL/Redis. Ảnh thật được tải để QA rồi phục vụ cục bộ, không đổi hoặc upload lại Cloudinary.
+
 ## Danh sách kiểm duyệt gồm chờ và từ chối — 31/10/2026
 
 - API Admin `/posts/pending` mặc định trả bài/phiên chờ và bài/phiên bị từ chối; lọc `status=all|pending|rejected`. SQL xếp nhóm chờ trước, ID giảm dần trong nhóm; cursor chứa nhóm/ID để không bỏ nhóm chờ khi có nhiều bài từ chối ID cao. Thẻ từ chối lấy lý do/ngày xử lý mới nhất từ KiemDuyet. Không thêm schema/dependency, không đổi lịch sử, quyền hoặc điều kiện duyệt/gửi lại/kích hoạt.

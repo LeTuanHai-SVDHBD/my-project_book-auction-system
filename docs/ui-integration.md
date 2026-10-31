@@ -59,6 +59,12 @@ Danh sách công khai chỉ trả bài đã duyệt/đã công bố, thêm `anh_
 
 ## Media, ISBN và trình bày hồ sơ
 
+Ảnh ở thẻ sách dùng chung khung 4:3 cho Trang chủ, Đấu giá và Kiểm duyệt Admin. Ảnh nằm thẳng,
+canh giữa trên nền sáng, giữ nguyên tỷ lệ và hiển thị đầy đủ bằng `object-fit: contain`.
+Bỏ bóng đổ/hiệu ứng xoay của mô phỏng bìa sách cũ; hover không làm nghiêng ảnh.
+Nhãn trạng thái có khoảng riêng phía trên; ảnh dọc, ngang, vuông dùng cùng khung, chưa có ảnh giữ placeholder.
+Không sửa file ảnh, URL Cloudinary, dữ liệu media hoặc cách chọn ảnh/video ở chi tiết.
+
 Bài đăng không còn giới hạn 12 ảnh. `GET /api/media/config` trả `maxImages: null`; cấu hình cũ `MEDIA_MAX_IMAGES` bị bỏ qua. Giữ giới hạn dung lượng mỗi ảnh (mặc định 10 MB), 3 video/50 MB mỗi video theo cấu hình, hạn vé và kiểm soát tài nguyên upload hiện có. Cả Backend và frontend đều kiểm tra số video gồm media giữ lại. JSON body và khả năng lưu trữ vẫn tuân giới hạn kỹ thuật của hạ tầng; không đổi schema hoặc thông số tải AI.
 
 Mỗi media vừa tải có nút × với tên truy cập theo tệp. Nút gọi DELETE vé của chính người dùng và chỉ gỡ khỏi danh sách sau thành công; vé đã bỏ không được gửi cùng bài. Media đã lưu trong lịch sử bài không bị xóa qua giao diện này. Thay đổi này chỉ áp dụng ảnh sách, không đổi quy tắc tối đa 5 ảnh bằng chứng khiếu nại.

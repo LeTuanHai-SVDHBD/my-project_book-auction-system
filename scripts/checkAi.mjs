@@ -11,7 +11,7 @@ export async function checkAi({env,fetchImpl,write=console.log}={}){
     const config=parseAiConfig(env);write(`Model Gemini: ${config.model}`);
     if(!config.configured){write('FAIL AI_NOT_CONFIGURED — Cần AI_ENABLED=true và GEMINI_API_KEY trong .env gốc.');return 1;}
     write('Gọi Gemini một lần với văn bản mẫu, không gửi ảnh hoặc dữ liệu SQL.');
-    const provider=createGemini({config,fetchImpl,onHttpError:details=>{if(details.message)write(`Google trả lời (đã che khóa): ${details.message}`);}});
+    const provider=createGemini({config:{...config,maxAttempts:1},fetchImpl,onHttpError:details=>{if(details.message)write(`Google trả lời (đã che khóa): ${details.message}`);}});
     const response=await provider.analyze({ten_sach:'Kiểm tra kết nối Gemini',mo_ta_tinh_trang:'Mẫu không có ảnh. Không đủ căn cứ quan sát thì đánh dấu missing, không tự cho điểm.',media:[]});
     const result=scoreObservations(response.observations,{mediaIds:response.mediaIds,sourceUrls:response.sourceUrls});
     if(result.diem_do_hiem!==null||result.diem_tinh_trang!==null)throw Error('INVALID_NULL_TEST');

@@ -27,12 +27,16 @@ AI_ENABLED=true
 GEMINI_API_KEY=YOUR_PRIVATE_KEY
 GEMINI_MODEL=gemini-3.8-flash
 AI_PROVIDER_TIMEOUT_MS=60000
+AI_PROVIDER_MAX_TIMEOUT_MS=300000
+AI_PROVIDER_MAX_ATTEMPTS=2
+AI_MEDIA_PREPARE_TIMEOUT_MS=45000
+AI_THINKING_LEVEL=low
 AI_MEDIA_TOTAL_MB=12
 ```
 
 Thay `YOUR_PRIVATE_KEY` bằng khóa của chính tài khoản Gemini. Không gửi khóa qua chat, không commit `.env`
 và không đặt trong `VITE_*`. Có thể đổi model tương thích JSON/ảnh/video nếu tài khoản không được cấp model mặc định.
-Cấu hình mẫu theo tài liệu Gemini kiểm tra ngày 24/10/2026; quyền truy cập/quota phụ thuộc tài khoản.
+Cấu hình mẫu theo tài liệu Gemini kiểm tra ngày 31/10/2026; quyền truy cập/quota phụ thuộc tài khoản.
 Khởi động lại API và worker sau khi đổi cấu hình:
 
 ```powershell
@@ -118,6 +122,9 @@ Prompt chỉ gửi một trường `mo_ta_tinh_trang` cho tình trạng, yếu t
 
 Worker chỉ tải HTTPS từ đúng `res.cloudinary.com/<cloud-name>/...` của dự án, không theo redirect.
 Kiểm tra loại media, MIME, magic bytes, kích thước và deadline trước khi gửi.
+Tải tối đa bốn tệp song song theo từng lô, giữ thứ tự gốc/mã M1…; mỗi tải có tối đa 15 giây,
+toàn bước chuẩn bị mặc định 45 giây. Đủ ngân sách hoặc hết thời gian thì không tải thêm lô mới.
+Manifest ghi rõ tệp đã gửi/bỏ qua và lý do; không báo đã xem ảnh chưa gửi.
 Tổng bytes thô mặc định tối đa 12 MiB, ảnh/video nhỏ được gửi inline; base64 làm tăng kích thước khoảng một phần ba.
 Đây là ngân sách AI riêng, không thay giới hạn upload 10 MB/ảnh và 50 MB/video.
 Video lớn hoặc tệp vượt ngân sách không được gửi; lưu manifest/cảnh báo và giữ thiếu dữ liệu cho phần không quan sát được.
@@ -127,6 +134,30 @@ Nguồn URL chỉ được chấp nhận nếu đã xuất hiện trong văn b�
 Worker không truy cập URL nguồn, không tuyên bố đã xác minh nội dung nguồn.
 Admin cần tự kiểm tra xuất xứ/giấy tờ với dữ liệu thực tế, đặc biệt chữ ký, con dấu và lai lịch.
 
+## Thời gian chờ và thử lại hữu hạn
+
+`AI_PROVIDER_TIMEOUT_MS` là thời gian cơ sở (mặc định 60.000 ms). Mỗi media **thực sự gửi**
+được cộng 4.000 ms; mỗi lượt không vượt `AI_PROVIDER_MAX_TIMEOUT_MS` (mặc định 300.000 ms).
+Đây là ngân sách chờ của ứng dụng, không phải dự đoán thời gian Google trả kết quả.
+Ví dụ gửi đủ 32 ảnh, cấu hình cơ sở 60 giây cũ vẫn cho phép 188 giây mỗi lượt.
+Giới hạn bao gồm cả đọc response body, nên phản hồi có headers rồi bị treo cũng bị ngắt.
+
+Tối đa `AI_PROVIDER_MAX_ATTEMPTS` lượt cho mỗi lần worker xử lý (1–2, mặc định 2),
+chỉ thử lại khi timeout, HTTP 408/500/502/503/504 hoặc lỗi mạng tạm thời thuộc allowlist.
+Chờ ngẫu nhiên 750–1.249 ms trước lượt tiếp theo; dùng lại payload/media đã chuẩn bị.
+Không thử lại lỗi khóa/quyền/billing/model, HTTP 400/401/402/403/404/429, DNS `ENOTFOUND`, TLS,
+JSON sai hoặc phản hồi chưa hoàn tất. Lượt lỗi cũng có thể tốn quota/chi phí; không retry vô hạn.
+
+Deadline toàn job = giới hạn chuẩn bị + giới hạn mỗi lượt × số lượt + 10 giây dự phòng
+(mặc định 655 giây). Deadline job hoặc worker dừng sẽ hủy yêu cầu đang chạy.
+`AI_THINKING_LEVEL=low` giảm mức suy luận cho tác vụ trích xuất; có thể đặt `default` để bỏ tham số
+nếu model khác không hỗ trợ. Giữ `max_output_tokens=8192`, vì hạ giới hạn output có thể cắt cả phần suy luận
+và JSON. Không đổi model, tiêu chí hoặc cơ chế NULL để che lỗi timeout.
+
+Tài liệu Google: [Thinking levels](https://ai.google.dev/gemini-api/docs/thinking/),
+[API errors](https://ai.google.dev/gemini-api/docs/api-errors),
+[Troubleshooting](https://ai.google.dev/gemini-api/docs/troubleshooting).
+
 ## Vòng đời, lưu trữ và phục hồi
 
 Sau COMMIT đăng mới, đăng lại hoặc gửi duyệt lại, API xếp job vào stream AI riêng.
@@ -135,18 +166,24 @@ Mỗi 15 giây đối soát bài pending chưa có phân tích của `row_versio
 
 Job mang request UUID, ID bài, version và hash đầu vào. Redis giữ trạng thái queued/running/done/skipped,
 cache kết quả đã kiểm tra trước khi ghi SQL; lease theo bài bảo vệ xử lý đồng thời.
+Lease AI sống 60 giây và được gia hạn mỗi 15 giây trong suốt lúc chuẩn bị/chờ Gemini.
+Mất lease hoặc worker dừng thì hủy provider, để stream pending cho phục hồi, không ghi thất bại giả.
+Kiểm tra quyền sở hữu lại trước khi cache và ngay trước COMMIT SQL.
 Con trỏ job theo bài và dữ liệu job có TTL 24 giờ, tránh hết con trỏ khi nhiều bài đang xếp hàng.
 SQL khóa bài/phiên, kiểm tra lại pending/version rồi lưu một PhanTichAI và các ChiTietPhanTichAI trong cùng transaction.
 Không sửa trạng thái bài/phiên. Nếu Admin đã duyệt/từ chối hoặc chủ sách gửi lại dữ liệu mới, bỏ kết quả đến muộn.
 
 Dùng hai bảng đã có, không thêm cột. Một chi tiết nhóm `khac` chứa metadata có phiên bản:
 request UUID, hash đầu vào, source version, model, bộ quy tắc, media đã gửi/bỏ qua, cảnh báo/mã lỗi.
+Thêm số lượt gọi, số media gửi/tổng, thời gian chuẩn bị/provider/tổng và giới hạn mỗi lượt
+vào metadata JSON hiện có; không thêm bảng/cột hoặc lưu body lỗi provider.
 UI tách metadata khỏi chín tiêu chí. Mỗi lần phân tích là một bản ghi mới, giữ lịch sử; API trả 20 lần gần nhất.
 Hash/version giúp đánh dấu kết quả thuộc dữ liệu cũ; dữ liệu lịch sử chưa có metadata vẫn xem được, có cảnh báo.
 
 Lỗi provider được lưu trạng thái `that_bai`, cả hai điểm NULL; thiếu dữ liệu là `chua_day_du`.
 Không tự gọi lại vô hạn cho cùng version đã có kết quả (kể cả thất bại); Admin chủ động **Phân tích lại bằng AI**.
-Lỗi SQL giữ stream pending, reclaim sau ba phút. Replay sau SQL COMMIT tìm receipt trước và không ghi/gọi lại.
+Lỗi SQL giữ stream pending, có thể reclaim sau ba phút; lease còn sống vẫn chặn xử lý trùng.
+Khi worker chết, chờ lease hết hạn và lượt reclaim tiếp theo để xử lý lại. Replay sau SQL COMMIT tìm receipt trước và không ghi/gọi lại.
 Cache kết quả giúp retry SQL không tốn thêm lượt Gemini khi cache còn tồn tại.
 Crash trước khi cache hoặc mất Redis có thể gọi provider lại; không cam kết gọi Gemini đúng một lần.
 Redis mất dữ liệu được bù bài pending từ SQL; không tự khôi phục lịch sử trạng thái job Redis đã mất.
@@ -155,13 +192,15 @@ Redis mất dữ liệu được bù bài pending từ SQL; không tự khôi ph
 
 - `GET /api/ai/:id?analysis=<id>`: chủ bài hoặc Admin; lần phân tích phải thuộc đúng bài.
 - `POST /api/ai/:id`: chỉ Admin, đăng nhập + CSRF, body chỉ có `row_version` hiện tại; trả 202 khi xếp hàng.
-- Admin xem AI trong **Kiểm duyệt**, đọc lại mỗi ba giây, có trạng thái chờ/đang chạy/kết quả, chẩn đoán kỹ thuật, lịch sử và nút phân tích lại khi bài đang chờ duyệt. Chỉ Admin được POST yêu cầu phân tích; quyết định duyệt/từ chối vẫn độc lập.
+- Admin xem AI trong **Kiểm duyệt**, đọc lại mỗi ba giây, có tiến độ chuẩn bị ảnh/video, lượt chờ Gemini/thử lại, kết quả, chẩn đoán kỹ thuật, lịch sử và nút phân tích lại khi bài đang chờ duyệt. Chỉ Admin được POST yêu cầu phân tích; quyết định duyệt/từ chối vẫn độc lập.
 - Chủ bài đang chờ duyệt chỉ thấy tiến độ và lịch sử quyết định trước đó (nếu có), không hiện/gọi panel AI. Sau phê duyệt hoặc từ chối, quyết định/lý do hiện trước, phần **Kết quả AI tham khảo** thu gọn bên dưới. Gửi duyệt lại sẽ ẩn AI cho tới quyết định mới. Người mua/khách không có API phân tích riêng.
 - Backend cũng lọc `ai` trong chi tiết riêng và `GET /api/ai/:id`: người bán không nhận job/lịch sử phân tích chưa công bố hoặc mã lỗi provider. Chỉ công bố kết quả có hash đầu vào hiện tại và thời điểm nằm sau quyết định trước, không muộn hơn quyết định hiện tại. Không đủ metadata/mốc thời gian thì báo chưa có kết quả phù hợp, không gán kết quả cũ vào lần mới. Query `analysis` của người bán chỉ nhận ID đã công bố hiện tại; Admin vẫn xem lịch sử riêng.
 - Người bán thấy hai điểm, lý do NULL, tiêu chí, bằng chứng, nguồn và phép tính của kết quả phù hợp. Nếu phân tích thất bại, hiện **AI chưa phân tích thành công. Vui lòng xem quyết định và lý do kiểm duyệt của Admin.**, không hiện `AI_TIMEOUT` hoặc hướng dẫn cấu hình. Không đổi cách tính điểm hay dữ liệu phân tích đã lưu.
 - Nút duyệt/từ chối hiện tại tiếp tục hoạt động khi AI tắt, thiếu dữ liệu hoặc lỗi. Phê duyệt vẫn cần xác nhận bằng chứng quý hiếm.
 
-Thay đổi hiển thị theo vai trò không sửa thời gian chờ hoặc việc chuẩn bị 32 ảnh: ngân sách media và timeout hiện có vẫn áp dụng; `ai:check` PASS với văn bản không chứng minh phân tích đầy đủ ảnh đã đạt.
+Khi đang chạy lại, kết quả cũ có nhãn rõ là lần trước, không nhầm với tiến độ mới.
+Admin xem được số media đã gửi và thời gian chờ; người bán không nhận các chẩn đoán này.
+`ai:check` PASS với văn bản không chứng minh phân tích đầy đủ ảnh đã đạt.
 
 ## Chẩn đoán khi smoke báo AI_PROVIDER_ERROR
 
@@ -196,12 +235,16 @@ Có thể gửi kết quả lệnh để đối soát, không gửi `.env`, khó
 | `AI_REQUEST_REJECTED` | Cấu trúc/giới hạn tham số hoặc điều kiện project; đọc thông báo lệnh mẫu để xác định |
 | `AI_QUOTA_EXCEEDED` | Quota hoặc giới hạn lượt/token |
 | `AI_NETWORK_ERROR` | DNS/proxy/TLS/kết nối máy chạy worker; có thể có `ENOTFOUND` hoặc mã TLS |
-| `AI_TIMEOUT` | Kết nối hoặc thời gian chờ provider |
+| `AI_TIMEOUT` | Hết thời gian từng lượt dù đã thử lại hữu hạn; xem số media/thời gian ở Admin và kiểm tra mạng/dịch vụ Google |
+| `AI_JOB_TIMEOUT` | Hết deadline tổng, gồm chuẩn bị media và gọi provider |
 | `AI_INVALID_RESPONSE` / `AI_INCOMPLETE_RESPONSE` | JSON không hợp đồng hoặc chưa hoàn tất |
 
 Không kết luận key sai hoặc tự đổi model chỉ từ `AI_PROVIDER_ERROR` cũ.
 Sau khi sửa nguyên nhân/cấu hình, khởi động lại `dev:all`, chạy lại `smoke:ai` để nghiệm thu toàn luồng.
-Model mặc định, payload, schema, bộ điểm và nhà cung cấp vẫn là Gemini; bản sửa này bổ sung chẩn đoán.
+Nhà cung cấp/model và schema/bộ điểm giữ nguyên; cấu hình thời gian, mức suy luận và điều phối media được cập nhật như trên.
+Sau pull chạy `npm.cmd run setup:ai` rồi khởi động lại API/worker để nhận cấu hình. Script giữ key và giá trị `.env` cũ.
+Bản ghi `AI_TIMEOUT` đã lưu SQL vẫn thuộc lần trước: vào **Admin → Kiểm duyệt → bài đang chờ → Phân tích lại bằng AI**
+để tạo lượt mới. Không tự thay kết quả cũ hoặc chạy lại AI cho bài đã có quyết định.
 
 ## Kiểm tra và nghiệm thu
 
@@ -222,10 +265,10 @@ Khi API/worker/SQL/Redis thật đang chạy, Gemini đã bật và có quota:
 npm.cmd run smoke:ai
 ```
 
-Smoke dùng một lượt Gemini thật cho bài mẫu không có ảnh: kiểm tra JSON/SQL, giữ hai điểm NULL;
+Smoke dùng chính provider/retry của worker (tối đa hai lượt mặc định) cho bài mẫu không có ảnh: kiểm tra JSON/SQL, giữ hai điểm NULL;
 chủ bài chưa thấy AI khi đang chờ. Admin từ chối fixture thiếu ảnh rồi chủ bài mới xem cùng kết quả.
 Dọn đúng tài khoản/bài/quyết định SQL của lần chạy;
-job chưa rõ hoàn tất giữ fixture và báo FAIL để đối soát. Redis job hết TTL, không FLUSHDB.
+job chưa rõ hoàn tất giữ fixture và báo FAIL để đối soát. Smoke chờ theo deadline cấu hình cộng 180 giây cho hàng đợi/lưu SQL. Redis job hết TTL, không FLUSHDB.
 Smoke này không thay nghiệm thu chất lượng thẩm định ảnh/video thật hoặc xác thực nguồn.
 Nếu chỉ nghiệm thu đấu giá/media mà không muốn phát sinh lượt Gemini cho fixture, tắt AI rồi khởi động lại API/worker.
 

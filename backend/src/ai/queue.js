@@ -10,7 +10,7 @@ export function createAiQueue({getRedis,settings=AI_QUEUE}) {
     async enqueue(row,{manual=false}={}){const job={requestId:randomUUID(),postId:row.bai_dang_id,sourceVersion:row.row_version,inputHash:inputHash(row),trigger:manual?'manual':'auto',state:'queued'};
       return JSON.parse(await getRedis().eval(enqueueLua,{keys:[current(job.postId),jobKey(job.requestId),settings.stream],arguments:[job.requestId,JSON.stringify(job),settings.prefix+'job:',job.sourceVersion]}));},
     async get(id){const value=await getRedis().get(jobKey(id));return value?JSON.parse(value):null;},
-    async status(postId){const id=await getRedis().get(current(postId));if(!id)return null;const value=await this.get(id);return value?{request_id:value.requestId,state:value.state,source_version:value.sourceVersion,analysis_id:value.analysisId??null}:null;},
+    async status(postId){const id=await getRedis().get(current(postId));if(!id)return null;const value=await this.get(id);return value?{request_id:value.requestId,state:value.state,source_version:value.sourceVersion,analysis_id:value.analysisId??null,progress:value.progress??null}:null;},
     async update(job,patch){const next={...job,...patch};await getRedis().set(jobKey(job.requestId),JSON.stringify(next),{EX:86400});return next;}
   };
 }

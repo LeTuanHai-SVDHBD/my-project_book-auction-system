@@ -217,6 +217,7 @@ cấp CSRF 60 lần/IP/phút. Bộ đếm tính cả lần thành công. Khi b�
 8. Phiên đã kích hoạt xuất hiện trong **Danh mục**. API công khai không trả `gia_toi_thieu`.
 
 Khi đã bật Gemini, worker tự phân tích bài mới/gửi duyệt lại, lưu hai điểm độc lập cùng bằng chứng, cảnh báo và lịch sử.
+Với nhiều ảnh/video, Admin thấy tiến độ chuẩn bị và lượt chờ/thử lại. `setup:ai` bổ sung cấu hình còn thiếu, giữ API key hiện có; xem [thời gian chờ và phục hồi](docs/ai-analysis.md#thời-gian-chờ-và-thử-lại-hữu-hạn).
 Admin xem **AI hỗ trợ kiểm duyệt**, mở từng tiêu chí/phép tính hoặc yêu cầu phân tích lại.
 Người bán đang chờ duyệt chỉ thấy tiến độ. Sau phê duyệt/từ chối, xem quyết định/lý do của Admin
 và mở **Kết quả AI tham khảo** bên dưới; gửi duyệt lại sẽ ẩn AI cho tới quyết định mới.
@@ -300,7 +301,7 @@ npm.cmd run smoke:m8
 | `ai:check` | Một lượt Gemini trực tiếp với văn bản mẫu; phân biệt HTTP/model/quota/khóa/mạng; không cần SQL/Redis/API |
 | `ai:example` | Mẫu đầu vào và phép tính 100 / 76,39; không gọi Gemini |
 | `test:ai` | Bộ điểm, JSON Gemini giả, quyền, pipeline, Redis/SQL opt-in |
-| `smoke:ai` | Một lượt Gemini thật, lưu SQL, NULL khi thiếu ảnh và quyền xem riêng |
+| `smoke:ai` | Gemini thật qua worker (retry hữu hạn), lưu SQL, NULL khi thiếu ảnh và quyền xem riêng |
 | `smoke` | Hạ tầng thật, Socket.IO và probe qua Streams |
 | `smoke:auth` | Đăng ký/đăng nhập, CSRF, cookie, quyền và thu hồi phiên |
 | `smoke:m4` | Cloudinary, tạo/duyệt/kích hoạt bài, rollback SQL, retry và điều kiện đăng lại |
@@ -354,6 +355,7 @@ xem [hướng dẫn](docs/after-sales.md). Bản giao dịch mới không thêm 
 | Hai tab vẫn đổi tài khoản cùng nhau | Cập nhật cả Backend/Frontend, khởi động lại API/web và F5 từng tab |
 | Báo thiếu phiên bản dữ liệu | Khởi động API bản mới, F5 và mở lại chi tiết bài; token API phải có 16 ký tự hex |
 | Chưa có kết quả AI | Chạy `setup:ai`, kiểm tra `AI_ENABLED=true` và khóa Gemini, khởi động lại API/worker; xem hàng đợi/lịch sử ở chi tiết |
+| AI_TIMEOUT với nhiều ảnh | Pull bản mới, chạy `setup:ai`, khởi động lại API/worker rồi Admin nhấn **Phân tích lại bằng AI**; tải media tối đa bốn luồng, timeout tăng theo số tệp, tối đa hai lượt; [cấu hình/giới hạn](docs/ai-analysis.md#thời-gian-chờ-và-thử-lại-hữu-hạn) |
 | AI báo thất bại hoặc chưa đầy đủ | Xem mã HTTP/provider và cảnh báo; chạy `npm.cmd run ai:check` để chẩn đoán trực tiếp Gemini; xem [hướng dẫn](docs/ai-analysis.md) |
 | Cập nhật trực tiếp đang kết nối lại | Kiểm tra API/Redis, mạng và origin; giao diện vẫn tự lấy lại trạng thái khi HTTP hoạt động |
 | Tưởng mất dữ liệu sau đổi Docker project | Kiểm tra mount thực tế và biến tên volume; xem hướng dẫn chuyển đổi |

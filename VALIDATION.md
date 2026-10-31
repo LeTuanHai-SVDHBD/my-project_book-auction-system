@@ -2,8 +2,17 @@
 
 # Kết quả kiểm tra
 
-Cập nhật ngày 30/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
+Cập nhật ngày 31/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
+
+## AI_TIMEOUT với bài nhiều media — 31/10/2026
+
+- Thay tải tuần tự bằng tối đa bốn tải media song song theo lô, deadline chuẩn bị riêng 45 giây, giữ thứ tự/mã bằng chứng và ngân sách 12 MiB. Dừng tải lô mới khi hết ngân sách/thời gian; không coi media chưa gửi là đã quan sát. Không đổi model, hash đầu vào, tiêu chí/hai điểm, schema hoặc dependency.
+- Timeout Gemini cơ sở + 4 giây/media thực gửi, trần mặc định 300 giây/lượt; cấu hình 60 giây cũ gửi 32 ảnh có 188 giây/lượt. Body response cũng chịu timeout/hủy. Tối đa hai lượt với lỗi tạm thời, dùng lại payload; lỗi quota/key/quyền/DNS cố định/TLS không retry. Đặt thinking_level=low, giữ output 8192. `ai:check` tiếp tục đúng một lượt gọi văn bản; `smoke:ai` chờ theo deadline worker.
+- Lease AI 60 giây được gia hạn mỗi 15 giây suốt tác vụ; mất lease/worker dừng hủy provider, để pending, không lưu điểm thất bại giả. Cache/receipt/version guard SQL giữ nguyên. Lỗi provider cuối vẫn lưu hai điểm NULL và metadata thời gian/media an toàn; không lưu raw body/secret.
+- `npm run check`: **142 tệp PASS**; `npm test`: **150 PASS, 12 SKIP**, tổng 162; `npm run build`: PASS (89 modules). Test mới dùng HTTP/stream fixture, gồm **32 ảnh mẫu tổng 8 MiB**, bốn tải đồng thời, đúng ID/thứ tự, giữ nguyên payload khi 503 rồi thành công, không tải tiếp sau hết ngân sách, ngắt tải chậm, response body bị treo/quá lớn được hủy, timeout cuối, quota/key/mạng, gia hạn/mất lease và NULL. Sau khi mở rộng kiểm tra setup bảo toàn key/timeout cũ và bổ sung biến mới, chạy lại test setup PASS; `git diff --check` PASS.
+- Chromium production build, HTTP/session/CSRF/router/service AI thật, model/queue/provider fixture: Admin thấy 4/32 media → chờ lượt 1/2 với 188 giây → thử lượt 2/2; kết quả cũ có nhãn rõ. Khi done, nút phân tích lại bật; POST CSRF thật trả 202 và enqueue một lần. Chủ bài pending không có panel hoặc request AI. Xem ảnh desktop/mobile; **1440/768/390/320px** không tràn ngang hoặc lỗi JavaScript trong lượt đạt.
+- **Chưa gọi Gemini thật, tải bộ ảnh Cloudinary thật hoặc chạy SQL Server/Redis thật cho bản sửa này**; 12 test dịch vụ thật vẫn SKIP. Fixture 32 ảnh không xác nhận chất lượng thẩm định sách thật. Không cam kết loại bỏ mọi outage/quota/mạng Google. Máy nhóm cần pull, `npm.cmd run setup:ai`, khởi động lại API/worker, rồi Admin chọn **Phân tích lại bằng AI** ở bài đang chờ: lỗi SQL đã lưu thuộc lượt cũ và không tự đổi thành kết quả mới. Hướng dẫn đầy đủ: [Phân tích AI](docs/ai-analysis.md).
 
 ## Ô ISBN không ép 10 hoặc 13 ký tự — 31/10/2026
 

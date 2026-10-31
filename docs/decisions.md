@@ -278,3 +278,17 @@ Người bán xuất PDF của lần đã được Admin phê duyệt/từ chố
 ## Ô ISBN nhận chuỗi do người bán cung cấp
 
 Theo yêu cầu ngày 31/10/2026, bỏ ràng buộc chính xác 10/13 ký tự ở frontend, Backend và SQL. Dùng chung ISBN_MAX_LENGTH=100; giữ nội dung và dấu phân cách, không ép uppercase hoặc chuyển Number. Migration 006 mở rộng cột hiện có thành NVARCHAR(100), bỏ check định dạng cũ, giữ check không rỗng và chỉ mục. Không tự xác nhận mã người đăng nhập là ISBN chuẩn; Admin tiếp tục đối chiếu. Không sửa dữ liệu hay hash nguồn của phân tích AI cũ.
+
+
+## AI nhiều media: chuẩn bị riêng, timeout thích ứng và lease được gia hạn
+
+Theo lỗi lặp lại ngày 31/10/2026, thay bước tải tuần tự bằng tối đa bốn tải song song theo lô,
+giữ thứ tự/mã bằng chứng và ngân sách 12 MiB. Bước chuẩn bị có deadline riêng; tệp bỏ qua vẫn nằm trong manifest.
+Thời gian từng lượt Gemini = cơ sở + 4 giây/media thực gửi, có trần 300 giây mặc định; tối đa hai lượt
+chỉ với lỗi tạm thời, dùng lại payload. Đọc body cũng nằm trong deadline. Dùng thinking_level=low,
+giữ output 8192 để tránh cắt JSON; Admin vẫn quyết định và hai điểm giữ NULL khi không đủ dữ liệu.
+
+Lease AI 60 giây được gia hạn mỗi 15 giây suốt tác vụ; mất lease/worker dừng thì hủy và để pending,
+không lưu kết quả giả. Replay SQL dùng cache/receipt cũ. Có thể gọi provider lại sau crash trước cache;
+không cam kết đúng một lượt hay hết mọi sự cố Gemini/mạng. Admin thấy tiến độ và thống kê an toàn;
+kết quả cũ được đánh dấu khi phân tích lại. Không đổi schema/dependency/hash nguồn, nhà cung cấp hoặc cấu hình riêng.

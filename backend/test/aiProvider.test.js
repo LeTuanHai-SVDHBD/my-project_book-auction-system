@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {createGemini} from '../src/ai/gemini.js';
 import {parseAiConfig} from '../src/config/ai.js';
 import {conditionPreview} from '../../shared/bookCondition.js';
-const config=parseAiConfig({AI_ENABLED:'true',GEMINI_API_KEY:'fixture-only-key-123',CLOUDINARY_CLOUD_NAME:'demo'});
+const config=parseAiConfig({AI_ENABLED:'true',GEMINI_API_KEY:'fixture-only-key-123',CLOUDINARY_CLOUD_NAME:'demo',AI_PROVIDER_MAX_ATTEMPTS:'1'});
 const png=Buffer.from('89504e470d0a1a0a','hex');
 test('REST structured output, store=false, media bytes có nhãn và dữ liệu gửi không chứa giá/tài khoản',async()=>{
   let body;

@@ -8,7 +8,8 @@ const messages={
   AI_REQUEST_REJECTED:'Gemini từ chối đầu vào/cấu hình yêu cầu. Đối chiếu mã provider, tham số API và điều kiện project.',
   AI_QUOTA_EXCEEDED:'Gemini đã chạm giới hạn lượt/token hoặc quota. Kiểm tra hạn mức project trước khi thử lại.',
   AI_PROVIDER_UNAVAILABLE:'Dịch vụ Gemini tạm không khả dụng. Thử lại sau khi kiểm tra trạng thái dịch vụ.',
-  AI_TIMEOUT:'Yêu cầu Gemini hết thời gian chờ. Kiểm tra kết nối hoặc AI_PROVIDER_TIMEOUT_MS.',
+  AI_TIMEOUT:'Gemini chưa trả xong trong thời gian chờ sau các lượt thử của tác vụ. Xem số media/lượt gọi bên dưới; Admin có thể thử lại sau hoặc kiểm duyệt thủ công.',
+  AI_JOB_TIMEOUT:'Tác vụ AI đã hết tổng thời gian xử lý. Chưa có kết quả hoàn tất; Admin có thể thử lại sau khi kiểm tra kết nối và dữ liệu media.',
   AI_NETWORK_ERROR:'Không kết nối được Gemini. Kiểm tra mạng, DNS, proxy và chứng chỉ TLS của máy chạy worker.',
   AI_INVALID_RESPONSE:'Gemini trả dữ liệu không đúng JSON/hợp đồng. Chưa thể dùng để tính điểm.',
   AI_RESPONSE_TOO_LARGE:'Phản hồi Gemini vượt giới hạn đọc của ứng dụng.',
@@ -16,8 +17,8 @@ const messages={
   AI_PROVIDER_ERROR:'Chưa phân tích được bằng Gemini. Cần xem mã HTTP/provider để xác định nguyên nhân.'
 };
 const providerCodes=new Set(['INVALID_REQUEST','FAILED_PRECONDITION','PARAMETER_UNKNOWN','AUTHENTICATION','PAYMENT_REQUIRED','PERMISSION_DENIED','NOT_FOUND','MODEL_NOT_FOUND','RATE_LIMIT_EXCEEDED','QUOTA_EXCEEDED','TOO_MANY_REQUESTS','API_ERROR','UNIMPLEMENTED','SERVICE_UNAVAILABLE','DEADLINE_EXCEEDED','INVALID_ARGUMENT','UNAUTHENTICATED','RESOURCE_EXHAUSTED','INTERNAL','UNAVAILABLE','API_KEY_INVALID','API_KEY_EXPIRED','API_KEY_SERVICE_BLOCKED','API_KEY_HTTP_REFERRER_BLOCKED','API_KEY_IP_ADDRESS_BLOCKED','SERVICE_DISABLED','BILLING_DISABLED']);
-const transports=new Set(['ENOTFOUND','EAI_AGAIN','ECONNRESET','ETIMEDOUT','ECONNREFUSED','UNABLE_TO_VERIFY_LEAF_SIGNATURE','SELF_SIGNED_CERT_IN_CHAIN','CERT_HAS_EXPIRED','DEPTH_ZERO_SELF_SIGNED_CERT','UND_ERR_CONNECT_TIMEOUT','UND_ERR_HEADERS_TIMEOUT']);
-const fields=new Set(['model','input','response_format','response_format.type','response_format.mime_type','response_format.schema','generation_config','generation_config.max_output_tokens','system_instruction','store','background','stream','tools']);
+const transports=new Set(['ENOTFOUND','EAI_AGAIN','ECONNRESET','ETIMEDOUT','ECONNREFUSED','UNABLE_TO_VERIFY_LEAF_SIGNATURE','SELF_SIGNED_CERT_IN_CHAIN','CERT_HAS_EXPIRED','DEPTH_ZERO_SELF_SIGNED_CERT','UND_ERR_CONNECT_TIMEOUT','UND_ERR_HEADERS_TIMEOUT','UND_ERR_SOCKET']);
+const fields=new Set(['model','input','response_format','response_format.type','response_format.mime_type','response_format.schema','generation_config','generation_config.max_output_tokens','generation_config.thinking_level','system_instruction','store','background','stream','tools']);
 export const aiFailureMessage=code=>messages[code]||messages.AI_PROVIDER_ERROR;
 export function safeAiDiagnostics(value={}){
   if(!value||typeof value!=='object')return {};
@@ -26,6 +27,10 @@ export function safeAiDiagnostics(value={}){
   if(transports.has(value.transport_code))result.transport_code=value.transport_code;
   if(fields.has(value.field))result.field=value.field;
   return result;
+}
+export function safeAiExecution(value={}) {
+  return Object.fromEntries(['attempts','media_total','media_sent','media_ms','provider_ms','provider_timeout_ms','total_ms']
+    .filter(key=>Number.isSafeInteger(value?.[key])&&value[key]>=0&&value[key]<=86400000).map(key=>[key,value[key]]));
 }
 export function geminiFailure(code,details={}){const error=new HttpError(502,code,aiFailureMessage(code));error.aiDiagnostics=safeAiDiagnostics(details);return error;}
 export function geminiHttpFailure(status,body){

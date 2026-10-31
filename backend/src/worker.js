@@ -35,7 +35,7 @@ const processAuction=createAuctionProcessor({model:auctionModel,locks:createAuct
 const controller = new AbortController();
 const aiReader=makeRedisClient('redis-ai-reader'),aiConfig=parseAiConfig(process.env),aiModel=createAiModel({getPool,sql}),posts=createPostModel({getPool,sql}),aiQueue=createAiQueue({getRedis:()=>redis});
 const aiService=createAiService({posts,model:aiModel,queue:aiQueue,config:aiConfig});
-const processAi=createAiProcessor({posts,model:aiModel,queue:aiQueue,provider:createGemini({config:aiConfig}),locks:createAuctionLock({getRedis:()=>redis,keyPrefix:'bookauction:ai:lock:',leaseMs:180000}),config:aiConfig,signal:controller.signal});
+const processAi=createAiProcessor({posts,model:aiModel,queue:aiQueue,provider:createGemini({config:aiConfig}),locks:createAuctionLock({getRedis:()=>redis,keyPrefix:'bookauction:ai:lock:',leaseMs:60000}),config:aiConfig,signal:controller.signal});
 let heartbeatTimer; let heartbeatTask; let loops=[]; let stopping = false;
 async function pulse() {
   try {

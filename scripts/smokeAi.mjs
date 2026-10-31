@@ -19,7 +19,7 @@ try{
   stage='đăng bài và nhận job AI tự động';
   const created=await seller.call('/posts','POST',{ma_yeu_cau:randomUUID(),sach:{ten_sach:`AI SMOKE ${runId}`,tinh_trang_sach:'Fixture không có ảnh, không được suy ra tình trạng tốt.'},bai_dang:{tieu_de:`AI SMOKE ${runId}`,mo_ta_tinh_trang:'Không có dữ liệu hình ảnh. Chỉ kiểm thử kết nối và NULL.'},phien:{gia_khoi_diem:'100000',gia_toi_thieu:'200000',buoc_gia:'1000',thoi_gian_cho_dat_lai:20},media:[]});postId=created.id;cleanupSafe=false;
   stage='chờ Gemini/worker lưu SQL';console.log('Đang kiểm tra Gemini thật; dữ liệu mẫu thiếu ảnh nên điểm phải giữ NULL.');
-  let data;const deadline=Date.now()+180000;
+  let data;const deadline=Date.now()+parseAiConfig(process.env).jobTimeout+180000;
   while(Date.now()<deadline){data=await admin.call(`/ai/${postId}`);if(data.analysis&&(!data.job||data.job.state==='done')){cleanupSafe=true;break;}await delay(1000);}
   assert(data?.analysis,'Hết thời gian chờ kết quả AI.');assert.notEqual(data.analysis.trang_thai,'that_bai',`Gemini chưa hoàn tất: ${formatAiFailure(data.analysis.thong_tin)}`);
   assert.equal(data.analysis.diem_do_hiem,null);assert.equal(data.analysis.diem_tinh_trang,null);assert.equal(data.analysis.chi_tiet.length,9);

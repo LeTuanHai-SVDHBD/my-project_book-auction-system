@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiRequest, apiPost } from "../services/authApi.js";
 import { currentReview } from "../../../shared/aiVisibility.js";
+import { aiProgressMessage } from "../utils/aiProgress.js";
 const states = {
   thanh_cong: "Đã phân tích",
   chua_day_du: "Chưa đầy đủ",
@@ -115,9 +116,9 @@ export default function AiPanel({ post, user }) {
       )}
       {admin && pending && (
         <p className="notice" role="status">
-          {data.job.state === "running"
-            ? "Đang phân tích sách…"
-            : "Đang chờ AI xử lý…"}
+          {aiProgressMessage(data.job)}
+          {analysis &&
+            " Kết quả bên dưới thuộc lần phân tích trước; yêu cầu mới chưa hoàn tất."}
         </p>
       )}
       {admin && post.trang_thai_phien === "cho_kiem_duyet" && (
@@ -194,6 +195,21 @@ export default function AiPanel({ post, user }) {
               <p className="field-hint">
                 Mô hình: {analysis.thong_tin.model} · Bộ quy tắc:{" "}
                 {analysis.thong_tin.rule_version}
+              </p>
+            )}
+            {admin && analysis.thong_tin?.execution && (
+              <p className="field-hint">
+                Đã gửi {analysis.thong_tin.execution.media_sent ?? 0}/
+                {analysis.thong_tin.execution.media_total ?? 0} media · Gọi
+                Gemini {analysis.thong_tin.execution.attempts ?? 0} lượt · Chuẩn
+                bị media{" "}
+                {Math.ceil((analysis.thong_tin.execution.media_ms ?? 0) / 1000)}{" "}
+                giây · Giới hạn mỗi lượt{" "}
+                {Math.ceil(
+                  (analysis.thong_tin.execution.provider_timeout_ms ?? 0) /
+                    1000,
+                )}{" "}
+                giây.
               </p>
             )}
             {admin && analysis.thong_tin?.error_code && (

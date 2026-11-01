@@ -72,7 +72,7 @@ npm.cmd run admin:create
 ```
 
 `setup` tạo `.env` và cấu hình Frontend khi chưa có; các script setup giữ nguyên giá trị đã tồn tại.
-`db:init` tạo schema nền rồi áp dụng các migration media, quyết định đấu giá, thông báo, bản kết quả kiểm duyệt và mở rộng ô ISBN. Schema hiện tại có **21 bảng, 162 cột**.
+`db:init` tạo schema nền rồi áp dụng các migration media, quyết định đấu giá, thông báo, bản kết quả kiểm duyệt, mở rộng ô ISBN và hồ sơ gửi duyệt lại. Schema hiện tại có **21 bảng, 165 cột**.
 Người bán xuất kết quả sau phê duyệt/từ chối tại **Bài của tôi → Kết quả kiểm duyệt**; xem [cách lưu PDF và nâng cấp bản kết quả](docs/review-exports.md).
 
 `admin:create` yêu cầu tên, email và mật khẩu kín trong terminal. Admin đã tồn tại được giữ nguyên mật khẩu;
@@ -135,7 +135,7 @@ Dùng `127.0.0.1` nhất quán cho Frontend và API để cookie hoạt động 
 | Ảnh | JPEG, PNG, WebP | Không giới hạn số ảnh/bài; 10 MB/tệp |
 | Video | MP4, WebM | 3 tệp/bài; 50 MB/tệp |
 
-Điều chỉnh bằng `MEDIA_MAX_VIDEOS`, `MEDIA_IMAGE_MAX_MB`, `MEDIA_VIDEO_MAX_MB`. `MEDIA_MAX_IMAGES` cũ không còn được áp dụng; không cần sửa `.env` riêng. Ảnh vừa tải lên có nút × để bỏ trước khi gửi bài, chỉ gửi các vé còn giữ. Giới hạn video tính cả video giữ lại khi bổ sung/đăng lại.
+Điều chỉnh bằng `MEDIA_MAX_VIDEOS`, `MEDIA_IMAGE_MAX_MB`, `MEDIA_VIDEO_MAX_MB`. `MEDIA_MAX_IMAGES` cũ không còn được áp dụng; không cần sửa `.env` riêng. Ảnh vừa tải lên có nút × để bỏ trước khi gửi bài, chỉ gửi các vé còn giữ. Khi gửi duyệt lại, media cũ cũng có nút × để dự kiến gỡ khỏi hồ sơ mới, có thể giữ lại hoặc Hủy; chỉ lưu khi gửi thành công. Giới hạn video tính cả video giữ lại khi bổ sung/đăng lại.
 
 ISBN là tùy chọn: chọn **Có ISBN** để nhập mã theo sách (tối đa 100 ký tự, giữ dấu gạch nối/khoảng trắng, không ép 10/13), hoặc **Không có ISBN** để lưu NULL. Trang chủ dùng đúng bốn nhóm từ `shared/bookGenres.js`; chọn nhóm sẽ lọc các thể loại con, không tìm nhóm bằng từ khóa tự đặt.
 API kiểm tra MIME, magic bytes và kích thước; tối đa hai upload đang xử lý mỗi tiến trình và 60 lần thử/tài khoản/giờ.
@@ -212,7 +212,7 @@ cấp CSRF 60 lần/IP/phút. Bộ đếm tính cả lần thành công. Khi b�
 4. Gửi kiểm duyệt: bài và phiên cùng chờ duyệt, chưa có lịch.
 5. Admin mở **Kiểm duyệt**: danh sách gồm bài chờ duyệt và đã từ chối, ưu tiên chờ duyệt; có bộ lọc Tất cả/Chờ kiểm duyệt/Đã từ chối. Bài từ chối giữ lý do/ngày xử lý và xem lại lịch sử; bài phê duyệt rời danh sách này. Xem thông tin/media và nguồn đối chiếu. Ghi lý do;
    phê duyệt yêu cầu xác nhận đã kiểm tra bằng chứng quý hiếm. Có thể từ chối và chỉ rõ phần cần bổ sung.
-6. Chủ sách bổ sung bài bị từ chối rồi gửi lại; giữ ID bài/phiên, media đã lưu và lịch sử kiểm duyệt.
+6. Chủ sách bổ sung bài bị từ chối rồi gửi lại; giữ ID bài/phiên và lịch sử kiểm duyệt; sửa thông tin sách theo hồ sơ riêng của bài, gỡ/thay media khỏi lần gửi mới mà không xóa file lịch sử.
 7. Sau khi được duyệt, chủ sách đặt giờ bắt đầu trong tương lai và giờ kết thúc sau đó, rồi kích hoạt đúng phiên hiện có.
 8. Phiên đã kích hoạt xuất hiện trong **Danh mục**. API công khai không trả `gia_toi_thieu`.
 
@@ -348,7 +348,7 @@ xem [hướng dẫn](docs/after-sales.md). Bản giao dịch mới không thêm 
 | Hiện tượng | Kiểm tra |
 |---|---|
 | smoke:m5/m6/m8 dừng tại readiness | Giữ dev:all ở terminal khác; xem từng thành phần tại /api/health/ready và docker compose ps; [hướng dẫn chẩn đoán](docs/after-sales.md#dừng-tại-readiness) |
-| SQL readiness chưa đạt 21 bảng/162 cột | Kiểm tra đúng database, kết nối và chạy `npm.cmd run db:migrate` |
+| SQL readiness chưa đạt 21 bảng/165 cột | Kiểm tra đúng database, kết nối và chạy `npm.cmd run db:migrate` |
 | Không upload được | Kiểm tra ba biến Cloudinary, giới hạn tệp và khởi động lại API |
 | Lỗi CSRF hoặc phiên hết hạn | Frontend tự lấy token mới và thử lại đúng một lần khi Backend trả INVALID_CSRF; phiên đăng nhập đã hết hạn/thu hồi vẫn phải đăng nhập lại. Không tắt bảo vệ cookie/CSRF. |
 | HTTP 409 khi duyệt/kích hoạt | Tải lại chi tiết trước khi thao tác; không dùng `row_version` cũ |
@@ -378,3 +378,13 @@ và kiểm tra lại cookie Secure. Không commit thông tin kết nối hoặc 
 - [Bằng chứng kiểm thử](VALIDATION.md)
 - [Chuyển Docker project và bảo toàn dữ liệu](docs/docker-migration.md)
 - [Quản lý báo cáo, slide và sơ đồ](academic/README.md)
+
+
+### Nâng cấp bổ sung và gửi duyệt lại (migration 007)
+
+Dừng dev:all, pull feat/Hai, chạy `npm.cmd run db:migrate`, rồi `npm.cmd run dev:all` và Ctrl+F5.
+Không thêm bảng/dependency; thêm `BaiDang.ho_so_sach` (JSON nullable) và cờ `dang_su_dung` ở HinhAnh/Video.
+Schema 21 bảng/165 cột, 99 check. Migration giữ dữ liệu cũ và chạy lại được.
+Người bán sửa tên/tác giả/thể loại/NXB/năm/ISBN/giới thiệu khi bài bị từ chối; chỉ lưu hồ sơ của bài,
+không đổi Sach gốc dùng chung hoặc phiên cũ. Media gỡ vẫn giữ trong SQL/Cloudinary và bản kết quả cũ;
+chỉ media giữ lại/mới được dùng cho gallery, bìa và AI lần tiếp theo. Xem [luồng gửi lại](docs/flows.md).

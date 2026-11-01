@@ -12,7 +12,7 @@ npm.cmd run db:migrate
 npm.cmd run dev:all
 ```
 
-Mở `http://localhost:5173`. Không cần pnpm, không đổi `.env` và không tạo lại database. Migration 004 thêm `ThongBao`/index; migration 005 thêm `KiemDuyet.ket_qua_snapshot` để lưu bản kết quả theo từng quyết định. Chạy lại được; schema mới 21 bảng/162 cột. Các bản cũ 20/152 và 21/161 được init nhận diện để nâng cấp giữ dữ liệu.
+Mở `http://localhost:5173`. Không cần pnpm, không đổi `.env` và không tạo lại database. Migration 004 thêm `ThongBao`/index; migration 005 thêm `KiemDuyet.ket_qua_snapshot` để lưu bản kết quả theo từng quyết định. Chạy lại được; schema mới 21 bảng/165 cột sau migration 007. Các bản cũ 20/152, 21/161 và 21/162 được init nhận diện để nâng cấp giữ dữ liệu.
 
 ## Phiên biểu mẫu và giao diện khách
 
@@ -81,7 +81,7 @@ Chọn **Có ISBN** sẽ hiện ô **Mã ISBN**, bắt buộc khi đã chọn, t
 
 Biểu mẫu chỉ có một ô **Tình trạng, yếu tố quý hiếm và bằng chứng**, bắt buộc và tối đa 12.000 ký tự, lưu đầy đủ vào `BaiDang.mo_ta_tinh_trang`. Không còn ô nhập `tinh_trang_sach` riêng; **Giới thiệu sách** dành cho nội dung tác phẩm.
 
-API tạo sách chấp nhận bỏ `sach.tinh_trang_sach`. Để tương thích cột SQL `Sach.tinh_trang_sach NVARCHAR(1000) NOT NULL`, Backend tự lấy phần đầu tối đa 1.000 ký tự làm bản xem trước, không cắt toàn văn của bài. Client cũ vẫn có thể gửi trường riêng với giới hạn cũ. Không migration, không sửa dữ liệu sách đã lưu hoặc lịch sử khi gửi duyệt lại/đăng lại. Chi tiết bài và prompt Gemini dùng cùng hàm gộp: bỏ phần xem trước đã có trong mô tả, giữ tình trạng cũ khác biệt dưới nhãn **Tình trạng đã lưu trước đây**. Không biến thông tin thiếu thành một đánh giá tình trạng tự động.
+API tạo sách chấp nhận bỏ `sach.tinh_trang_sach`. Để tương thích cột SQL `Sach.tinh_trang_sach NVARCHAR(1000) NOT NULL`, Backend tự lấy phần đầu tối đa 1.000 ký tự làm bản xem trước, không cắt toàn văn của bài. Client cũ vẫn có thể gửi trường riêng với giới hạn cũ. Bản preview ban đầu không đổi Sach; từ migration 007, gửi duyệt lại lưu bản sửa ở ho_so_sach của riêng bài, giữ Sach/lịch sử phiên trước. Chi tiết bài và prompt Gemini dùng cùng hàm gộp: bỏ phần xem trước đã có trong mô tả, giữ tình trạng cũ khác biệt dưới nhãn **Tình trạng đã lưu trước đây**. Không biến thông tin thiếu thành một đánh giá tình trạng tự động.
 
 Nút Tìm kiếm có chiều rộng gọn trên desktop, dành chỗ cho ô nhập; màn hình nhỏ xếp nút ở hàng riêng. Chuông chỉ có một huy hiệu chưa đọc, không chồng chấm đỏ; khách không có chuông. Hộp thông báo mở thành bảng bên phải, có vùng cuộn riêng, bộ lọc Tất cả/Chưa đọc, tải thêm, trạng thái rỗng/lỗi và thời gian; không thay quyền hay cách ghi nhận thông báo.
 
@@ -135,3 +135,15 @@ Sau phê duyệt/từ chối, phần kết quả có nút **Xuất kết quả k
 Dừng dev:all, pull feat/Hai rồi chạy `npm.cmd run db:migrate` trước khi khởi động lại. Migration 006 đổi `Sach.isbn` từ VARCHAR(13) sang NVARCHAR(100), bỏ check ép định dạng 10/13, giữ check không rỗng và chỉ mục IX_Sach_isbn. Không thêm bảng/cột; schema vẫn 21 bảng/162 cột, còn 98 check. Dữ liệu cũ không được cắt, đổi mã hoặc chuẩn hóa lại. Chạy lại migration được; nếu phát hiện dữ liệu vượt sức chứa thì dừng và rollback.
 
 ISBN chuẩn gồm 10 ký tự ở bản cũ hoặc 13 chữ số ở bản mới; dấu phân cách làm chuỗi hiển thị dài hơn. Theo yêu cầu của người dùng, đây là trường nhập theo thông tin trên sách, có thể nhận mã ngoài định dạng đó; lưu được không đồng nghĩa đã xác minh ISBN hợp lệ. Nguồn: [International ISBN Agency](https://www.isbn-international.org/index.php/content/what-isbn/10). Chọn Không có ISBN tiếp tục lưu NULL; không sửa ISBN của sách đã lưu khi gửi duyệt lại/đăng lại.
+
+
+## Bổ sung và gửi duyệt lại sau từ chối
+
+Bốn bước điền sẵn dữ liệu đang dùng. Bước Thông tin sách cho sửa toàn bộ trường sách, tiêu đề và tình trạng/bằng chứng.
+Thể loại giữ lựa chọn cũ; ISBN có thể sửa hoặc chọn Không có ISBN để lưu NULL. Bước Kiểm tra hiển thị dữ liệu đã sửa,
+số media giữ/gỡ/mới; không lấy ISBN cũ thay cho lựa chọn NULL mới. Chỉ chủ bài bị từ chối gửi lại được.
+
+Media đã lưu có nút × đánh dấu gỡ khỏi hồ sơ mới, danh sách Giữ lại và chú thích chưa áp dụng tới khi gửi thành công.
+Đóng biểu mẫu không gửi chỉnh sửa, chỉ dọn vé upload mới. Video cũ bị gỡ giải phóng chỗ trong giới hạn video;
+không cho Giữ lại nếu cộng video mới vượt giới hạn. Sau khi gửi, bài về chờ và AI tự phân tích lại nếu đã bật.
+Cập nhật API/frontend và migration 007 cùng nhau, không cần thay .env hoặc xóa database/Cloudinary.

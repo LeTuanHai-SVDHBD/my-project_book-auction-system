@@ -1,5 +1,6 @@
 /** SQL bài đăng/phiên: khóa cặp trạng thái và sách vật lý, tiền được truyền/đọc bằng chuỗi. */
-import {BOOK_GENRE_GROUPS} from '../../../shared/bookGenres.js';
+import {bookProfile,bookProfileSql} from './bookProfile.js';
+import {BOOK_GENRES,BOOK_GENRE_GROUPS} from '../../../shared/bookGenres.js';
 import {ISBN_MAX_LENGTH} from '../../../shared/bookIdentifiers.js';
 import {searchPattern,catalogOrders} from '../services/catalogSearch.js';
 import { HttpError } from '../middlewares/errorHandler.js';
@@ -12,11 +13,11 @@ import {assertVersion,assertStatePair,assertRelistable,assertVideoLimit} from '.
 const conflict = message => { throw new HttpError(409,'POST_CONFLICT',message); };
 const notFound = () => { throw new HttpError(404,'POST_NOT_FOUND','Không tìm thấy bài đăng.'); };
 const projection = `b.bai_dang_id,b.sach_id,b.nguoi_dung_id,b.ma_san_pham,b.tieu_de,b.mo_ta_tinh_trang,b.trang_thai AS trang_thai_bai,b.ngay_dang,
- s.ten_sach,s.tac_gia,s.the_loai,s.nha_xuat_ban,s.nam_xuat_ban,s.isbn,s.tinh_trang_sach,s.mo_ta,
+ bs.ten_sach,bs.tac_gia,bs.the_loai,bs.nha_xuat_ban,bs.nam_xuat_ban,bs.isbn,bs.tinh_trang_sach,bs.mo_ta,
  p.phien_dau_gia_id,p.trang_thai AS trang_thai_phien,p.thoi_gian_bat_dau,p.thoi_gian_ket_thuc,
  CONVERT(VARCHAR(18),p.gia_khoi_diem) AS gia_khoi_diem,CONVERT(VARCHAR(18),p.gia_hien_tai) AS gia_hien_tai,
  CONVERT(VARCHAR(18),p.buoc_gia) AS buoc_gia,p.thoi_gian_cho_dat_lai,CONVERT(BINARY(8),p.row_version) AS row_version`;
-const joins = 'FROM dbo.BaiDang b JOIN dbo.Sach s ON s.sach_id=b.sach_id JOIN dbo.PhienDauGia p ON p.bai_dang_id=b.bai_dang_id';
+const joins = `FROM dbo.BaiDang b JOIN dbo.Sach s ON s.sach_id=b.sach_id JOIN dbo.PhienDauGia p ON p.bai_dang_id=b.bai_dang_id ${bookProfileSql}`;
 export function createPostModel({ getPool, sql }) {
   const request = target => target.request ? target.request() : new sql.Request(target);
   async function transaction(work) {
@@ -48,19 +49,18 @@ export function createPostModel({ getPool, sql }) {
       .query('INSERT dbo.LichSuDauGia(phien_dau_gia_id,nguoi_dung_id,hanh_dong) VALUES(@auction,@owner,@action)');
   }
   async function media(target,postId) {
-    const images=await request(target).input('id',sql.Int,postId).query("SELECT 'image' AS kind,duong_dan_img AS url,tieu_de_img AS title,cloudinary_public_id AS publicId FROM dbo.HinhAnh WHERE bai_dang_id=@id ORDER BY thu_tu_img");
-    const videos=await request(target).input('id',sql.Int,postId).query("SELECT 'video' AS kind,duong_dan_video AS url,tieu_de_video AS title,cloudinary_public_id AS publicId FROM dbo.Video WHERE bai_dang_id=@id ORDER BY thu_tu_video");
+    const images=await request(target).input('id',sql.Int,postId).query("SELECT hinh_anh_id AS id,'image' AS kind,duong_dan_img AS url,tieu_de_img AS title,cloudinary_public_id AS publicId FROM dbo.HinhAnh WHERE bai_dang_id=@id AND dang_su_dung=1 ORDER BY thu_tu_img");
+    const videos=await request(target).input('id',sql.Int,postId).query("SELECT video_id AS id,'video' AS kind,duong_dan_video AS url,tieu_de_video AS title,cloudinary_public_id AS publicId FROM dbo.Video WHERE bai_dang_id=@id AND dang_su_dung=1 ORDER BY thu_tu_video");
     return [...images.recordset,...videos.recordset];
   }
   async function insertMedia(tx,postId,items,limits,existing=[]) {
     const all=[...existing,...items];
     assertVideoLimit(all,limits.maxVideos);
-    const count={image:existing.filter(x=>x.kind==='image').length,video:existing.filter(x=>x.kind==='video').length};
     for (const item of items) {
       const image=item.kind==='image'; const table=image?'HinhAnh':'Video'; const suffix=image?'img':'video';
       await request(tx).input('id',sql.Int,postId).input('url',sql.VarChar(2048),item.url).input('title',sql.NVarChar(500),item.title||null)
-        .input('publicId',sql.VarChar(255),item.publicId||null).input('order',sql.SmallInt,++count[item.kind])
-        .query(`INSERT dbo.${table}(bai_dang_id,duong_dan_${suffix},tieu_de_${suffix},thu_tu_${suffix},cloudinary_public_id) VALUES(@id,@url,@title,@order,@publicId)`);
+        .input('publicId',sql.VarChar(255),item.publicId||null)
+        .query(`INSERT dbo.${table}(bai_dang_id,duong_dan_${suffix},tieu_de_${suffix},thu_tu_${suffix},cloudinary_public_id) SELECT @id,@url,@title,COALESCE(MAX(thu_tu_${suffix}),0)+1,@publicId FROM dbo.${table} WHERE bai_dang_id=@id`);
     }
   }
   function prices(req,input) {
@@ -98,13 +98,13 @@ export function createPostModel({ getPool, sql }) {
       const groupItems=BOOK_GENRE_GROUPS.find(item=>item.name===group)?.items||[];
       const req=request(await getPool());
       groupItems.forEach((item,index)=>req.input('group'+index,sql.NVarChar(100),item));
-      const groupClause=!group?'1=1':groupItems.length?`s.the_loai IN (${groupItems.map((_,index)=>'@group'+index).join(',')})`:'1=0';
+      const groupClause=!group?'1=1':groupItems.length?`bs.the_loai IN (${groupItems.map((_,index)=>'@group'+index).join(',')})`:'1=0';
       const result=await req.input('q',sql.NVarChar(250),searchPattern(q)).input('genre',sql.NVarChar(100),genre)
         .input('phase',sql.VarChar(10),phase).input('skip',sql.Int,(page-1)*30).query(`
-          SELECT ${projection},(SELECT TOP(1) duong_dan_img FROM dbo.HinhAnh WHERE bai_dang_id=b.bai_dang_id ORDER BY thu_tu_img) AS anh_bia
+          SELECT ${projection},(SELECT TOP(1) duong_dan_img FROM dbo.HinhAnh WHERE bai_dang_id=b.bai_dang_id AND dang_su_dung=1 ORDER BY thu_tu_img) AS anh_bia
           ${joins} WHERE b.trang_thai='da_duyet' AND p.trang_thai IN ('da_kich_hoat','da_ket_thuc')
-          AND (${['s.ten_sach','b.tieu_de','s.tac_gia','s.isbn','s.the_loai'].map(c=>`${folded(c)} LIKE @q COLLATE Vietnamese_100_CI_AI ESCAPE N'~'`).join(' OR ')})
-          AND (@genre=N'' OR s.the_loai COLLATE Vietnamese_100_CI_AI=@genre COLLATE Vietnamese_100_CI_AI)
+          AND (${['bs.ten_sach','b.tieu_de','bs.tac_gia','bs.isbn','bs.the_loai'].map(c=>`${folded(c)} LIKE @q COLLATE Vietnamese_100_CI_AI ESCAPE N'~'`).join(' OR ')})
+          AND (@genre=N'' OR bs.the_loai COLLATE Vietnamese_100_CI_AI=@genre COLLATE Vietnamese_100_CI_AI)
           AND (${groupClause})
           AND (@phase='all' OR @phase='ended' AND p.trang_thai='da_ket_thuc'
             OR @phase='live' AND p.trang_thai='da_kich_hoat' AND p.thoi_gian_bat_dau<=SYSUTCDATETIME() AND p.thoi_gian_ket_thuc>SYSUTCDATETIME()
@@ -117,7 +117,7 @@ export function createPostModel({ getPool, sql }) {
         const rank="CASE WHEN b.trang_thai='cho_kiem_duyet' THEN 0 ELSE 1 END";
         const rows=await request(await getPool()).input('status',sql.VarChar(10),reviewStatus).input('rank',sql.Int,reviewCursorRank).input('after',sql.Int,after)
           .query(`SELECT TOP(30) ${projection},
-            (SELECT TOP(1) duong_dan_img FROM dbo.HinhAnh WHERE bai_dang_id=b.bai_dang_id ORDER BY thu_tu_img) AS anh_bia,
+            (SELECT TOP(1) duong_dan_img FROM dbo.HinhAnh WHERE bai_dang_id=b.bai_dang_id AND dang_su_dung=1 ORDER BY thu_tu_img) AS anh_bia,
             CASE WHEN b.trang_thai='tu_choi' THEN review.phan_hoi_admin END AS ly_do_tu_choi,
             CASE WHEN b.trang_thai='tu_choi' THEN review.ngay_kiem_duyet END AS ngay_tu_choi
             ${joins} OUTER APPLY (SELECT TOP(1) phan_hoi_admin,ngay_kiem_duyet FROM dbo.KiemDuyet
@@ -129,7 +129,7 @@ export function createPostModel({ getPool, sql }) {
         return rows.recordset.map(withRowVersion);
       }
       const result=await request(await getPool()).input('owner',sql.Int,owner).input('pending',sql.Bit,pending).input('public',sql.Bit,publicOnly).input('after',sql.Int,after)
-        .query(`SELECT TOP(30) ${projection},(SELECT TOP(1) duong_dan_img FROM dbo.HinhAnh WHERE bai_dang_id=b.bai_dang_id ORDER BY thu_tu_img) AS anh_bia ${joins} WHERE b.bai_dang_id<@after AND (@owner IS NULL OR b.nguoi_dung_id=@owner)
+        .query(`SELECT TOP(30) ${projection},(SELECT TOP(1) duong_dan_img FROM dbo.HinhAnh WHERE bai_dang_id=b.bai_dang_id AND dang_su_dung=1 ORDER BY thu_tu_img) AS anh_bia ${joins} WHERE b.bai_dang_id<@after AND (@owner IS NULL OR b.nguoi_dung_id=@owner)
           AND (@pending=0 OR (b.trang_thai='cho_kiem_duyet' AND p.trang_thai='cho_kiem_duyet'))
           AND (@public=0 OR (b.trang_thai='da_duyet' AND p.trang_thai IN ('da_kich_hoat','da_ket_thuc'))) ORDER BY b.bai_dang_id DESC`);
       return result.recordset.map(withRowVersion);
@@ -165,7 +165,7 @@ export function createPostModel({ getPool, sql }) {
       }
       return transaction(async tx=>{
         const prior=await findRequest(code,owner,tx,true); if (prior) return {id:prior,replayed:true};
-        let bookId; let reused=[];
+        let bookId; let reused=[],profile;
         if (sourceId) {
           // Sach is the stable lock anchor across every generation of a relisted physical copy.
           bookId=sourceBookId;
@@ -175,15 +175,16 @@ export function createPostModel({ getPool, sql }) {
           const outcome=await request(tx).input('auction',sql.Int,source.phien_dau_gia_id).query('SELECT trang_thai,nguoi_thang_dau_id FROM dbo.KetQuaDauGia WITH (UPDLOCK,HOLDLOCK) WHERE phien_dau_gia_id=@auction');
           assertRelistable({sourceId,latestId:latest.recordset[0].bai_dang_id,state:source.trang_thai_phien,outcome:outcome.recordset[0]});
           if (input.reuseMedia) reused=await media(tx,sourceId);
+          profile=source.ho_so_sach || JSON.stringify(bookProfile((await request(tx).input('id',sql.Int,bookId).query('SELECT * FROM dbo.Sach WHERE sach_id=@id')).recordset[0]));
         } else {
-          const book=input.book; const req=request(tx);
+          const book=input.book; profile=JSON.stringify(bookProfile(book)); const req=request(tx);
           for (const [key,size] of Object.entries({ten_sach:300,tac_gia:200,the_loai:100,nha_xuat_ban:200,tinh_trang_sach:1000,mo_ta:sql.MAX})) req.input(key,sql.NVarChar(size),book[key]);
           req.input('year',sql.SmallInt,book.nam_xuat_ban).input('isbn',sql.NVarChar(ISBN_MAX_LENGTH),book.isbn);
           bookId=(await req.query('INSERT dbo.Sach(ten_sach,tac_gia,the_loai,nha_xuat_ban,nam_xuat_ban,isbn,tinh_trang_sach,mo_ta) OUTPUT INSERTED.sach_id VALUES(@ten_sach,@tac_gia,@the_loai,@nha_xuat_ban,@year,@isbn,@tinh_trang_sach,@mo_ta)')).recordset[0].sach_id;
         }
         const postId=(await request(tx).input('owner',sql.Int,owner).input('book',sql.Int,bookId).input('code',sql.VarChar(40),code)
-          .input('title',sql.NVarChar(300),input.post.tieu_de).input('description',sql.NVarChar(sql.MAX),input.post.mo_ta_tinh_trang)
-          .query('INSERT dbo.BaiDang(nguoi_dung_id,sach_id,ma_san_pham,tieu_de,mo_ta_tinh_trang) OUTPUT INSERTED.bai_dang_id VALUES(@owner,@book,@code,@title,@description)')).recordset[0].bai_dang_id;
+          .input('title',sql.NVarChar(300),input.post.tieu_de).input('description',sql.NVarChar(sql.MAX),input.post.mo_ta_tinh_trang).input('profile',sql.NVarChar(sql.MAX),profile)
+          .query('INSERT dbo.BaiDang(nguoi_dung_id,sach_id,ma_san_pham,tieu_de,mo_ta_tinh_trang,ho_so_sach) OUTPUT INSERTED.bai_dang_id VALUES(@owner,@book,@code,@title,@description,@profile)')).recordset[0].bai_dang_id;
         const auctionId=(await prices(request(tx).input('post',sql.Int,postId),input).query(`INSERT dbo.PhienDauGia(bai_dang_id,gia_khoi_diem,gia_toi_thieu,buoc_gia,thoi_gian_cho_dat_lai)
           OUTPUT INSERTED.phien_dau_gia_id VALUES(@post,CONVERT(DECIMAL(18,0),@gia_khoi_diem),CONVERT(DECIMAL(18,0),@gia_toi_thieu),CONVERT(DECIMAL(18,0),@buoc_gia),@wait)`)).recordset[0].phien_dau_gia_id;
         await insertMedia(tx,postId,[...reused,...items],limits);
@@ -195,8 +196,20 @@ export function createPostModel({ getPool, sql }) {
       return transaction(async tx=>{
         const row=await locked(tx,postId,owner); assertVersion(row,input.rowVersion);
         assertStatePair(row,'tu_choi','khong_dat_kiem_duyet','Chỉ bổ sung bài đã bị từ chối.');
-        await request(tx).input('id',sql.Int,postId).input('title',sql.NVarChar(300),input.post.tieu_de).input('description',sql.NVarChar(sql.MAX),input.post.mo_ta_tinh_trang)
-          .query("UPDATE dbo.BaiDang SET tieu_de=@title,mo_ta_tinh_trang=@description,trang_thai='cho_kiem_duyet' WHERE bai_dang_id=@id");
+        // Capture a legacy current-round decision before changing any book/media inputs.
+        const before=await reviewData(tx,postId),decision=currentReview(before);
+        if(decision)await saveSnapshot(tx,postId,decision.kiem_duyet_id,before);
+        const profile=input.book?bookProfile(input.book):bookProfile(before);
+        if(profile.the_loai&&!BOOK_GENRES.includes(profile.the_loai)&&profile.the_loai!==before.the_loai)conflict('Hãy chọn thể loại trong danh mục.');
+        const existing=await media(tx,postId);
+        for(const item of input.removeMedia||[]){
+          if(!existing.some(source=>source.id===item.id&&source.kind===item.kind))conflict('Media cần gỡ không còn thuộc hồ sơ này. Hãy tải lại bài.');
+          const table=item.kind==='image'?'HinhAnh':'Video',key=item.kind==='image'?'hinh_anh_id':'video_id';
+          await request(tx).input('post',sql.Int,postId).input('media',sql.Int,item.id).query(`UPDATE dbo.${table} SET dang_su_dung=0 WHERE bai_dang_id=@post AND ${key}=@media AND dang_su_dung=1`);
+        }
+
+        await request(tx).input('id',sql.Int,postId).input('title',sql.NVarChar(300),input.post.tieu_de).input('description',sql.NVarChar(sql.MAX),input.post.mo_ta_tinh_trang).input('profile',sql.NVarChar(sql.MAX),JSON.stringify(profile))
+          .query("UPDATE dbo.BaiDang SET tieu_de=@title,mo_ta_tinh_trang=@description,ho_so_sach=@profile,trang_thai='cho_kiem_duyet' WHERE bai_dang_id=@id");
         await prices(request(tx).input('id',sql.Int,row.phien_dau_gia_id),input).query(`UPDATE dbo.PhienDauGia SET gia_khoi_diem=CONVERT(DECIMAL(18,0),@gia_khoi_diem),gia_toi_thieu=CONVERT(DECIMAL(18,0),@gia_toi_thieu),buoc_gia=CONVERT(DECIMAL(18,0),@buoc_gia),thoi_gian_cho_dat_lai=@wait,trang_thai='cho_kiem_duyet' WHERE phien_dau_gia_id=@id`);
         await insertMedia(tx,postId,items,limits,await media(tx,postId));
         await history(tx,row.phien_dau_gia_id,owner,'Bổ sung thông tin/media và gửi kiểm duyệt lại; giữ lịch sử kiểm duyệt');

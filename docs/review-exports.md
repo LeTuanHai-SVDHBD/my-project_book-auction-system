@@ -13,7 +13,7 @@ npm.cmd run dev:all
 
 Migration `005_review_exports.sql` thêm đúng một cột nullable `KiemDuyet.ket_qua_snapshot`
 và ràng buộc JSON; không thêm bảng, dependency hoặc cấu hình. Có thể chạy lại, giữ dữ liệu cũ.
-Schema hiện tại: **21 bảng, 162 cột**. `db:init` nhận diện bản 21/161 để nâng cấp;
+Schema hiện tại sau migration 007: **21 bảng, 165 cột**. `db:init` nhận diện bản 21/161 để nâng cấp;
 readiness chưa đạt nếu chỉ pull mà chưa migration. Không tạo lại database/volume.
 
 ## Cách dùng
@@ -77,3 +77,9 @@ Nếu AI đang bật, các bài thử có thể phát sinh lượt Gemini theo l
 
 Nghiệm thu giao diện: mở cả hai kết quả phê duyệt/từ chối, lưu PDF nhiều trang, bấm một link ảnh/video,
 so hai điểm với màn hình, thử bài không có AI/AI thất bại, bài chờ, lịch sử sau gửi lại và chặn popup.
+
+
+Migration 007 cho phép sửa hồ sơ sách và gỡ media khỏi bài gửi duyệt lại. Trước chỉnh sửa, Backend lưu
+snapshot của quyết định hiện tại nếu còn thiếu; snapshot đã có không bị ghi đè. Media gỡ chỉ đổi cờ dùng cho
+hồ sơ mới, vẫn có hàng SQL và URL Cloudinary cho bản xuất vòng cũ. Vòng cũ hơn đã mất provenance/snapshot
+không được dựng ngược bằng dữ liệu mới. Chức năng xuất vẫn dùng snapshot, không tự gọi lại AI.

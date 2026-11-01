@@ -302,3 +302,13 @@ Từ chối chỉ đọc lại quyết định; chỉ sau khi người bán gử
 Dùng bộ lọc/cursor nhóm + ID phía server để bài chờ không bị chìm sau nhiều bài từ chối khi phân trang.
 Giữ route /posts/pending và quyền Admin; chỉ endpoint này dùng nextBefore dạng nhóm:ID.
 Không thêm bảng/cột/dependency hoặc đổi hợp đồng danh mục/người bán. Xem flows.md để tra bộ lọc/cursor.
+
+
+## Sửa hồ sơ và thay media sau từ chối — 01/11/2026
+
+Theo chốt của người dùng, gửi duyệt lại cho sửa đủ thông tin sách và gỡ media cũ khỏi hồ sơ mới.
+Không UPDATE Sach dùng chung: mỗi BaiDang lưu ho_so_sach; dữ liệu cũ NULL fallback về Sach.
+Đăng lại copy hồ sơ nguồn và giữ sach_id. HinhAnh/Video dùng cờ active, không DELETE/destroy file lịch sử.
+Trước resubmit chụp quyết định legacy hiện tại nếu thiếu snapshot; lịch sử/PDF không dùng đầu vào vòng mới.
+Dùng transaction/version/owner/state guard, chỉ enqueue AI sau COMMIT. Không thêm bảng/dependency;
+migration 007 thêm ba cột, schema 21/165 và 99 check. Client cũ không gửi sách/gỡ media vẫn giữ dữ liệu.

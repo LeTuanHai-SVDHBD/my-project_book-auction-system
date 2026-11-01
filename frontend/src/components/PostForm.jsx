@@ -17,7 +17,33 @@ export default function PostForm({
   const [isbnMode, setIsbnMode] = useState(source?.isbn ? "has" : "none"),
     [isbn, setIsbn] = useState(source?.isbn || "");
   const [config, setConfig] = useState(null);
-  const [media, setMedia] = useState([]);
+  const [media, setMedia] = useState([]),
+    [removed, setRemoved] = useState([]);
+  const editableBook = mode === "create" || mode === "resubmit";
+  const keptMedia = (source?.media || []).filter(
+    (item) => !removed.some((x) => x.id === item.id && x.kind === item.kind),
+  );
+  function stageRemoval(item) {
+    setRemoved((old) => [...old, { id: item.id, kind: item.kind }]);
+    setError("");
+  }
+  function undoRemoval(item) {
+    if (
+      item.kind === "video" &&
+      keptMedia.filter((x) => x.kind === "video").length +
+        media.filter((x) => x.kind === "video").length >=
+        (config?.maxVideos ?? 3)
+    ) {
+      setError(
+        "Không thể giữ lại video này vì đã đủ giới hạn video. Hãy bỏ video mới hoặc video khác trước.",
+      );
+      return;
+    }
+    setRemoved((old) =>
+      old.filter((x) => x.id !== item.id || x.kind !== item.kind),
+    );
+    setError("");
+  }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState("");
@@ -59,8 +85,7 @@ export default function PostForm({
             (mode === "relist" &&
               formRef.current?.elements.reuse_media?.checked);
           const existing = reused
-            ? (source?.media || []).filter((item) => item.kind === "video")
-                .length
+            ? keptMedia.filter((item) => item.kind === "video").length
             : 0;
           if (
             existing +
@@ -136,16 +161,9 @@ export default function PostForm({
       },
       media: media.map(({ upload_id, tieu_de }) => ({ upload_id, tieu_de })),
     };
-    if (mode === "create")
+    if (editableBook)
       body.sach = Object.fromEntries(
-        [
-          "ten_sach",
-          "tac_gia",
-          "the_loai",
-          "nha_xuat_ban",
-          "isbn",
-          "mo_ta",
-        ]
+        ["ten_sach", "tac_gia", "the_loai", "nha_xuat_ban", "isbn", "mo_ta"]
           .map((key) => [key, data[key] || null])
           .concat([
             [
@@ -154,11 +172,12 @@ export default function PostForm({
             ],
           ]),
       );
-    else {
+    if (mode !== "create") {
       body.reuse_media = mode === "resubmit" || data.reuse_media === "on";
       if (mode === "resubmit") {
         delete body.ma_yeu_cau;
         body.row_version = source.row_version;
+        body.remove_media = removed;
       }
     }
     try {
@@ -234,13 +253,13 @@ export default function PostForm({
       <form ref={formRef} noValidate onSubmit={submit}>
         <fieldset disabled={busy}>
           <div data-step="0" hidden={step !== 0}>
-            {mode === "create" ? (
+            {editableBook ? (
               <>
                 <h3>Thông tin bản sách</h3>
                 <div className="form-grid">
                   {input("ten_sach", "Tên sách", 300, true)}
                   {input("tac_gia", "Tác giả", 200)}
-                  <GenreSelect />
+                  <GenreSelect initialValue={source?.the_loai || ""} />
                   {input("nha_xuat_ban", "Nhà xuất bản", 200)}
                   {input("nam_xuat_ban", "Năm xuất bản", 4, false, "number")}
                   <div className="isbn-field">
@@ -297,7 +316,12 @@ export default function PostForm({
                 </div>
                 <label>
                   Giới thiệu sách
-                  <textarea name="mo_ta" maxLength={12000} />
+                  <textarea
+                    name="mo_ta"
+                    aria-label="Giới thiệu sách"
+                    maxLength={12000}
+                    defaultValue={source?.mo_ta || ""}
+                  />
                 </label>
               </>
             ) : (
@@ -325,8 +349,8 @@ export default function PostForm({
             <p className="field-hint" id="book-review-hint">
               Mô tả tình trạng bìa, gáy, trang giấy và các hư hỏng nếu có; nêu
               đặc điểm quý hiếm như bản in đầu, chữ ký, số lượng giới hạn… và
-              chỉ rõ ảnh/video minh chứng. Nếu không biết thông tin nào, hãy
-              ghi rõ chưa xác định.
+              chỉ rõ ảnh/video minh chứng. Nếu không biết thông tin nào, hãy ghi
+              rõ chưa xác định.
             </p>
           </div>
           <div data-step="1" hidden={step !== 1}>
@@ -381,21 +405,63 @@ export default function PostForm({
               <>
                 <h4>Media đã gắn với bản sách</h4>
                 <p className="field-hint">
-                  Media đã lưu được giữ lại cùng lịch sử bài đăng. Nút × chỉ áp
-                  dụng cho tệp vừa tải lên.
+                  {mode === "resubmit"
+                    ? "Nhấn × để gỡ khỏi hồ sơ gửi duyệt mới. Chỉ áp dụng khi gửi thành công; đóng biểu mẫu sẽ giữ nguyên dữ liệu cũ và file Cloudinary."
+                    : "Media đã lưu của bài nguồn được giữ nguyên cùng lịch sử."}
                 </p>
                 <div className="media-grid">
-                  {source.media.map((item) => (
-                    <figure key={item.url}>
-                      {item.kind === "image" ? (
-                        <img src={item.url} alt={item.title || "Ảnh sách"} />
-                      ) : (
-                        <video src={item.url} controls preload="metadata" />
-                      )}
-                      <figcaption>{item.title}</figcaption>
-                    </figure>
-                  ))}
+                  {keptMedia.map((item) =>
+                    mode === "resubmit" ? (
+                      <UploadMediaCard
+                        key={`${item.kind}:${item.id}`}
+                        item={item}
+                        disabled={busy || !item.id}
+                        onRemove={stageRemoval}
+                        removeTitle="Gỡ khỏi hồ sơ gửi duyệt mới"
+                      />
+                    ) : (
+                      <figure key={item.url}>
+                        {item.kind === "image" ? (
+                          <img src={item.url} alt={item.title || "Ảnh sách"} />
+                        ) : (
+                          <video src={item.url} controls preload="metadata" />
+                        )}
+                        <figcaption>{item.title}</figcaption>
+                      </figure>
+                    ),
+                  )}
                 </div>
+                {mode === "resubmit" && removed.length > 0 && (
+                  <div className="notice" aria-label="Media dự kiến gỡ">
+                    <strong>
+                      {removed.length} tệp sẽ được gỡ khỏi hồ sơ mới
+                    </strong>
+                    {source.media
+                      .filter((item) =>
+                        removed.some(
+                          (x) => x.kind === item.kind && x.id === item.id,
+                        ),
+                      )
+                      .map((item) => (
+                        <p key={`${item.kind}:${item.id}`}>
+                          {item.title ||
+                            (item.kind === "video"
+                              ? "Video bản sách"
+                              : "Ảnh bản sách")}{" "}
+                          ·{" "}
+                          <button
+                            type="button"
+                            className="text-button"
+                            onClick={() => undoRemoval(item)}
+                          >
+                            Giữ lại{" "}
+                            {item.title ||
+                              (item.kind === "video" ? "video" : "ảnh")}
+                          </button>
+                        </p>
+                      ))}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -449,11 +515,40 @@ export default function PostForm({
             </p>
             <dl className="post-info">
               <dt>Tên sách</dt>
-              <dd>{source?.ten_sach || review.ten_sach}</dd>
+              <dd>{editableBook ? review.ten_sach : source?.ten_sach}</dd>
               <dt>ISBN</dt>
-              <dd>{source?.isbn || review.isbn || "Không có ISBN"}</dd>
+              <dd>
+                {(editableBook ? review.isbn : source?.isbn) || "Không có ISBN"}
+              </dd>
+              <dt>Tác giả</dt>
+              <dd>
+                {(editableBook ? review.tac_gia : source?.tac_gia) || "Chưa rõ"}
+              </dd>
+              <dt>Thể loại</dt>
+              <dd>
+                {(editableBook ? review.the_loai : source?.the_loai) ||
+                  "Chưa chọn"}
+              </dd>
+              <dt>Nhà xuất bản</dt>
+              <dd>
+                {(editableBook ? review.nha_xuat_ban : source?.nha_xuat_ban) ||
+                  "Chưa rõ"}
+              </dd>
+              <dt>Năm xuất bản</dt>
+              <dd>
+                {(editableBook ? review.nam_xuat_ban : source?.nam_xuat_ban) ||
+                  "Chưa rõ"}
+              </dd>
               <dt>Tiêu đề bài</dt>
               <dd>{review.tieu_de}</dd>
+              {mode === "resubmit" && (
+                <>
+                  <dt>Media giữ lại</dt>
+                  <dd>{keptMedia.length} tệp</dd>
+                  <dt>Media gỡ khỏi hồ sơ mới</dt>
+                  <dd>{removed.length} tệp</dd>
+                </>
+              )}
               <dt>Media mới</dt>
               <dd>{media.length} tệp</dd>
               <dt>Giá khởi điểm</dt>
@@ -485,7 +580,14 @@ export default function PostForm({
               </button>
             )}
             {step < 3 ? (
-              <button type="button" className="primary" onClick={next}>
+              <button
+                type="button"
+                className="primary"
+                onClick={(event) => {
+                  event.preventDefault();
+                  next();
+                }}
+              >
                 Tiếp tục
               </button>
             ) : (

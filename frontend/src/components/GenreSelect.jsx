@@ -1,9 +1,9 @@
 /** Combobox một lựa chọn: nhập để lọc có/không dấu, chỉ lưu giá trị được chọn trong danh mục. */
 import {useEffect,useId,useRef,useState} from 'react';
 import {searchBookGenres} from '../../../shared/bookGenres.js';
-export default function GenreSelect(){
+export default function GenreSelect({initialValue=""}){
   const id=useId(),input=useRef(null),list=useRef(null);
-  const [query,setQuery]=useState(''),[selected,setSelected]=useState(''),[open,setOpen]=useState(false),[active,setActive]=useState(-1);
+  const [query,setQuery]=useState(initialValue),[selected,setSelected]=useState(initialValue),[open,setOpen]=useState(false),[active,setActive]=useState(-1);
   const groups=searchBookGenres(query===selected?'':query),items=groups.flatMap(group=>group.items);
   function choose(value){setSelected(value);setQuery(value);setOpen(false);setActive(-1);input.current.setCustomValidity('');input.current.focus();}
   function change(event){const value=event.target.value;setQuery(value);setSelected('');setOpen(true);setActive(-1);event.target.setCustomValidity(value?'Hãy chọn một thể loại trong danh sách hoặc xóa ô tìm kiếm.':'');}

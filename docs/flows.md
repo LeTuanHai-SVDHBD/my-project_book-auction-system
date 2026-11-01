@@ -43,7 +43,7 @@ quyết định/snapshot/lịch sử vẫn được giữ. Phê duyệt chưa t�
 |---|---|---|
 | Duyệt | Admin, bài/phiên pending, version hiện tại, lý do và xác nhận bằng chứng quý hiếm | Bài `da_duyet`, phiên `da_qua_kiem_duyet`, lưu quyết định/lịch sử |
 | Từ chối | Admin, cặp pending, version hiện tại và lý do | Bài `tu_choi`, phiên `khong_dat_kiem_duyet`, lưu quyết định/lịch sử |
-| Gửi lại | Chủ bài, cặp bị từ chối và version hiện tại | Cập nhật nội dung/giá, thêm media, cặp về pending; giữ ID và lịch sử |
+| Gửi lại | Chủ bài, cặp bị từ chối và version hiện tại | Cập nhật hồ sơ sách riêng/nội dung/giá, gỡ hoặc thêm media, cặp về pending; giữ ID và lịch sử |
 | Kích hoạt | Chủ bài, cặp đã duyệt, version hiện tại, lịch tương lai hợp lệ | Cập nhật cùng phiên thành `da_kich_hoat`; không tạo phiên khác |
 
 Model lấy khóa rồi đối chiếu rowversion. SQL xuất BINARY(8), utility mã hóa hex 16 ký tự cho JSON;
@@ -178,3 +178,27 @@ Bộ lọc/cursor sai trả 400; người dùng thường/khách không có quy�
 đúng dù ID các bài từ chối lớn hơn ID đang chờ. Khi dữ liệu đổi giữa các lượt tải, tải lại trang để có danh sách hiện tại;
 đây không phải snapshot SQL cố định. Danh mục công khai/Bài của tôi giữ cursor và hợp đồng cũ.
 Lý do/ngày từ chối lấy từ KiemDuyet hiện có, không thêm schema hoặc sửa quyết định đã lưu.
+
+
+## Sửa hồ sơ và media khi gửi duyệt lại
+
+`POST /api/posts/:id/resubmit` vẫn cần chủ bài, CSRF, cặp từ chối và row_version hiện tại. Body có thể
+thêm `sach` với cùng trường/giới hạn như đăng mới; không nhận sach_id/trạng thái hoặc URL tự chèn.
+Thêm `remove_media: [{kind:"image"|"video",id:<ID media>}]`; ID lấy từ media của GET chi tiết.
+Kiểm tra trùng/loại/ID, quyền và media còn đang dùng của đúng bài trong transaction. Client cũ không gửi
+sach/remove_media thì giữ hồ sơ/media hiện tại. Giới hạn video tính sau khi gỡ và cộng các vé mới.
+Thể loại mới phải trong danh mục; giá trị cũ ngoài danh mục được giữ nếu không đổi, không cho chèn tên mới.
+
+Migration 007 thêm ho_so_sach JSON ở BaiDang và dang_su_dung ở HinhAnh/Video. Không thêm bảng.
+Sach giữ bản vật lý/khóa đăng lại; thông tin hiển thị lấy từ hồ sơ bài, fallback về Sach nếu bài cũ chưa có JSON.
+OPENJSON WITH giữ NULL rõ ràng (xóa ISBN) và mô tả dài; tìm kiếm, danh sách, chi tiết, giao dịch và AI dùng cùng hồ sơ.
+Đăng mới lưu hồ sơ; đăng lại sao chép hồ sơ của bài nguồn vào bài mới, vẫn giữ cùng sach_id.
+Sửa bài bị từ chối của lần đăng sau không đổi hồ sơ phiên trước.
+
+Trước chỉnh sửa, chụp quyết định hiện tại nếu bản cũ chưa có snapshot. Sau đó cập nhật hồ sơ, đánh dấu media gỡ
+không còn dùng, thêm media mới theo thứ tự sau cả các hàng đã gỡ, đổi trạng thái/version và ghi lịch sử cùng transaction.
+Lỗi/version/quyền/video vượt giới hạn thì rollback tất cả; acknowledgement/enqueue AI chỉ sau COMMIT.
+Media lịch sử không bị DELETE/destroy Cloudinary và vẫn được isMediaReferenced bảo vệ khỏi cleanup.
+Bản bìa/gallery/AI chỉ lấy media dang_su_dung=1; hash/version làm kết quả AI vòng trước không thành kết quả mới.
+Nút × trên media cũ chỉ đổi draft: Hủy giữ nguyên, Giữ lại phục hồi draft (không vượt giới hạn video).
+Nút × trên tệp vừa upload vẫn hủy vé mới như trước. Quyết định cũ và PDF giữ sách/media lúc kiểm duyệt.

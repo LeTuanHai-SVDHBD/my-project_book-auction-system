@@ -1,9 +1,10 @@
 /** Giao dịch/chat/khiếu nại/đánh giá/bình luận trên schema hiện có; SQL quyết định quyền và chuyển trạng thái. */
+import {bookProfileSql} from './bookProfile.js';
 import {setTimeout as delay} from 'node:timers/promises';
 import {participant,assertTrade,assertConversation,assertReview,assertComment,complaintReader,assignedAdmin,missing,conflict,tradeView} from '../services/communityPolicy.js';
 const columns=`g.giao_dich_id,g.ma_giao_dich,g.ket_qua_id,g.nguoi_mua_id,g.nguoi_ban_id,CONVERT(VARCHAR(18),g.so_tien) AS so_tien,g.trang_thai,g.ngay_tao,g.ngay_hoan_tat,g.thoi_gian_xac_nhan_mua,g.thoi_gian_xac_nhan_ban,
- k.phien_dau_gia_id,k.trang_thai AS ket_qua_trang_thai,k.nguoi_thang_dau_id,CONVERT(VARCHAR(18),k.muc_gia_thang) AS gia_thang,p.trang_thai AS trang_thai_phien,b.bai_dang_id,b.sach_id,b.nguoi_dung_id AS chu_bai_id,b.tieu_de,s.ten_sach,buyer.ho_ten AS ten_nguoi_mua,seller.ho_ten AS ten_nguoi_ban`;
-const joins=`JOIN dbo.KetQuaDauGia k ON k.ket_qua_id=g.ket_qua_id JOIN dbo.PhienDauGia p ON p.phien_dau_gia_id=k.phien_dau_gia_id JOIN dbo.BaiDang b ON b.bai_dang_id=p.bai_dang_id JOIN dbo.Sach s ON s.sach_id=b.sach_id JOIN dbo.NguoiDung buyer ON buyer.nguoi_dung_id=g.nguoi_mua_id JOIN dbo.NguoiDung seller ON seller.nguoi_dung_id=g.nguoi_ban_id`;
+ k.phien_dau_gia_id,k.trang_thai AS ket_qua_trang_thai,k.nguoi_thang_dau_id,CONVERT(VARCHAR(18),k.muc_gia_thang) AS gia_thang,p.trang_thai AS trang_thai_phien,b.bai_dang_id,b.sach_id,b.nguoi_dung_id AS chu_bai_id,b.tieu_de,bs.ten_sach,buyer.ho_ten AS ten_nguoi_mua,seller.ho_ten AS ten_nguoi_ban`;
+const joins=`JOIN dbo.KetQuaDauGia k ON k.ket_qua_id=g.ket_qua_id JOIN dbo.PhienDauGia p ON p.phien_dau_gia_id=k.phien_dau_gia_id JOIN dbo.BaiDang b ON b.bai_dang_id=p.bai_dang_id JOIN dbo.Sach s ON s.sach_id=b.sach_id JOIN dbo.NguoiDung buyer ON buyer.nguoi_dung_id=g.nguoi_mua_id JOIN dbo.NguoiDung seller ON seller.nguoi_dung_id=g.nguoi_ban_id ${bookProfileSql}`;
 const complaintColumns='khieu_nai_id,cuoc_tro_chuyen_id,giao_dich_id,nguoi_khieu_nai_id,ly_do,noi_dung,trang_thai,phan_hoi_admin,admin_id,ngay_khieu_nai,ngay_xu_ly';
 export function createCommunityModel({getPool,sql,beforeCommit=async()=>{}}){
   const req=target=>target.request?target.request():new sql.Request(target);

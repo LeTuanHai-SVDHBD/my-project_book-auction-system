@@ -15,11 +15,12 @@ test('SQL xuất kết quả: quyết định và snapshot cùng COMMIT, hai vò
     const {config}=await import('../src/config/env.js');
     const master=await new sql.ConnectionPool({...config.sql,database:'master'}).connect();
     try{await master.request().query(`IF DB_ID('${config.sql.database}') IS NULL CREATE DATABASE [${config.sql.database}]`);}finally{await master.close();}
-    const pool=await getPool(),users=[];let postId,bookId,auctionId,legacyBookId;
+    const pool=await getPool(),users=[];let postId,bookId,auctionId,legacyBookId,relistedId,relistedAuction;
     t.after(async()=>{try{
+      if(relistedId)await pool.request().input('post',sql.Int,relistedId).input('auction',sql.Int,relistedAuction).query('DELETE dbo.KiemDuyet WHERE bai_dang_id=@post;DELETE dbo.HinhAnh WHERE bai_dang_id=@post;DELETE dbo.Video WHERE bai_dang_id=@post;DELETE dbo.KetQuaDauGia WHERE phien_dau_gia_id=@auction;DELETE dbo.LichSuDauGia WHERE phien_dau_gia_id=@auction;DELETE dbo.PhienDauGia WHERE bai_dang_id=@post;DELETE dbo.BaiDang WHERE bai_dang_id=@post;');
       if(postId)await pool.request().input('post',sql.Int,postId).input('book',sql.Int,bookId).input('auction',sql.Int,auctionId).query(`
         DELETE dbo.KiemDuyet WHERE bai_dang_id=@post;DELETE dbo.HinhAnh WHERE bai_dang_id=@post;DELETE dbo.Video WHERE bai_dang_id=@post;
-        DELETE dbo.LichSuDauGia WHERE phien_dau_gia_id=@auction;DELETE dbo.PhienDauGia WHERE bai_dang_id=@post;
+        DELETE dbo.KetQuaDauGia WHERE phien_dau_gia_id=@auction;DELETE dbo.LichSuDauGia WHERE phien_dau_gia_id=@auction;DELETE dbo.PhienDauGia WHERE bai_dang_id=@post;
         DELETE dbo.BaiDang WHERE bai_dang_id=@post;DELETE dbo.Sach WHERE sach_id=@book;`);
       if(legacyBookId)await pool.request().input('id',sql.Int,legacyBookId).query('DELETE dbo.Sach WHERE sach_id=@id');
       for(const user of users)await pool.request().input('id',sql.Int,user).query('DELETE dbo.NguoiDung WHERE nguoi_dung_id=@id');
@@ -50,14 +51,27 @@ test('SQL xuất kết quả: quyết định và snapshot cùng COMMIT, hai vò
     const raw=(await pool.request().input('id',sql.Int,firstId).query('SELECT ket_qua_snapshot FROM dbo.KiemDuyet WHERE kiem_duyet_id=@id')).recordset[0];
     assert.deepEqual(JSON.parse(raw.ket_qua_snapshot),JSON.parse(JSON.stringify(first)));
     await assert.rejects(model.exportReview(other,postId,firstId),{status:404});
-    const next=structuredClone(input);next.post.tieu_de='Đã bổ sung';next.post.mo_ta_tinh_trang='Thông tin mới';next.rowVersion=detail.row_version;
+    // Clear the legacy snapshot to verify resubmit captures it before edits/removal.
+    await pool.request().input('id',sql.Int,firstId).query('UPDATE dbo.KiemDuyet SET ket_qua_snapshot=NULL WHERE kiem_duyet_id=@id');
+    const next=structuredClone(input);next.book.ten_sach='Sách đã sửa';next.book.isbn=null;next.book.mo_ta='Nội dung dài '.repeat(600);next.removeMedia=[{kind:'image',id:detail.media[0].id}];next.post.tieu_de='Đã bổ sung';next.post.mo_ta_tinh_trang='Thông tin mới';next.rowVersion=detail.row_version;
     await model.resubmit({owner,postId,input:next,items:[{kind:'video',url:'https://res.cloudinary.com/demo/video/upload/second.mp4'}],limits:{maxVideos:3}});
     assert.deepEqual(await model.exportReview(owner,postId,firstId),first);
+    const corrected=await model.detail(postId,{owner});assert.equal(corrected.ten_sach,'Sách đã sửa');assert.equal(corrected.isbn,null);assert.equal(corrected.mo_ta,next.book.mo_ta);assert.equal(corrected.media.length,1);assert.equal(corrected.media[0].kind,'video');await applyMigrations(pool);assert.equal((await model.detail(postId,{owner})).ten_sach,'Sách đã sửa');
+    const canonical=(await pool.request().input('id',sql.Int,bookId).query('SELECT ten_sach,isbn FROM dbo.Sach WHERE sach_id=@id')).recordset[0];assert.equal(canonical.ten_sach,input.book.ten_sach);assert.equal(canonical.isbn,input.book.isbn);
+    assert.equal((await pool.request().input('post',sql.Int,postId).query('SELECT dang_su_dung FROM dbo.HinhAnh WHERE bai_dang_id=@post')).recordset[0].dang_su_dung,false);
     assert((await model.list(moderationQuery({status:'pending'}))).some(p=>p.bai_dang_id===postId));
     await review('phe_duyet');assert(!(await model.list(moderationQuery({}))).some(p=>p.bai_dang_id===postId));const secondId=(await model.detail(postId,{owner})).kiem_duyet[0].kiem_duyet_id;
-    const second=await model.exportReview(owner,postId,secondId);assert.equal(second.media.length,2);assert.equal(second.review.ket_qua,'Phê duyệt');assert.equal(second.post.tieu_de,'Đã bổ sung');
+    const second=await model.exportReview(owner,postId,secondId);assert.equal(second.media.length,1);assert.equal(second.review.ket_qua,'Phê duyệt');assert.equal(second.post.tieu_de,'Đã bổ sung');
+    await pool.request().input('id',sql.Int,auctionId).query("UPDATE dbo.PhienDauGia SET trang_thai='da_ket_thuc',thoi_gian_bat_dau=DATEADD(HOUR,-2,SYSUTCDATETIME()),thoi_gian_ket_thuc=DATEADD(HOUR,-1,SYSUTCDATETIME()) WHERE phien_dau_gia_id=@id;INSERT dbo.KetQuaDauGia(phien_dau_gia_id,trang_thai,thoi_gian_ket_thuc) VALUES(@id,'khong_co_nguoi_thang',SYSUTCDATETIME());");
+    const searchable=await model.search({q:'Sách đã sửa',genre:'',group:'',phase:'ended',sort:'newest',page:1});const publicCard=searchable.items.find(x=>x.bai_dang_id===postId);assert(publicCard);assert.equal(publicCard.anh_bia,null);assert.equal((await model.detail(postId,{publicOnly:true})).media.length,1);
+    const relistInput={...input,book:undefined,requestId:randomUUID(),reuseMedia:true};
+    ({id:relistedId}=await model.create({owner,input:relistInput,sourceId:postId,items:[],limits:{maxVideos:3},code:'EX'+randomUUID().replaceAll('-','')}));
+    const relisted=await model.detail(relistedId,{owner});relistedAuction=relisted.phien_dau_gia_id;assert.equal(relisted.sach_id,bookId);assert.equal(relisted.ten_sach,'Sách đã sửa');assert.equal(relisted.media.length,1);
+    await model.review({admin,postId:relistedId,input:validateReview({quyet_dinh:'tu_choi',ly_do:'Cần thêm ảnh',row_version:relisted.row_version})});
+    const relistEdit={...next,book:{...next.book,ten_sach:'Chỉ sửa lần đăng sau'},removeMedia:[],rowVersion:(await model.detail(relistedId,{owner})).row_version};
+    await model.resubmit({owner,postId:relistedId,input:relistEdit,items:[],limits:{maxVideos:3}});assert.equal((await model.detail(postId,{owner})).ten_sach,'Sách đã sửa');assert.equal((await model.detail(relistedId,{owner})).ten_sach,'Chỉ sửa lần đăng sau');
     // Legacy records: capture only a still-current decision; never invent old-round media.
     await pool.request().input('post',sql.Int,postId).query('UPDATE dbo.KiemDuyet SET ket_qua_snapshot=NULL WHERE bai_dang_id=@post');
     await assert.rejects(model.exportReview(owner,postId,firstId),{status:409});
-    assert.equal((await model.exportReview(owner,postId,secondId)).media.length,2);
+    assert.equal((await model.exportReview(owner,postId,secondId)).media.length,1);
   });

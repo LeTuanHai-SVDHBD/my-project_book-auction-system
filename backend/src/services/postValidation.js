@@ -31,10 +31,16 @@ function money(value, name) {
   return value;
 }
 export function validatePost(body, { mode = 'create' } = {}) {
-  object(body, ['ma_yeu_cau', 'sach', 'bai_dang', 'phien', 'media', 'reuse_media', 'row_version'], 'Bài đăng');
+  object(body, ['ma_yeu_cau', 'sach', 'bai_dang', 'phien', 'media', 'reuse_media', 'row_version', 'remove_media'], 'Bài đăng');
   if (body.reuse_media !== undefined && typeof body.reuse_media !== 'boolean') bad('reuse_media không hợp lệ.');
-  const book = mode === 'create' ? object(body.sach, ['ten_sach','tac_gia','the_loai','nha_xuat_ban','nam_xuat_ban','isbn','tinh_trang_sach','mo_ta'], 'Sách') : null;
-  if (mode !== 'create' && body.sach !== undefined) bad('Đăng lại/gửi duyệt lại không sửa bản ghi Sách dùng trong lịch sử.');
+  const book = mode !== 'relist' && body.sach !== undefined ? object(body.sach, ['ten_sach','tac_gia','the_loai','nha_xuat_ban','nam_xuat_ban','isbn','tinh_trang_sach','mo_ta'], 'Sách') : null;
+  if (mode === 'create' && !book) bad('Thiếu thông tin Sách.');
+  if (mode === 'relist' && body.sach !== undefined) bad('Đăng lại giữ hồ sơ Sách từ bài nguồn.');
+  if (mode !== 'resubmit' && body.remove_media !== undefined) bad('Chỉ gỡ media khi gửi duyệt lại.');
+  const removed = body.remove_media === undefined ? [] : body.remove_media;
+  if (!Array.isArray(removed)) bad('Danh sách media gỡ không hợp lệ.');
+  const removeMedia = removed.map(item=>{object(item,['kind','id'],'Media gỡ');if(!['image','video'].includes(item.kind))bad('Loại media gỡ không hợp lệ.');return {kind:item.kind,id:id(item.id)};});
+  if(new Set(removeMedia.map(item=>`${item.kind}:${item.id}`)).size!==removeMedia.length)bad('Không lặp media gỡ.');
   const post = object(body.bai_dang, ['tieu_de','mo_ta_tinh_trang'], 'Nội dung bài đăng');
   const normalizedPost = { tieu_de: text(post.tieu_de, 300, 'Tiêu đề bài đăng', true),
     mo_ta_tinh_trang: text(post.mo_ta_tinh_trang, 12000, 'Tình trạng, yếu tố quý hiếm và bằng chứng', true) };
@@ -52,7 +58,7 @@ export function validatePost(body, { mode = 'create' } = {}) {
   if (new Set(media.map(item => item.upload_id)).size !== media.length) bad('Không lặp mã upload trong cùng bài đăng.');
   let normalizedBook;
   if (book) {
-    if(book.the_loai!==undefined&&book.the_loai!==null&&book.the_loai!==''&&!BOOK_GENRES.includes(book.the_loai))bad('Hãy chọn thể loại trong danh mục.');
+    if(mode==='create'&&book.the_loai!==undefined&&book.the_loai!==null&&book.the_loai!==''&&!BOOK_GENRES.includes(book.the_loai))bad('Hãy chọn thể loại trong danh mục.');
     normalizedBook = { ten_sach: text(book.ten_sach, 300, 'Tên sách', true), tac_gia: text(book.tac_gia, 200, 'Tác giả'),
       the_loai: text(book.the_loai, 100, 'Thể loại'), nha_xuat_ban: text(book.nha_xuat_ban, 200, 'Nhà xuất bản'),
       tinh_trang_sach: text(book.tinh_trang_sach, 1000, 'Tình trạng sách') ?? conditionPreview(normalizedPost.mo_ta_tinh_trang), mo_ta: text(book.mo_ta, 12000, 'Mô tả sách'),
@@ -61,7 +67,7 @@ export function validatePost(body, { mode = 'create' } = {}) {
   }
   return { requestId: mode === 'resubmit' ? null : uuid(body.ma_yeu_cau), book: normalizedBook,
     post: normalizedPost,
-    prices, media, reuseMedia: mode !== 'create' && body.reuse_media === true,
+    prices, media, removeMedia, reuseMedia: mode !== 'create' && body.reuse_media === true,
     rowVersion: mode === 'resubmit' ? version(body.row_version) : null };
 }
 export function validateReview(body) {

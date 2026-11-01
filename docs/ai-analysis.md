@@ -18,7 +18,7 @@ npm.cmd run setup:ai
 
 Script bổ sung biến còn thiếu vào `.env`, giữ giá trị đang có và tắt AI mặc định.
 Với máy mới, hoàn thành cài đặt trong README trước. Bản AI không thêm dependency hoặc migration;
-schema phần AI giữ nguyên; toàn hệ thống có 21 bảng/162 cột sau migration 005 lưu bản kết quả kiểm duyệt.
+schema phần AI giữ nguyên; toàn hệ thống có 21 bảng/165 cột sau migration 007 lưu hồ sơ sách và media dùng cho lần gửi duyệt hiện tại.
 
 Mở `.env` ở thư mục gốc trên máy phát triển:
 
@@ -286,3 +286,8 @@ Kiểm tra ngày 24/10/2026:
 - [Image understanding](https://ai.google.dev/gemini-api/docs/image-understanding)
 - [Video understanding](https://ai.google.dev/gemini-api/docs/video-understanding)
 - [Gemini API errors](https://ai.google.dev/gemini-api/docs/api-errors)
+
+
+Khi gửi duyệt lại, AI đọc hồ sơ sách riêng của bài và media còn active sau gỡ/thay; không đọc lại Sach gốc
+để bỏ qua bản sửa. ID media dùng cho thao tác gỡ không được thêm vào hash/Gemini: hash cũ vẫn giữ hợp lệ
+nếu sách/media chưa đổi. Snapshot quyết định trước vẫn giữ đầu vào/AI đã công bố. Schema cần migration 007.

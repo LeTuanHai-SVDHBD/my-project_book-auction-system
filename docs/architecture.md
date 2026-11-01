@@ -42,7 +42,7 @@ Luồng đấu giá: `HTTP → Redis Streams → Consumer → Redis lock → SQL
 Job hết hạn đọc đồng hồ SQL và xếp sự kiện chốt vào cùng stream nghiệp vụ.
 YeuCauDatGia lưu quyết định cuối; LuotDatGia chỉ lưu lượt hợp lệ.
 Cùng transaction ghi quyết định, lượt/giá/lịch sử, kết quả, giao dịch và phòng chat nếu có người thắng khi phiên kết thúc.
-SQL có 21 bảng/162 cột sau migration 005 (hộp thông báo và bản kết quả kiểm duyệt); DDL nền được giữ để nâng cấp tại chỗ.
+SQL có 21 bảng/165 cột sau migration 007 (hộp thông báo, bản kết quả kiểm duyệt và hồ sơ gửi duyệt lại); DDL nền được giữ để nâng cấp tại chỗ.
 
 ## Xác thực theo tab
 
@@ -103,3 +103,9 @@ Bình luận khóa dòng phiên rồi kiểm tra cửa sổ thời gian bằng S
 Trang mới nhất tự đọc HTTP mỗi ba giây, lịch sử dùng cursor; không có receipt cho mọi POST hoặc cam kết giao đúng một lần.
 Bằng chứng ảnh dùng vé media hiện có; API hạn chế truy cập hồ sơ nhưng delivery Cloudinary chưa phải CDN riêng tư.
 Chi tiết tại [after-sales.md](after-sales.md); phần chờ nghiệm thu/thực nghiệm tại [tasks.md](tasks.md).
+
+
+Hồ sơ sách theo bài nằm ở BaiDang.ho_so_sach; Sach là bản vật lý/khóa ổn định và không bị gửi duyệt lại ghi đè.
+HinhAnh/Video giữ hàng lịch sử với dang_su_dung=0 sau khi gỡ; chỉ hàng active dùng cho gallery/bìa/AI.
+KiemDuyet.ket_qua_snapshot giữ hồ sơ từng quyết định. Gửi lại chụp snapshot legacy hiện tại trước cập nhật,
+đổi hồ sơ/media/trạng thái cùng transaction; đăng lại sao chép hồ sơ nguồn, không tạo bản sách vật lý khác.

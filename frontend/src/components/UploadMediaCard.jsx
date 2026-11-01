@@ -1,6 +1,11 @@
-/** Remove only a newly uploaded ticket; persisted historical media has no remove action. */
+/** Media preview; the caller decides whether removal discards an upload or stages a resubmission edit. */
 import { Icon } from "./DesignUi.jsx";
-export default function UploadMediaCard({ item, onRemove, disabled = false }) {
+export default function UploadMediaCard({
+  item,
+  onRemove,
+  disabled = false,
+  removeTitle = "Bỏ tệp vừa tải lên",
+}) {
   const label =
     item.tieu_de ||
     item.title ||
@@ -27,7 +32,7 @@ export default function UploadMediaCard({ item, onRemove, disabled = false }) {
         type="button"
         className="remove-upload"
         aria-label={`Bỏ ${item.kind === "video" ? "video" : "ảnh"} ${label}`}
-        title="Bỏ tệp vừa tải lên"
+        title={removeTitle}
         disabled={disabled}
         onClick={() => onRemove(item)}
       >

@@ -2,8 +2,17 @@
 
 # Kết quả kiểm tra
 
-Cập nhật ngày 31/10/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
+Cập nhật ngày 01/11/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
+
+## Sửa thông tin sách và gỡ/thay media khi gửi duyệt lại — 01/11/2026
+
+- Biểu mẫu điền sẵn và cho sửa tên/tác giả/thể loại/NXB/năm/ISBN/giới thiệu; lựa chọn Không có ISBN hiển thị và gửi NULL đúng. Media cũ có × dự kiến gỡ và Giữ lại; Hủy không thay dữ liệu cũ. Upload mới vẫn dùng vé; video cap tính sau gỡ/cộng mới, undo không vượt cap. Bước kiểm tra hiển thị metadata sửa và số giữ/gỡ/mới; chuyển bước không tự submit/báo thiếu xác nhận trước khi bấm Gửi.
+- Migration 007 chạy lại được, thêm BaiDang.ho_so_sach JSON nullable, HinhAnh/Video.dang_su_dung mặc định 1; không thêm bảng/dependency/xóa dữ liệu hoặc file Cloudinary. Manifest **21 bảng/165 cột, 99 check**; init nhận schema cũ 21/162. Sach giữ bản vật lý không ghi đè; bài/phiên cũ giữ hồ sơ riêng, đăng lại sao chép hồ sơ nguồn. Đọc/tìm kiếm/bìa/giao dịch/AI nhất quán; OPENJSON WITH giữ NULL và mô tả dài.
+- Model chụp quyết định legacy hiện tại trước sửa; quyền/rowversion/cặp trạng thái, ID media đúng bài và active, giới hạn video kiểm tra trong transaction. Lỗi rollback cả profile/media/snapshot; thứ tự media mới sau cả hàng đã gỡ, file cũ được bảo vệ khỏi cleanup. AI enqueue sau COMMIT; hash cũ không đổi chỉ vì thêm ID thao tác media.
+- `npm run check`: **146 tệp PASS**; `npm test`: **160 PASS, 12 SKIP**, tổng 172; `npm run build`: PASS (91 modules); `git diff --check`: PASS. Năm test mới chạy model/service/controller/router/session/CSRF thật với SQL adapter transaction fixture: sửa profile/NULL/mô tả dài, gỡ/thay video đúng cap, snapshot cũ và Sach không đổi, hash mới, forged ID/genre/owner/version/state/cap rollback, tương thích client cũ và enqueue sau COMMIT. Test SQL opt-in mở rộng migration chạy lại, cờ media, snapshot legacy, đọc profile và đăng lại/sửa lần sau không đổi phiên trước.
+- Chromium production build qua HTTP/session/CSRF/router/upload magic validation thật, provider/ledger/model fixture: trường cũ điền sẵn, sửa thông tin, ISBN NULL, gỡ/undo/Hủy không DELETE media cũ, video đầy → gỡ → tải thay → undo bị chặn đúng cap, bỏ vé mới/giữ lại/tải thay; payload cuối đủ book/remove_media/vé mới và chỉ một lần gửi. **1440/768/390/320px** ở media và xem lại không tràn ngang/lỗi JavaScript; đã xem ảnh chụp mobile.
+- **Chưa chạy migration 007 hoặc truy vấn SQL Server/Redis/Cloudinary/Gemini thật ở môi trường này**; 12 test dịch vụ thật vẫn SKIP. Fixture không chứng minh DDL/truy vấn/lưu thực tế đã đạt. Máy nhóm cần dừng dev:all, pull, `npm.cmd run db:migrate`, khởi động lại rồi Ctrl+F5. Không xóa database/volume/file Cloudinary để nâng cấp.
 
 ## Nút và phím đổi ảnh/video — 31/10/2026
 

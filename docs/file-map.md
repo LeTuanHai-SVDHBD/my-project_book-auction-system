@@ -220,3 +220,8 @@ Bộ lọc/cursor riêng của trang Kiểm duyệt nằm ở `backend/src/servi
   container, chuyển đổi AI, vòng đời upload/nháp, cô lập tài khoản và nháp hết hạn.
 
 - `backend/test/aiManual.test.js`: đăng/đăng lại/bổ sung/replay và GET không tự enqueue, chỉ yêu cầu Admin tạo job; bỏ tiến độ auto cũ nhưng giữ lịch sử SQL.
+
+- `backend/src/ai/files.js`: upload video tới Gemini Files, xác minh upload URL/File ID/URI,
+  poll ACTIVE và cleanup tệp tạm có giới hạn; chỉ dùng nội bộ worker.
+- `backend/test/aiFiles.test.js`: video >12 MiB, dài >5 phút theo metadata, tách ngân sách ảnh,
+  tuần tự từng video, retry dùng lại URI, timeout/codec/URL/quyền và cleanup; Google HTTP fixture.

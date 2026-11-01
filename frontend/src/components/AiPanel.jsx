@@ -290,7 +290,13 @@ export default function AiPanel({ post, user }) {
                     <a href={row.url} target="_blank" rel="noreferrer">
                       {row.id}
                     </a>{" "}
-                    · {row.sent ? "Đã gửi phân tích" : "Chưa phân tích"}
+                    · {row.sent ? "Đã gửi cho AI" : "Chưa phân tích"}
+                    {row.input_method === "files_api" &&
+                      " · Files API · Toàn bộ tệp video (Gemini lấy mẫu)"}
+                    {Number.isFinite(row.duration_seconds) &&
+                      ` · ${Math.floor(row.duration_seconds / 60)} phút ${Math.floor(row.duration_seconds % 60)} giây`}
+                    {Number.isFinite(row.bytes) &&
+                      ` · ${(row.bytes / 1048576).toFixed(1)} MB`}
                   </p>
                 ))}
               </details>

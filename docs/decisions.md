@@ -283,7 +283,7 @@ Theo yêu cầu ngày 31/10/2026, bỏ ràng buộc chính xác 10/13 ký tự �
 ## AI nhiều media: chuẩn bị riêng, timeout thích ứng và lease được gia hạn
 
 Theo lỗi lặp lại ngày 31/10/2026, thay bước tải tuần tự bằng tối đa bốn tải song song theo lô,
-giữ thứ tự/mã bằng chứng và ngân sách 12 MiB. Bước chuẩn bị có deadline riêng; tệp bỏ qua vẫn nằm trong manifest.
+giữ thứ tự/mã bằng chứng và ngân sách ảnh inline 12 MiB (video dùng Files API theo quyết định mới bên dưới). Bước chuẩn bị có deadline riêng; tệp bỏ qua vẫn nằm trong manifest.
 Thời gian từng lượt Gemini = cơ sở + 4 giây/media thực gửi, có trần 300 giây mặc định; tối đa hai lượt
 chỉ với lỗi tạm thời, dùng lại payload. Đọc body cũng nằm trong deadline. Dùng thinking_level=low,
 giữ output 8192 để tránh cắt JSON; Admin vẫn quyết định và hai điểm giữ NULL khi không đủ dữ liệu.
@@ -327,3 +327,13 @@ không gộp vào yêu cầu manual mới; lịch sử SQL đã lưu được gi
 Phân biệt chưa chạy, đang chạy, thất bại và phân tích thiếu dữ liệu. Chỉ hiện ô điểm khi có kết quả
 không thất bại; chưa chạy dùng “Phân tích bằng AI”, đã chạy dùng “Phân tích lại bằng AI”.
 Không đổi tiêu chí, trọng số, NULL, quyền xem của người bán hoặc quyền quyết định thủ công.
+
+
+## Video AI dài dùng Files API — 01/11/2026
+
+Giữ video Cloudinary làm bằng chứng gốc; không thêm luồng đăng YouTube. Ảnh vẫn inline trong
+12 MiB, video dùng Files API riêng: upload một lần/tệp, chờ ACTIVE, tham chiếu URI qua Interactions.
+Không đặt clip offset hoặc cắt ở phút thứ 5, không thay cả video bằng vài frame; mặc định Gemini lấy mẫu.
+Tải/chuẩn bị tuần tự và có dung lượng/deadline riêng; manifest giữ đúng M1… và link gốc, không lưu URI tạm.
+Thử xóa file Google khi kết thúc, chấp nhận TTL của Files API nếu crash/lost-response/cleanup lỗi.
+Không đổi API key, model, hai điểm/NULL, quyền Admin, SQL schema, giới hạn upload gốc hoặc dependency.

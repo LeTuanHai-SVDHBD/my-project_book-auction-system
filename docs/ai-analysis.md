@@ -32,6 +32,9 @@ AI_PROVIDER_MAX_ATTEMPTS=2
 AI_MEDIA_PREPARE_TIMEOUT_MS=45000
 AI_THINKING_LEVEL=low
 AI_MEDIA_TOTAL_MB=12
+AI_VIDEO_MAX_MB=100
+AI_VIDEO_PREPARE_TIMEOUT_MS=300000
+AI_VIDEO_DOWNLOAD_TIMEOUT_MS=120000
 ```
 
 Thay `YOUR_PRIVATE_KEY` bằng khóa của chính tài khoản Gemini. Không gửi khóa qua chat, không commit `.env`
@@ -120,15 +123,43 @@ Chỉ gửi thông tin sách, mô tả bằng chứng và media của bài. Khô
 
 Prompt chỉ gửi một trường `mo_ta_tinh_trang` cho tình trạng, yếu tố quý hiếm và bằng chứng. Phần xem trước `tinh_trang_sach` trùng trong toàn văn không gửi lặp; tình trạng khác biệt của dữ liệu cũ vẫn được kèm với nhãn đã lưu trước đây. Hai điểm và các tiêu chí vẫn tính độc lập như trên. Hash nguồn tiếp tục dùng các trường gốc đầy đủ để giữ khả năng đối chiếu, phát hiện dữ liệu đổi và đọc kết quả phân tích cũ; không sửa hoặc tự gọi lại phân tích đã lưu chỉ vì đổi cách trình bày prompt.
 
-Worker chỉ tải HTTPS từ đúng `res.cloudinary.com/<cloud-name>/...` của dự án, không theo redirect.
-Kiểm tra loại media, MIME, magic bytes, kích thước và deadline trước khi gửi.
-Tải tối đa bốn tệp song song theo từng lô, giữ thứ tự gốc/mã M1…; mỗi tải có tối đa 15 giây,
-toàn bước chuẩn bị mặc định 45 giây. Đủ ngân sách hoặc hết thời gian thì không tải thêm lô mới.
-Manifest ghi rõ tệp đã gửi/bỏ qua và lý do; không báo đã xem ảnh chưa gửi.
-Tổng bytes thô mặc định tối đa 12 MiB, ảnh/video nhỏ được gửi inline; base64 làm tăng kích thước khoảng một phần ba.
-Đây là ngân sách AI riêng, không thay giới hạn upload 10 MB/ảnh và 50 MB/video.
-Video lớn hoặc tệp vượt ngân sách không được gửi; lưu manifest/cảnh báo và giữ thiếu dữ liệu cho phần không quan sát được.
-Chưa có nén, cắt video, trích frame hoặc Files API. Thời lượng video chưa được kiểm tra.
+Worker chỉ tải HTTPS từ đúng `res.cloudinary.com/<cloud-name>/<image|video>/upload/...` của dự án,
+không theo redirect; kiểm tra MIME/magic bytes, dung lượng và deadline trước khi gửi.
+Ảnh tải tối đa bốn luồng/lô, mỗi tải 15 giây, cả bước ảnh mặc định 45 giây.
+`AI_MEDIA_TOTAL_MB` (tên cũ giữ tương thích) nay chỉ là ngân sách **ảnh inline**, mặc định/tối đa 12 MiB.
+Base64 ảnh làm tăng payload khoảng một phần ba; hết ngân sách ảnh vẫn tiếp tục chuẩn bị video.
+Giữ thứ tự và mã M1… theo dữ liệu gốc để đối chiếu.
+
+Video được xử lý **từng tệp một**: tải bản Cloudinary phù hợp → upload resumable lên Gemini Files API
+→ poll tới `ACTIVE` → gửi `uri` vào video content của Interactions API. Không đặt offset cắt clip,
+không có giới hạn nội dung 5 phút; tệp trên 12 MiB không dùng chung ngân sách ảnh.
+Mặc định tối đa 100 MiB/video ở nhánh AI, 120 giây tải Cloudinary và 300 giây/tệp cho toàn quá trình
+lấy tệp/upload/poll, kể cả đọc body. Có thể cấu hình lần lượt bằng `AI_VIDEO_MAX_MB` (1–100),
+`AI_VIDEO_DOWNLOAD_TIMEOUT_MS` (1000–300000), `AI_VIDEO_PREPARE_TIMEOUT_MS` (1000–600000).
+Đây là giới hạn tài nguyên, không phải giới hạn thời lượng nội dung. Upload gốc vẫn 50 MB/video,
+tối đa 3 video/bài theo mặc định; giới hạn này chưa thay đổi. Bản MOV/AVI… dùng bản chuyển MP4 của
+Cloudinary có thể khác dung lượng gốc và chịu hạn mức chuyển đổi của tài khoản.
+
+Files API dùng khóa Backend hiện có, không thêm SDK/ffmpeg/dependency. Upload URL phải thuộc đúng
+Google origin/path, không redirect/không chuyển API key sang host khác. File ID/MIME/URI phải khớp;
+`FAILED`, quá hạn, quá lớn hoặc thiếu quyền/quota đều được ghi là chưa gửi và có cảnh báo.
+Không upload lại bytes khi một HTTP bị mất; các lượt retry Interactions dùng lại cùng file URI.
+Sau xử lý, thử xóa các tệp Google đã nhận diện (deadline riêng 10 giây); link Cloudinary gốc được giữ.
+Nếu worker chết trước cleanup, upload mất phản hồi chưa biết File ID hoặc DELETE lỗi, tệp Google có
+thể còn tới khi hết thời hạn Files API (Google công bố 48 giờ); không cam kết xóa tức thì trong các sự cố đó.
+URI tệp tạm không lưu vào SQL/manifest/PDF, chỉ lưu link gốc, cách gửi, số bytes và thời lượng nếu Google trả.
+
+Manifest ghi tệp đã gửi/bỏ qua và lý do. UI ghi **Files API · Toàn bộ tệp video (Gemini lấy mẫu)**:
+gửi toàn tệp không có nghĩa mô hình kiểm tra mọi frame hoặc mọi trang. Prompt yêu cầu dẫn mốc thời gian
+khi quan sát được; không tự sinh timestamp hay gán điểm 0 khi không quan sát được. Không đặt FPS thấp,
+không lặng lẽ trích vài frame thay thế video. Quota/token/context/model vẫn do tài khoản Gemini quyết định;
+Files API không làm video dài miễn phí. Luồng này dùng video đã upload, chưa thêm ô YouTube;
+link YouTube trong mô tả vẫn chỉ là nguồn văn bản cần Admin xác minh.
+
+Tham chiếu Google kiểm tra ngày 01/11/2026:
+[Video/Files với Interactions](https://ai.google.dev/gemini-api/docs/video-understanding),
+[REST File resource](https://ai.google.dev/api/files),
+[File input methods](https://ai.google.dev/gemini-api/docs/file-input-methods).
 
 Nguồn URL chỉ được chấp nhận nếu đã xuất hiện trong văn bản đầu vào và dùng HTTPS.
 Worker không truy cập URL nguồn, không tuyên bố đã xác minh nội dung nguồn.
@@ -137,7 +168,7 @@ Admin cần tự kiểm tra xuất xứ/giấy tờ với dữ liệu thực t�
 ## Thời gian chờ và thử lại hữu hạn
 
 `AI_PROVIDER_TIMEOUT_MS` là thời gian cơ sở (mặc định 60.000 ms). Mỗi media **thực sự gửi**
-được cộng 4.000 ms; mỗi lượt không vượt `AI_PROVIDER_MAX_TIMEOUT_MS` (mặc định 300.000 ms).
+được cộng 4.000 ms; mỗi video đã chuẩn bị cộng thêm 120.000 ms, mỗi lượt không vượt `AI_PROVIDER_MAX_TIMEOUT_MS` (mặc định 300.000 ms).
 Đây là ngân sách chờ của ứng dụng, không phải dự đoán thời gian Google trả kết quả.
 Ví dụ gửi đủ 32 ảnh, cấu hình cơ sở 60 giây cũ vẫn cho phép 188 giây mỗi lượt.
 Giới hạn bao gồm cả đọc response body, nên phản hồi có headers rồi bị treo cũng bị ngắt.
@@ -148,8 +179,9 @@ Chờ ngẫu nhiên 750–1.249 ms trước lượt tiếp theo; dùng lại pay
 Không thử lại lỗi khóa/quyền/billing/model, HTTP 400/401/402/403/404/429, DNS `ENOTFOUND`, TLS,
 JSON sai hoặc phản hồi chưa hoàn tất. Lượt lỗi cũng có thể tốn quota/chi phí; không retry vô hạn.
 
-Deadline toàn job = giới hạn chuẩn bị + giới hạn mỗi lượt × số lượt + 10 giây dự phòng
-(mặc định 655 giây). Deadline job hoặc worker dừng sẽ hủy yêu cầu đang chạy.
+Deadline toàn job = giới hạn chuẩn bị ảnh + giới hạn chuẩn bị/video × giới hạn số video
++ giới hạn mỗi lượt provider × số lượt + 10 giây dự phòng (mặc định 1555 giây, là trần cho ba video).
+Số video đọc theo MEDIA_MAX_VIDEOS, tối đa 5; deadline job hoặc worker dừng sẽ hủy yêu cầu đang chạy.
 `AI_THINKING_LEVEL=low` giảm mức suy luận cho tác vụ trích xuất; có thể đặt `default` để bỏ tham số
 nếu model khác không hỗ trợ. Giữ `max_output_tokens=8192`, vì hạ giới hạn output có thể cắt cả phần suy luận
 và JSON. Không đổi model, tiêu chí hoặc cơ chế NULL để che lỗi timeout.

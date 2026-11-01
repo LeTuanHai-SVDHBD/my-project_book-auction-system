@@ -2,6 +2,27 @@
 
 # Kết quả kiểm tra
 
+## 2026-11-01 — Video AI dài qua Gemini Files API
+
+- `npm run check`: PASS 155 tệp JS; `npm test`: PASS 195, SKIP 12 bài cần dịch vụ thật
+  (207 tổng); `npm run build`: PASS 94 modules.
+- Bộ HTTP fixture mới: video 13 MiB với metadata hơn 6 phút dùng upload resumable → poll ACTIVE
+  → URI trong Interactions, không base64/cắt clip; hết ngân sách ảnh vẫn gửi video; giữ đúng IDs/link gốc.
+  Kiểm tra xử lý từng video tuần tự, retry suy luận dùng lại URI, FAIL/oversize/quyền/URL nguy hiểm,
+  file identity/MIME/URI, deadline/body treo, hủy tác vụ và xóa tệp tạm.
+- Chromium production + HTTP/session/CSRF/AI router/service/processor/Gemini client thật với
+  Google HTTP/model/queue fixture: PASS tệp MP4 hợp lệ do FFmpeg tạo để QA, ffprobe xác nhận
+  366 giây/11881 bytes; ba ảnh dùng hết ngân sách inline, M4 vẫn gửi Files API. Có tiến độ chờ Google,
+  poll ACTIVE, 1 upload/1 cleanup, manifest ghi 4/4, hiện 6 phút 6 giây và cách lấy mẫu; không lưu URI
+  tạm vào kết quả. Reload không tự phân tích; PASS 1440/768/390/320 px không tràn/lỗi JS; đã xem ảnh QA.
+  Video QA là màu tĩnh tổng hợp, không dùng để nghiệm thu chất lượng thẩm định sách.
+- Chưa chạy Gemini Files/Interactions, SQL Server hoặc Redis thật. 12 bài dịch vụ vẫn SKIP;
+  chưa xác minh khóa/quota, codec và chất lượng quan sát trên video Cloudinary của người dùng.
+- Không thêm thư viện/SQL migration, không yêu cầu cài FFmpeg để chạy ứng dụng. Giữ key/model,
+  chín tiêu chí/hai điểm/NULL, quyết định Admin và giới hạn upload gốc. Setup chỉ thêm biến video còn thiếu.
+  Cleanup Google là best effort; khi crash/lost response/DELETE lỗi, phụ thuộc thời hạn lưu Files API.
+
+
 ## 2026-11-01 — Admin chủ động chạy AI
 
 - `npm run check`: PASS 153 tệp JS server/script/shared; `npm test`: PASS 185, SKIP 12 bài

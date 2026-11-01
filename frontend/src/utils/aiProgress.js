@@ -7,6 +7,10 @@ export function aiProgressMessage(job) {
   const attempt = number(p.attempt),
     max = number(p.max_attempts),
     seconds = Math.ceil(number(p.provider_timeout_ms) / 1000);
+  const mediaId=/^M\d+$/.test(p.media_id||'')?p.media_id:'video';
+  if(p.phase==='video_download')return `Đang lấy ${mediaId} từ Cloudinary để gửi AI…`;
+  if(p.phase==='video_upload')return `Đang chuyển ${mediaId} sang Gemini Files API…`;
+  if(p.phase==='video_processing')return `Gemini đang chuẩn bị ${mediaId}; video dài có thể cần vài phút…`;
   if (p.phase === "media")
     return `Đang chuẩn bị ảnh/video: ${number(p.media_completed)}/${number(p.media_total)} tệp…`;
   if (p.phase === "retry")

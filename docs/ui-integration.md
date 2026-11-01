@@ -168,3 +168,11 @@ Bài chưa phân tích hiển thị trạng thái và nút **Phân tích bằng 
 nút đổi thành **Phân tích lại bằng AI**. Lỗi Gemini/timeout hiện thất bại và chẩn đoán;
 “Chưa đủ dữ liệu” trong ô điểm chỉ dùng cho kết quả thực sự thiếu bằng chứng.
 Đọc bài, tải lại trang, đăng mới hoặc gửi duyệt lại không gọi Gemini; kết quả cũ không bị xóa.
+
+
+### Video dài trong AI
+
+Tiến độ tách lấy video Cloudinary, chuyển sang Gemini Files API và chờ Google chuẩn bị video.
+Sau khi gửi, mục “Dữ liệu media đã dùng” giữ link gốc và ghi cách gửi Files API, toàn bộ tệp
+(Gemini lấy mẫu), dung lượng/thời lượng nếu có. Tệp bị bỏ qua vẫn có cảnh báo; hết ngân sách ảnh
+không làm video bị loại. Không tự chạy AI; Admin vẫn chủ động bấm nút và quyết định kiểm duyệt.

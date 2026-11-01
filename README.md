@@ -222,6 +222,10 @@ Admin xem **AI hỗ trợ kiểm duyệt**: chưa chạy thì hiện **Chưa ph�
 Người bán đang chờ duyệt chỉ thấy tiến độ. Sau phê duyệt/từ chối, xem quyết định/lý do của Admin
 và mở **Kết quả AI tham khảo** bên dưới; gửi duyệt lại sẽ ẩn AI cho tới quyết định mới.
 Thiếu dữ liệu giữ NULL; lỗi AI không từ chối bài. Khi AI tắt, kiểm duyệt thủ công vẫn hoạt động.
+Video AI dùng Gemini Files API, tách khỏi ngân sách ảnh inline 12 MiB: gửi toàn bộ tệp thay vì bỏ video
+lớn hoặc cắt ở phút thứ 5. Admin thấy tiến độ chuẩn bị video và cách gửi trong dữ liệu media.
+Sau pull chạy `npm.cmd run setup:ai` để bổ sung các biến video còn thiếu, rồi khởi động lại API/worker;
+script giữ nguyên khóa/cấu hình hiện có. Upload gốc vẫn tối đa 50 MB/video theo mặc định.
 Tình trạng đẹp không thay thế điều kiện quý hiếm. Cấu hình và nghiệm thu tại [Phân tích AI](docs/ai-analysis.md).
 Giờ được lưu theo UTC và kiểm tra bằng đồng hồ SQL Server.
 

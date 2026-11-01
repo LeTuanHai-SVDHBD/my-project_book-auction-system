@@ -1,6 +1,9 @@
 /** Mã lỗi Gemini có hướng xử lý; chỉ giữ chẩn đoán thuộc allowlist, không lưu body/message từ provider. */
 import {HttpError} from '../middlewares/errorHandler.js';
 const messages={
+  AI_FILE_INVALID_RESPONSE:'Gemini Files API trả thông tin tệp không hợp lệ.',
+  AI_FILE_PROCESSING_FAILED:'Gemini không xử lý được video. Kiểm tra định dạng/codec hoặc xuất lại video MP4.',
+  AI_FILE_PROCESSING_TIMEOUT:'Hết thời gian chờ Gemini chuẩn bị video.',
   AI_KEY_INVALID:'Gemini từ chối API key. Kiểm tra GEMINI_API_KEY trong .env và khởi động lại API/worker.',
   AI_ACCESS_DENIED:'Gemini từ chối quyền truy cập. Kiểm tra quyền API key, project, giới hạn truy cập và quyền dùng model.',
   AI_BILLING_REQUIRED:'Gemini yêu cầu kiểm tra billing hoặc số dư của project. Không tự chạy lại liên tục.',

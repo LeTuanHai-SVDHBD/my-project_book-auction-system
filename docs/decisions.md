@@ -312,3 +312,7 @@ Không UPDATE Sach dùng chung: mỗi BaiDang lưu ho_so_sach; dữ liệu cũ N
 Trước resubmit chụp quyết định legacy hiện tại nếu thiếu snapshot; lịch sử/PDF không dùng đầu vào vòng mới.
 Dùng transaction/version/owner/state guard, chỉ enqueue AI sau COMMIT. Không thêm bảng/dependency;
 migration 007 thêm ba cột, schema 21/165 và 99 check. Client cũ không gửi sách/gỡ media vẫn giữ dữ liệu.
+
+## Cloudinary lưu tệp nhưng API chưa xác nhận — 01/11/2026
+
+Tách timeout video 300 giây khỏi ảnh 120 giây và cho client chờ đủ cả body/provider/lookup. Sau lỗi tạm thời, tra đọc đúng public ID đã cấp tối đa ba lần; không upload lại bytes hay đoán URL. Chỉ trả ready sau xác minh identity/kind/URL và Redis; trạng thái chưa rõ vẫn thất bại. Lookup cần quyền/hạn mức Admin API, không cam kết đúng một upload qua crash hoặc mọi lần chọn lại. Media error trả thông báo tĩnh và log HTTP/transport an toàn, không quy mọi lỗi thành Docker hoặc lộ body provider. Không đổi nghiệp vụ/quyền/SQL/dependency; staging cleanup và SQL reference guard giữ nguyên.

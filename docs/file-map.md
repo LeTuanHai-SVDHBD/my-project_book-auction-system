@@ -210,3 +210,5 @@ Bộ lọc/cursor riêng của trang Kiểm duyệt nằm ở `backend/src/servi
 Ảnh chi tiết dùng `frontend/src/components/ImageZoom.jsx`; hình học kính lúp/ảnh contain tách ở `frontend/src/utils/imageZoom.js`. `BookGallery.jsx` tiếp tục quản lý lựa chọn ảnh/video; không đổi nguồn media hoặc endpoint.
 
 `backend/src/models/bookProfile.js` thống nhất hồ sơ sách riêng theo bài cho đọc/AI/tìm kiếm/giao dịch; migration `007_resubmission_profiles.sql` thêm JSON và hai cờ media active. `backend/test/postResubmit.test.js` kiểm tra model transaction/HTTP/quyền/rollback/lịch sử với SQL adapter fixture; SQL opt-in mở rộng ở reviewExportSql.test.js.
+
+`backend/src/services/mediaErrors.js` giữ thông báo/diagnostic Cloudinary thuộc allowlist; `backend/src/utils/providerJson.js` đọc body JSON trong deadline và giới hạn byte. `backend/test/mediaUpload.test.js` kiểm tra upload-timeout/metadata recovery/URL/HTTP/quota/stream và ngân sách client bằng fixture. Hướng dẫn vận hành tại `docs/media-upload.md`.

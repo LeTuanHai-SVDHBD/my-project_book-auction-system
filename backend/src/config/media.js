@@ -1,8 +1,8 @@
 /** Cloudinary và giới hạn kỹ thuật upload; không đưa bí mật vào cấu hình trả cho React. */
 export function parseMediaConfig(env) {
-  const integer = (name, fallback, max) => {
+  const integer = (name, fallback, max, min=1) => {
     const value = Number(env[name] || fallback);
-    if (!Number.isInteger(value) || value < 1 || value > max) throw new Error(`${name} không hợp lệ.`);
+    if (!Number.isInteger(value) || value < min || value > max) throw new Error(`${name} không hợp lệ.`);
     return value;
   };
   const cloudName = env.CLOUDINARY_CLOUD_NAME || '';
@@ -14,10 +14,17 @@ export function parseMediaConfig(env) {
     imageMaxBytes: integer('MEDIA_IMAGE_MAX_MB', 10, 20) * 1024 * 1024,
     videoMaxBytes: integer('MEDIA_VIDEO_MAX_MB', 50, 100) * 1024 * 1024,
     maxImages: null, maxVideos: integer('MEDIA_MAX_VIDEOS', 3, 5),
-    pendingSeconds: 3600, uploadTimeoutMs: 120000 };
+    pendingSeconds: 3600,
+    uploadTimeoutMs: integer('MEDIA_IMAGE_UPLOAD_TIMEOUT_MS',120000,300000,1000),
+    videoUploadTimeoutMs: integer('MEDIA_VIDEO_UPLOAD_TIMEOUT_MS',300000,300000,1000),
+    recoveryTimeoutMs: integer('MEDIA_RECOVERY_TIMEOUT_MS',15000,30000,1000),recoveryAttempts:3,recoveryDelayMs:1000 };
 }
 export function publicMediaConfig(config) {
   return { configured: config.configured, imageMaxBytes: config.imageMaxBytes, videoMaxBytes: config.videoMaxBytes,
     maxImages: config.maxImages, maxVideos: config.maxVideos,
+    uploadTimeoutMs: {image:mediaUploadBudget(config,'image'),video:mediaUploadBudget(config,'video')},
     imageTypes: ['image/jpeg', 'image/png', 'image/webp'], videoTypes: ['video/mp4', 'video/webm'] };
 }
+
+// Client includes time for the incoming binary body (Node request timeout), provider and bounded recovery.
+export function mediaUploadBudget(config,kind) {return (kind==='video'?(config.videoUploadTimeoutMs||300000):config.uploadTimeoutMs)+(config.recoveryAttempts||3)*(config.recoveryTimeoutMs||15000)+Math.max(0,(config.recoveryAttempts||3)-1)*(config.recoveryDelayMs??1000)+310000;}

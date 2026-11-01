@@ -102,8 +102,16 @@ export default function PostForm({
           throw new Error(
             `Tệp ${file.name} vượt giới hạn ${Math.round((image ? config.imageMaxBytes : config.videoMaxBytes) / 1048576)} MB.`,
           );
-        setProgress(`Đang tải ${index + 1}/${files.length}: ${file.name}`);
-        const result = await postApi.upload(file);
+        setProgress(
+          `Đang tải ${index + 1}/${files.length}: ${file.name}${video ? " — video có thể cần vài phút để Cloudinary xác nhận" : ""}`,
+        );
+        let result;
+        try {
+          result = await postApi.upload(file, config);
+        } catch (failure) {
+          failure.message = `${file.name}: ${failure.message}`;
+          throw failure;
+        }
         const item = { ...result, tieu_de: file.name.slice(0, 500) };
         tickets.current = [...tickets.current, item];
         setMedia(tickets.current);

@@ -349,7 +349,7 @@ xem [hướng dẫn](docs/after-sales.md). Bản giao dịch mới không thêm 
 |---|---|
 | smoke:m5/m6/m8 dừng tại readiness | Giữ dev:all ở terminal khác; xem từng thành phần tại /api/health/ready và docker compose ps; [hướng dẫn chẩn đoán](docs/after-sales.md#dừng-tại-readiness) |
 | SQL readiness chưa đạt 21 bảng/165 cột | Kiểm tra đúng database, kết nối và chạy `npm.cmd run db:migrate` |
-| Không upload được | Kiểm tra ba biến Cloudinary, giới hạn tệp và khởi động lại API |
+| Không upload được / Cloudinary có tệp nhưng web báo lỗi | Pull bản mới, chạy `setup:media`, khởi động lại API/web; kiểm tra mã media/HTTP trong log; xem [upload và đối soát video](docs/media-upload.md) |
 | Lỗi CSRF hoặc phiên hết hạn | Frontend tự lấy token mới và thử lại đúng một lần khi Backend trả INVALID_CSRF; phiên đăng nhập đã hết hạn/thu hồi vẫn phải đăng nhập lại. Không tắt bảo vệ cookie/CSRF. |
 | HTTP 409 khi duyệt/kích hoạt | Tải lại chi tiết trước khi thao tác; không dùng `row_version` cũ |
 | Hai tab vẫn đổi tài khoản cùng nhau | Cập nhật cả Backend/Frontend, khởi động lại API/web và F5 từng tab |
@@ -388,3 +388,5 @@ Schema 21 bảng/165 cột, 99 check. Migration giữ dữ liệu cũ và chạy
 Người bán sửa tên/tác giả/thể loại/NXB/năm/ISBN/giới thiệu khi bài bị từ chối; chỉ lưu hồ sơ của bài,
 không đổi Sach gốc dùng chung hoặc phiên cũ. Media gỡ vẫn giữ trong SQL/Cloudinary và bản kết quả cũ;
 chỉ media giữ lại/mới được dùng cho gallery, bìa và AI lần tiếp theo. Xem [luồng gửi lại](docs/flows.md).
+
+Video có thời gian chờ provider riêng (mặc định 300 giây); API đối soát đúng public ID sau phản hồi bị gián đoạn, không gửi lại upload. Lỗi Cloudinary được hiển thị riêng thay vì báo kiểm tra Docker. Cấu hình/cách cập nhật và giới hạn tại [media-upload.md](docs/media-upload.md).

@@ -20,7 +20,7 @@ Client HTTP không gửi `X-Tab-ID` dùng cookie chung độc lập với các c
 
 1. Sau xác thực/quyền/CSRF, API kiểm tra MIME, magic bytes và kích thước của từng tệp.
 2. Tạo vé Redis trước khi gọi Cloudinary để theo dõi cả upload bị ngắt.
-3. Cloudinary trả URL/public_id; API trả vé UUID và URL xem trước cho đúng chủ sách.
+3. Cloudinary trả URL/public_id; khi phản hồi bị gián đoạn, API tra metadata đúng ID đã cấp, tối đa ba lần và không upload lại. Chỉ sau xác minh/Redis ready mới trả vé UUID và URL xem trước cho đúng chủ sách. Xem [media-upload.md](media-upload.md).
 4. React gửi nội dung sách/bài/giá cùng vé; các ô tiền nhập số thuần, dòng xem trước nhóm nghìn; API nhận chuỗi nguyên.
 5. Service claim tất cả vé nguyên tử, xác nhận owner/trạng thái/tuổi vé; không tin URL do client khai báo.
 6. Transaction SQL tạo Sach, BaiDang, PhienDauGia pending, media và lịch sử; chưa có lịch đấu giá.

@@ -147,3 +147,7 @@ Media đã lưu có nút × đánh dấu gỡ khỏi hồ sơ mới, danh sách 
 Đóng biểu mẫu không gửi chỉnh sửa, chỉ dọn vé upload mới. Video cũ bị gỡ giải phóng chỗ trong giới hạn video;
 không cho Giữ lại nếu cộng video mới vượt giới hạn. Sau khi gửi, bài về chờ và AI tự phân tích lại nếu đã bật.
 Cập nhật API/frontend và migration 007 cùng nhau, không cần thay .env hoặc xóa database/Cloudinary.
+
+## Lỗi tải video và phản hồi Cloudinary
+
+Biểu mẫu dùng uploadTimeoutMs từ /media/config cho ảnh/video, không còn cắt cố định ở 150 giây. Khi tải video có gợi ý chờ Cloudinary xác nhận; lỗi hiển thị kèm tên tệp, không xóa các vé thành công trước đó. API chỉ trả vé sau xác minh tệp/metadata và Redis ready. Mã media được hiện bằng thông báo tĩnh, không đổi thành lỗi Docker. Client không tự upload lại khi mất phản hồi; xem [media-upload.md](media-upload.md) để cấu hình và đối soát.

@@ -9,9 +9,12 @@ export const postApi={
   exportReview:(id,reviewId)=>apiPost(`/posts/${id}/reviews/${reviewId}/export`),
   activate:(id,body)=>apiPost(`/posts/${id}/activate`,body),
   config:()=>apiRequest('/media/config'),
-  async upload(file) {
+  async upload(file,config) {
     const kind=file.type.startsWith('image/')?'image':'video';
-    return apiRequest(`/media/${kind}`,{method:'POST',headers:{'Content-Type':file.type,'x-csrf-token':await ensureCsrf()},body:file,signal:AbortSignal.timeout(150000)});
+    const configured=config?.uploadTimeoutMs?.[kind];
+    const timeout=Number.isInteger(configured)&&configured>=1000&&configured<=1200000?configured:(kind==='video'?700000:500000);
+    try { return await apiRequest(`/media/${kind}`,{method:'POST',headers:{'Content-Type':file.type,'x-csrf-token':await ensureCsrf()},body:file,signal:AbortSignal.timeout(timeout)}); }
+    catch(error){if(['TimeoutError','AbortError'].includes(error.name))throw new Error('Hết thời gian chờ xác nhận tệp. Tệp có thể đã lên Cloudinary; chưa thể đưa vào bài. Không tải lại liên tục.');if(error instanceof TypeError)throw new Error('Mất kết nối với API khi tải tệp. Chưa xác nhận được kết quả tải lên.');throw error;}
   },
   async discard(id) {return apiRequest(`/media/${id}`,{method:'DELETE',headers:{'x-csrf-token':await ensureCsrf()}});},
 };

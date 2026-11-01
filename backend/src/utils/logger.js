@@ -1,5 +1,6 @@
 /** Log ứng dụng; che bí mật cấu hình và dữ liệu xác thực. */
 import pino from 'pino';
+import {safeMediaDiagnostics} from '../services/mediaErrors.js';
 import { config } from '../config/env.js';
 export const logger = pino({ level: config.logLevel, base: { service: process.env.PROCESS_ROLE || 'book-auction' },
   redact: ['password', 'mat_khau', 'passwordHash', 'token', 'csrfToken', 'SESSION_SECRET',
@@ -8,5 +9,5 @@ export const logger = pino({ level: config.logLevel, base: { service: process.en
 export function logError(error, context = {}) {
   let message = String(error?.message || error);
   for (const secret of [config.sql.password, config.probeToken, process.env.SESSION_SECRET, process.env.CLOUDINARY_API_SECRET, process.env.CLOUDINARY_API_KEY, process.env.GEMINI_API_KEY].filter(Boolean)) message = message.replaceAll(secret, '[REDACTED]');
-  logger.error({ ...context, code: error?.code, message }, 'Lỗi xử lý');
+  logger.error({ ...context, code: error?.code, ...(error?.mediaDiagnostics?{cloudinary:safeMediaDiagnostics(error.mediaDiagnostics)}:{}), ...(error?.recoveryDiagnostics?{cloudinaryRecovery:safeMediaDiagnostics(error.recoveryDiagnostics)}:{}), message }, 'Lỗi xử lý');
 }

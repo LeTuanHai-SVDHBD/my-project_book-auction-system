@@ -130,7 +130,7 @@ async function serverFixture(t,{providerUpload,mediaOverrides={},moderationRows}
   const service={create:async(owner,input)=>{writes++;createdInput=input;return {id:7};},review:async()=>{writes++;return {id:7};}};
   const authRouter=createAuthRouter({authConfig,sessionMiddleware,users,passwords:{verify:async()=>true},limiter:{consume:async()=>0}});
   const postRouter=createPostRouter({sessionMiddleware,users,model,service,limits:mediaConfig});
-  const mediaRouter=createMediaRouter({sessionMiddleware,users,config:{...mediaConfig,...mediaOverrides},provider:{upload:async()=>{uploads++;if(providerUpload)return providerUpload();return {url:'https://res.cloudinary.com/demo/image/upload/x.png'};}},ledger:{begin:async()=>({publicId:'test'}),ready:async()=>({upload_id:randomUUID()})}});
+  const mediaRouter=createMediaRouter({sessionMiddleware,users,config:{...mediaConfig,...mediaOverrides},provider:{upload:async()=>{uploads++;if(providerUpload)return providerUpload();return {url:'https://res.cloudinary.com/demo/image/upload/x.png'};}},ledger:{begin:async(owner,kind)=>({publicId:'test',owner,kind}),ready:async(ticket,url)=>({upload_id:randomUUID(),url,kind:ticket.kind})}});
   const server=createServer(createApp({config:{origins:[],mode:'development',probeToken:'x'},deps:{},probes:{},authRouter,postRouter,mediaRouter}));
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(async()=>{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));});
   const base=`http://127.0.0.1:${server.address().port}`;
@@ -239,4 +239,15 @@ test('HTTP Admin: tất cả/chờ/từ chối, phân trang qua hai nhóm và b�
   moderationRows[34].trang_thai_bai='cho_kiem_duyet';moderationRows[34].trang_thai_phien='cho_kiem_duyet';
   assert.equal((await admin.call('/posts/pending?status=pending')).data.items[0].bai_dang_id,35);
   for(const suffix of ['?status=approved','?before=invalid','?status=rejected&before=pending:10'])assert.equal((await admin.call('/posts/pending'+suffix)).status,400);
+});
+
+test('HTTP video: Cloudinary đã nhận nhưng timeout vẫn trả vé sau đối soát; lỗi provider không báo Docker',async t=>{
+ let mode='recover',uploads=0,lookups=0;const bytes=Buffer.from('000000186674797069736f6d0000000069736f6d6d703432','hex');
+ const cloud=createCloudinary({config:mediaConfig,wait:async()=>{},fetchImpl:async(url,options)=>{
+  if(options.method==='POST'){uploads++;if(mode==='recover')throw new DOMException('private','TimeoutError');return Response.json({error:{message:'testsecret'}},{status:400});}
+  lookups++;return Response.json({public_id:'test',resource_type:'video',type:'upload',secure_url:'https://res.cloudinary.com/demo/video/upload/test.mp4'});
+ }});
+ const f=await serverFixture(t,{providerUpload:()=>cloud.upload({kind:'video',publicId:'test',bytes,mime:'video/mp4'})}),c=f.client();await c.login('a@example.test');
+ const ok=await c.call('/media/video','POST',bytes,c.token,'video/mp4');assert.equal(ok.status,201);assert.equal(ok.data.kind,'video');assert.equal(ok.data.url,'https://res.cloudinary.com/demo/video/upload/test.mp4');assert(ok.data.upload_id);assert.equal(uploads,1);assert.equal(lookups,1);
+ mode='reject';const failed=await c.call('/media/video','POST',bytes,c.token,'video/mp4');assert.equal(failed.status,502);assert.equal(failed.data.error,'MEDIA_PROVIDER_REJECTED');assert(!failed.data.message.includes('Docker'));assert(!JSON.stringify(failed.data).includes('testsecret'));assert(!failed.data.upload_id);assert.equal(uploads,2);assert.equal(lookups,1);
 });

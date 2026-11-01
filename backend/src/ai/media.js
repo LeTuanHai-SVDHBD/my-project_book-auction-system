@@ -1,4 +1,5 @@
 /** Chuẩn bị media song song có giới hạn, chọn theo thứ tự gốc để giữ ngân sách và mã bằng chứng. */
+import {mediaDisplayUrl} from '../../../shared/mediaDelivery.js';
 import {verifyMedia} from '../services/cloudinary.service.js';
 import {boundedBytes} from './transport.js';
 export async function prepareAiMedia({media,config,fetchImpl,signal,onProgress=async()=>{}}) {
@@ -12,7 +13,7 @@ export async function prepareAiMedia({media,config,fetchImpl,signal,onProgress=a
       const url=new URL(item.url);
       if(!['image','video'].includes(item.kind)||url.protocol!=='https:'||url.hostname!=='res.cloudinary.com'||url.username||url.password||url.port||!config.cloudName||!url.pathname.startsWith(`/${config.cloudName}/`))return {reason:'untrusted'};
       const requestSignal=AbortSignal.any([prepareSignal,AbortSignal.timeout(config.mediaDownloadTimeout||15000)]);
-      response=await fetchImpl(url.href,{redirect:'error',signal:requestSignal});
+      response=await fetchImpl(mediaDisplayUrl(url.href,item.kind),{redirect:'error',signal:requestSignal});
       if(!response.ok){void response.body?.cancel().catch(()=>{});return {reason:'unavailable'};}
       const mime=(response.headers.get('content-type')||'').split(';')[0];
       if(!['image/jpeg','image/png','image/webp','video/mp4','video/webm'].includes(mime)||!mime.startsWith(item.kind+'/')){void response.body?.cancel().catch(()=>{});return {reason:'invalid'};}

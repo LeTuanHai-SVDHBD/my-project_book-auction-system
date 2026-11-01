@@ -1,4 +1,5 @@
-/** All media belong to one post/physical copy. The video player uses the stored real URL. */
+/** All media belong to one physical copy. Compatible previews keep original evidence links. */
+import { mediaDisplayUrl } from "../../../shared/mediaDelivery.js";
 import { useEffect, useRef, useState } from "react";
 import ImageZoom from "./ImageZoom.jsx";
 import { Icon } from "./DesignUi.jsx";
@@ -88,15 +89,16 @@ export default function BookGallery({ items = [] }) {
         {media.kind === "video" ? (
           <video
             key={media.url}
-            src={media.url}
+            src={mediaDisplayUrl(media.url, media.kind)}
             controls
             preload="metadata"
             aria-label={media.title || "Video bản sách"}
           />
         ) : (
           <ImageZoom
+            originalSrc={media.url}
             key={media.url}
-            src={media.url}
+            src={mediaDisplayUrl(media.url, media.kind)}
             alt={media.title || "Ảnh bản sách"}
           />
         )}
@@ -134,7 +136,11 @@ export default function BookGallery({ items = [] }) {
               onClick={() => choose(i)}
             >
               {item.kind === "image" ? (
-                <img src={item.url} alt="" loading="lazy" />
+                <img
+                  src={mediaDisplayUrl(item.url, item.kind)}
+                  alt=""
+                  loading="lazy"
+                />
               ) : (
                 <>
                   <Icon name="play" size={30} />

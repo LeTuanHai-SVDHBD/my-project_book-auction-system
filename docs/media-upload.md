@@ -82,3 +82,44 @@ nếu người dùng chủ động tải lại nhiều lần. Không tự độn
 
 Kiểm tra sau cập nhật: tải một MP4 nằm trong dung lượng cho phép, chờ có preview/vé, gửi bài rồi mở lại
 để xác nhận video đã gắn SQL. Unit/browser fixture không thay nghiệm thu codec và phát video thật.
+
+## Định dạng và tên tệp
+
+Đuôi `.jpg` và `.jpeg` đều là JPEG; tên `1.jpg` không bị cấm. Client đọc tối đa 64 KiB đầu
+để nhận diện nội dung và chọn route/MIME đúng; API kiểm tra lại bytes trước khi gọi Cloudinary.
+Tệp PNG/WebP/AVIF bị đặt tên `.jpg` được gửi theo định dạng thật. HTML/SVG/PDF/executable hoặc
+container không nhận diện được vẫn bị từ chối, không bỏ kiểm tra magic bytes để nhận tệp giả.
+
+Danh sách nhận: JPG/JPEG/JFIF, PNG, WebP, GIF, BMP, TIFF/TIF, AVIF, HEIC/HEIF;
+MP4, M4V, MOV/QT, WebM, MKV và AVI. EBML phải có DocType WebM/Matroska;
+ISO-BMFF phải có brand phù hợp, không coi mọi `ftyp` là MP4.
+Đây là kiểm tra nhận diện, không thay thế việc Cloudinary giải mã và xác thực toàn bộ tệp/codec.
+Tệp hỏng hoặc codec/tài khoản provider không hỗ trợ vẫn có thể bị từ chối với lỗi riêng theo tên tệp.
+Batch tiếp tục những tệp khác khi một tệp lỗi; dừng các tệp chưa gửi khi phiên đăng nhập đổi.
+
+Giữ link Cloudinary gốc trong SQL, PDF và bằng chứng AI. Với các định dạng trình duyệt khó hiển thị,
+web dùng URL chuyển đổi JPEG hoặc MP4/H.264/AAC; GIF hiển thị khung đầu, link gốc vẫn xem được
+trong thư viện ảnh. AI dùng cùng bản chuyển đổi, manifest vẫn ghi link gốc; không tải được bản
+chuyển đổi thì ghi cảnh báo thiếu media, không tự tạo điểm. Cloudinary có thể cần thời gian tạo
+bản chuyển đổi và tính vào hạn mức transformations; kiểm thử giả lập không chứng minh codec thật
+phát được trên mọi thiết bị. Tham chiếu: [ảnh](https://cloudinary.com/documentation/image_format_support),
+[video](https://cloudinary.com/documentation/video_transcoding).
+
+## Nháp đăng sách
+
+- Tự lưu thông tin sách, ISBN, thể loại đã chọn, mô tả, tiền nguyên dạng chuỗi, cooldown,
+  bước đang nhập, vé media và các tệp dự định gỡ khi bổ sung. Tách nháp theo tài khoản,
+  chế độ tạo/bổ sung/đăng lại và bài nguồn; không lưu mật khẩu, cookie hoặc CSRF.
+- Lưu trên trình duyệt hiện tại; không thêm bảng SQL và không đồng bộ nháp sang thiết bị khác.
+  Nháp có thể mất nếu xóa dữ liệu web/ẩn danh/ổ đĩa bị chặn. Web hiển thị lỗi khi không ghi được.
+- Đóng biểu mẫu hoặc chuyển trang trong SPA giữ nháp. Tác vụ tải sống ngoài component, tiếp tục
+  từng tệp và cập nhật đúng nháp khi quay lại; không gọi DELETE khi component unmount.
+- Tải lại trang/đóng trình duyệt không thể giữ kết nối upload đang chạy. Giữ nội dung và vé đã
+  xác nhận, đánh dấu lượt tải chưa xác nhận để người dùng kiểm tra; không tự gửi POST lặp.
+  Vé chưa gửi bài vẫn có hạn **1 giờ từ lúc bắt đầu tải**, không phải kho lưu lâu dài.
+  API trả `expires_at`; vé hết hạn được bỏ có thông báo khi khôi phục/kiểm tra trước khi gửi.
+- Chỉ xóa nháp sau khi API xác nhận gửi thành công, hoặc người dùng xác nhận “Bỏ bản nháp”.
+  Khi bỏ nháp, chỉ bỏ vé mới; kết quả đến trễ của upload cũng được bỏ, không xóa media lịch sử.
+  Mã yêu cầu được giữ qua lần thử lại để chống tạo bài trùng khi mất phản hồi.
+- Nháp bổ sung có row_version của hồ sơ nguồn; nguồn đã đổi thì không áp dụng dữ liệu nháp cũ.
+  Checkbox xác nhận đúng một bản sách phải đánh dấu lại khi mở lại, không phục hồi đồng ý cũ.

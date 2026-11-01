@@ -132,10 +132,10 @@ Dùng `127.0.0.1` nhất quán cho Frontend và API để cookie hoạt động 
 
 | Loại | Định dạng | Giới hạn mặc định |
 |---|---|---|
-| Ảnh | JPEG, PNG, WebP | Không giới hạn số ảnh/bài; 10 MB/tệp |
-| Video | MP4, WebM | 3 tệp/bài; 50 MB/tệp |
+| Ảnh | JPEG/JPG/JFIF, PNG, WebP, GIF, BMP, TIFF, AVIF, HEIC/HEIF | Không giới hạn số ảnh/bài; 10 MB/tệp |
+| Video | MP4, M4V, MOV/QT, WebM, MKV, AVI | 3 tệp/bài; 50 MB/tệp |
 
-Điều chỉnh bằng `MEDIA_MAX_VIDEOS`, `MEDIA_IMAGE_MAX_MB`, `MEDIA_VIDEO_MAX_MB`. `MEDIA_MAX_IMAGES` cũ không còn được áp dụng; không cần sửa `.env` riêng. Ảnh vừa tải lên có nút × để bỏ trước khi gửi bài, chỉ gửi các vé còn giữ. Khi gửi duyệt lại, media cũ cũng có nút × để dự kiến gỡ khỏi hồ sơ mới, có thể giữ lại hoặc Hủy; chỉ lưu khi gửi thành công. Giới hạn video tính cả video giữ lại khi bổ sung/đăng lại.
+Điều chỉnh bằng `MEDIA_MAX_VIDEOS`, `MEDIA_IMAGE_MAX_MB`, `MEDIA_VIDEO_MAX_MB`. `MEDIA_MAX_IMAGES` cũ không còn được áp dụng; không cần sửa `.env` riêng. Ảnh vừa tải lên có nút × để bỏ trước khi gửi bài, chỉ gửi các vé còn giữ. Khi gửi duyệt lại, media cũ cũng có nút × để dự kiến gỡ khỏi hồ sơ mới, có thể giữ lại; đóng biểu mẫu giữ nháp, chỉ cập nhật hồ sơ khi gửi thành công. Giới hạn video tính cả video giữ lại khi bổ sung/đăng lại.
 
 ISBN là tùy chọn: chọn **Có ISBN** để nhập mã theo sách (tối đa 100 ký tự, giữ dấu gạch nối/khoảng trắng, không ép 10/13), hoặc **Không có ISBN** để lưu NULL. Trang chủ dùng đúng bốn nhóm từ `shared/bookGenres.js`; chọn nhóm sẽ lọc các thể loại con, không tìm nhóm bằng từ khóa tự đặt.
 API kiểm tra MIME, magic bytes và kích thước; tối đa hai upload đang xử lý mỗi tiến trình và 60 lần thử/tài khoản/giờ.
@@ -390,3 +390,8 @@ không đổi Sach gốc dùng chung hoặc phiên cũ. Media gỡ vẫn giữ t
 chỉ media giữ lại/mới được dùng cho gallery, bìa và AI lần tiếp theo. Xem [luồng gửi lại](docs/flows.md).
 
 Video có thời gian chờ provider riêng (mặc định 300 giây); API đối soát đúng public ID sau phản hồi bị gián đoạn, không gửi lại upload. Lỗi Cloudinary được hiển thị riêng thay vì báo kiểm tra Docker. Cấu hình/cách cập nhật và giới hạn tại [media-upload.md](docs/media-upload.md).
+
+Đăng sách có tự lưu nháp trên trình duyệt: đổi trang trong ứng dụng vẫn giữ nội dung và tiếp tục tải
+ảnh/video; gửi thành công mới xóa nháp. Hỗ trợ thêm GIF/BMP/TIFF/AVIF/HEIC và MOV/M4V/MKV/AVI,
+nhận diện nội dung thay vì chỉ nhìn đuôi tệp. Vé media nháp giữ tối đa 1 giờ; xem
+[chi tiết lưu nháp và tải tệp](docs/media-upload.md).

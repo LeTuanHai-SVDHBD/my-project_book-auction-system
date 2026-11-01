@@ -2,6 +2,26 @@
 
 # Kết quả kiểm tra
 
+## 2026-11-01 — Nhiều định dạng tệp và nháp đăng sách
+
+- `npm run check`: PASS 153 tệp JS phía server/script/shared.
+- `npm test`: PASS 183, SKIP 12 bài cần dịch vụ thật (tổng 195). Có kiểm tra 15 định dạng,
+  ảnh đổi đuôi gửi canonical MIME qua HTTP, chặn tệp giả/sai loại, chuyển đổi media AI giữ link gốc;
+  nháp riêng tài khoản/chế độ/bài, tiền 18 chữ số, lưu trữ bị chặn, hết hạn, đổi phiên đăng nhập,
+  kết quả upload đến sau khi bỏ nháp, xóa sau submit mà không xóa media đã gắn.
+- `npm run build`: PASS 94 modules.
+- Chromium chạy bản production và HTTP session/CSRF/router/controller/service thật với SQL/ledger/
+  Cloudinary-fetch giả lập: PASS hai lần chuyển SPA route trong khi video đang tải chỉ tạo 1 POST;
+  `1.jpg` chứa PNG gửi lên thành PNG, tệp HTML giả bị từ chối và không mất tệp hợp lệ trong cùng batch;
+  khôi phục đủ thông tin, thể loại, ISBN, giá, bước và media qua route + reload, checkbox phải xác nhận lại;
+  gửi thành công xóa nháp, không gọi discard tệp đã gắn. Bổ sung/gỡ media giữ nháp, bỏ nháp giữ hồ sơ gốc.
+  PASS không tràn ngang/lỗi JS tại 1440/768/390/320 px; đã xem ảnh chụp giao diện.
+- Chưa có tệp `1.jpg` gốc, không xác nhận loại/hỏng của tệp trong ảnh chụp người dùng.
+  Chưa chạy SQL/Redis/Cloudinary/Gemini thật hoặc chứng minh codec HEIC/MOV/MKV/AVI phát trên thiết bị thật.
+  Nháp cục bộ không thêm bảng/migration/dependency; upload đang chạy chỉ tiếp tục qua SPA route,
+  không tự tiếp tục sau đóng/reload trình duyệt; vé chưa gửi vẫn hết hạn sau 1 giờ.
+
+
 Cập nhật ngày 01/11/2026. Kết quả trong môi trường chuẩn bị được phân biệt với xác nhận trên máy nhóm.
 Không coi việc Admin duyệt thành công hoặc probe completed là bằng chứng toàn bộ nghiệp vụ đã đạt.
 

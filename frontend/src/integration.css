@@ -2277,3 +2277,13 @@ figure.upload-media-card {
     display: none;
   }
 }
+
+/* Draft status remains compact and readable in the four-step listing form. */
+.post-draft-status { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.1rem 1.3rem; margin:1.5rem 0; border:1px solid #dce2e8; border-radius:16px; background:#f1f5f8; color:#203c60; }
+.post-draft-status p { margin:.35rem 0; }
+.post-draft-status small { display:block; color:#596777; }
+.post-draft-status button { flex-shrink:0; }
+@media (max-width:600px) { .post-draft-status { align-items:stretch; flex-direction:column; padding:1rem; } }
+.post-draft-status > div { flex:1; min-width:0; }
+.post-sheet .post-draft-status > button { width:auto; }
+@media (max-width:600px) { .post-sheet .post-draft-status > button { width:100%; } }

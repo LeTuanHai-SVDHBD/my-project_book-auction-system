@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "./DesignUi.jsx";
 import { containedImage, imageZoomView } from "../utils/imageZoom.js";
-export default function ImageZoom({ src, alt }) {
+export default function ImageZoom({ src, originalSrc = src, alt }) {
   const target = useRef(null),
     image = useRef(null),
     position = useRef({ x: 0.5, y: 0.5 });
@@ -85,7 +85,7 @@ export default function ImageZoom({ src, alt }) {
       <a
         ref={target}
         className="image-zoom-target"
-        href={src}
+        href={originalSrc}
         target="_blank"
         rel="noreferrer"
         aria-label={`Phóng to ảnh: ${alt} (mở ảnh gốc)`}

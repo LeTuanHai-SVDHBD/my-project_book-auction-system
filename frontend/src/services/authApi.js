@@ -6,6 +6,7 @@ const base=browserApiBase();
 let csrfToken;
 let bootstrap;
 let authenticated=false,sessionRevision=0;
+export const getSessionRevision=()=>sessionRevision;
 export function invalidateSession(replaced=true){csrfToken=undefined;authenticated=false;++sessionRevision;if(replaced)markAccountReplaced();else markAccountExpired();}
 export async function apiRequest(path, options = {}) {
   if(isAccountReplaced()&&!['/auth/csrf','/auth/login','/auth/register','/auth/me'].includes(path))throw replacedError();

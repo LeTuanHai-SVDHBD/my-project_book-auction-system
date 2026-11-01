@@ -1,11 +1,11 @@
 /** Combobox một lựa chọn: nhập để lọc có/không dấu, chỉ lưu giá trị được chọn trong danh mục. */
 import {useEffect,useId,useRef,useState} from 'react';
 import {searchBookGenres} from '../../../shared/bookGenres.js';
-export default function GenreSelect({initialValue=""}){
+export default function GenreSelect({initialValue="",onValueChange}){
   const id=useId(),input=useRef(null),list=useRef(null);
   const [query,setQuery]=useState(initialValue),[selected,setSelected]=useState(initialValue),[open,setOpen]=useState(false),[active,setActive]=useState(-1);
   const groups=searchBookGenres(query===selected?'':query),items=groups.flatMap(group=>group.items);
-  function choose(value){setSelected(value);setQuery(value);setOpen(false);setActive(-1);input.current.setCustomValidity('');input.current.focus();}
+  function choose(value){onValueChange?.(value);setSelected(value);setQuery(value);setOpen(false);setActive(-1);input.current.setCustomValidity('');input.current.focus();}
   function change(event){const value=event.target.value;setQuery(value);setSelected('');setOpen(true);setActive(-1);event.target.setCustomValidity(value?'Hãy chọn một thể loại trong danh sách hoặc xóa ô tìm kiếm.':'');}
   function keys(event){
     if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();setOpen(true);setActive(value=>items.length?(value+(event.key==='ArrowDown'?1:-1)+items.length)%items.length:-1);}

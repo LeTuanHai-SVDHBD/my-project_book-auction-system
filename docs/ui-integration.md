@@ -151,3 +151,11 @@ Cập nhật API/frontend và migration 007 cùng nhau, không cần thay .env h
 ## Lỗi tải video và phản hồi Cloudinary
 
 Biểu mẫu dùng uploadTimeoutMs từ /media/config cho ảnh/video, không còn cắt cố định ở 150 giây. Khi tải video có gợi ý chờ Cloudinary xác nhận; lỗi hiển thị kèm tên tệp, không xóa các vé thành công trước đó. API chỉ trả vé sau xác minh tệp/metadata và Redis ready. Mã media được hiện bằng thông báo tĩnh, không đổi thành lỗi Docker. Client không tự upload lại khi mất phản hồi; xem [media-upload.md](media-upload.md) để cấu hình và đối soát.
+
+### Nháp biểu mẫu và nhiều định dạng media
+
+Đăng sách tự lưu nháp riêng từng tài khoản/bài/chế độ trên trình duyệt. Chuyển route trong ứng dụng
+không hủy upload hoặc bỏ vé; quay lại tiếp tục đúng bước và xem kết quả. Đóng biểu mẫu giữ nháp;
+“Bỏ bản nháp” có xác nhận và chỉ bỏ các tệp mới. Tải lại trang giữ thông tin + tệp đã xác nhận,
+lượt upload chưa có phản hồi được báo gián đoạn; vé hết hạn 1 giờ cần chọn lại.
+Xem [định dạng, bản chuyển đổi và giới hạn nháp](media-upload.md).

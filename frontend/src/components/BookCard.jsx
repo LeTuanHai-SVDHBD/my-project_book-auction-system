@@ -1,4 +1,5 @@
 /** Public card uses a real cover only; no fabricated appraisal images or quantity selector. */
+import { mediaDisplayUrl } from "../../../shared/mediaDelivery.js";
 import { Icon } from "./DesignUi.jsx";
 export const money = (value) =>
   value == null
@@ -31,7 +32,7 @@ export default function BookCard({ post, mode = "catalog", query = "" }) {
         </span>
         {post.anh_bia ? (
           <img
-            src={post.anh_bia}
+            src={mediaDisplayUrl(post.anh_bia, "image")}
             alt={`Bản sách ${post.ten_sach}`}
             loading="lazy"
           />

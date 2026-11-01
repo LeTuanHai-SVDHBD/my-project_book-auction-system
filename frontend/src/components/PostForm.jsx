@@ -1,5 +1,14 @@
 /** Biểu mẫu sách/bài đăng; tệp được tải trước, chỉ vé upload được gửi cùng nội dung. */
-import { useEffect, useRef, useState } from "react";
+import { mediaDisplayUrl } from "../../../shared/mediaDelivery.js";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { openPostDraft } from "../services/postDrafts.js";
+import { mediaAccept } from "../../../shared/mediaFormats.js";
 import { postApi } from "../services/postApi.js";
 import UploadMediaCard from "./UploadMediaCard.jsx";
 import MoneyInput from "./MoneyInput.jsx";
@@ -7,18 +16,24 @@ import GenreSelect from "./GenreSelect.jsx";
 import { ISBN_MAX_LENGTH } from "../../../shared/bookIdentifiers.js";
 export default function PostForm({
   source,
+  owner,
   mode = "create",
   onSaved,
   onCancel,
 }) {
-  const [step, setStep] = useState(0),
-    [review, setReview] = useState({});
+  const [draft] = useState(() => openPostDraft({ owner, mode, source }));
+  useSyncExternalStore(draft.subscribe, draft.snapshot);
+  const initial = useRef({ ...source, ...draft.data.fields }).current;
+  const [step, setStep] = useState(draft.data.step),
+    [review, setReview] = useState(draft.data.fields);
   const formRef = useRef(null);
-  const [isbnMode, setIsbnMode] = useState(source?.isbn ? "has" : "none"),
-    [isbn, setIsbn] = useState(source?.isbn || "");
+  const [isbnMode, setIsbnMode] = useState(draft.data.isbnMode),
+    [isbn, setIsbn] = useState(draft.data.isbn);
   const [config, setConfig] = useState(null);
-  const [media, setMedia] = useState([]),
-    [removed, setRemoved] = useState([]);
+  const media = draft.data.media;
+  const [removed, setRemoved] = useState(draft.data.removed);
+  const [editRevision, setEditRevision] = useState(0),
+    [confirmDiscard, setConfirmDiscard] = useState(false);
   const editableBook = mode === "create" || mode === "resubmit";
   const keptMedia = (source?.media || []).filter(
     (item) => !removed.some((x) => x.id === item.id && x.kind === item.kind),
@@ -46,13 +61,22 @@ export default function PostForm({
   }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [progress, setProgress] = useState("");
   const [cooldown, setCooldown] = useState(() =>
-    String(source?.thoi_gian_cho_dat_lai ?? 20),
+    String(initial.thoi_gian_cho_dat_lai ?? 20),
   );
-  const [requestId] = useState(() => crypto.randomUUID());
-  const tickets = useRef([]);
-  const submitted = useRef(false);
+  const requestId = draft.data.requestId;
+  const uploading = draft.status.busy,
+    locked = busy || uploading;
+  useLayoutEffect(() => {
+    if (formRef.current && !busy) {
+      const fields = Object.fromEntries(new FormData(formRef.current));
+      if (mode === "relist")
+        fields.reuse_media = formRef.current.elements.reuse_media.checked
+          ? "on"
+          : "off";
+      draft.save({ fields, step, isbnMode, isbn, removed });
+    }
+  }, [draft, step, isbnMode, isbn, cooldown, removed, editRevision, busy]);
   useEffect(() => {
     let canceled = false;
     postApi
@@ -65,81 +89,28 @@ export default function PostForm({
       });
     return () => {
       canceled = true;
-      if (!submitted.current)
-        for (const item of tickets.current)
-          void postApi.discard(item.upload_id).catch(() => {});
     };
   }, []);
-  async function upload(event) {
+  function upload(event) {
     const files = [...event.target.files];
     event.target.value = "";
-    setBusy(true);
     setError("");
-    try {
-      for (const [index, file] of files.entries()) {
-        const image = config.imageTypes.includes(file.type);
-        const video = config.videoTypes.includes(file.type);
-        if (video) {
-          const reused =
-            mode === "resubmit" ||
-            (mode === "relist" &&
-              formRef.current?.elements.reuse_media?.checked);
-          const existing = reused
-            ? keptMedia.filter((item) => item.kind === "video").length
-            : 0;
-          if (
-            existing +
-              tickets.current.filter((item) => item.kind === "video").length >=
-            config.maxVideos
-          )
-            throw new Error(
-              `Tối đa ${config.maxVideos} video cho mỗi bài đăng, tính cả video giữ lại.`,
-            );
-        }
-        if (!image && !video)
-          throw new Error("Chỉ hỗ trợ JPEG, PNG, WebP, MP4 và WebM.");
-        if (file.size > (image ? config.imageMaxBytes : config.videoMaxBytes))
-          throw new Error(
-            `Tệp ${file.name} vượt giới hạn ${Math.round((image ? config.imageMaxBytes : config.videoMaxBytes) / 1048576)} MB.`,
-          );
-        setProgress(
-          `Đang tải ${index + 1}/${files.length}: ${file.name}${video ? " — video có thể cần vài phút để Cloudinary xác nhận" : ""}`,
-        );
-        let result;
-        try {
-          result = await postApi.upload(file, config);
-        } catch (failure) {
-          failure.message = `${file.name}: ${failure.message}`;
-          throw failure;
-        }
-        const item = { ...result, tieu_de: file.name.slice(0, 500) };
-        tickets.current = [...tickets.current, item];
-        setMedia(tickets.current);
-      }
-    } catch (failure) {
-      setError(failure.message);
-    } finally {
-      setBusy(false);
-      setProgress("");
-    }
+    const reused =
+      mode === "resubmit" ||
+      (mode === "relist" && formRef.current?.elements.reuse_media?.checked);
+    void draft.upload(
+      files,
+      config,
+      reused ? keptMedia.filter((x) => x.kind === "video").length : 0,
+    );
   }
-  async function remove(item) {
-    setBusy(true);
+  function remove(item) {
     setError("");
-    try {
-      await postApi.discard(item.upload_id);
-      tickets.current = tickets.current.filter(
-        (x) => x.upload_id !== item.upload_id,
-      );
-      setMedia(tickets.current);
-    } catch (failure) {
-      setError(failure.message);
-    } finally {
-      setBusy(false);
-    }
+    void draft.remove(item);
   }
   async function submit(event) {
     event.preventDefault();
+    if (locked) return;
     if (step < 3) {
       next();
       return;
@@ -152,6 +123,7 @@ export default function PostForm({
       setError("Vui lòng kiểm tra thông tin còn thiếu.");
       return;
     }
+    if (draft.pruneExpired()) return;
     const data = Object.fromEntries(new FormData(event.currentTarget));
     setBusy(true);
     setError("");
@@ -190,7 +162,7 @@ export default function PostForm({
     }
     try {
       const result = await postApi.save(body, source?.bai_dang_id, mode);
-      submitted.current = true;
+      draft.clear({ submitted: true });
       onSaved(result.id);
     } catch (failure) {
       setError(
@@ -222,7 +194,7 @@ export default function PostForm({
     max,
     required = false,
     type = "text",
-    value = source?.[name] ?? "",
+    value = initial[name] ?? "",
   ) => (
     <label key={name}>
       {label}
@@ -258,7 +230,64 @@ export default function PostForm({
           </li>
         ))}
       </ol>
-      <form ref={formRef} noValidate onSubmit={submit}>
+      <aside className="post-draft-status" aria-label="Bản nháp đăng sách">
+        <div>
+          <strong>Bản nháp riêng của bạn</strong>
+          <p>
+            {draft.status.storageError ||
+              "Tự động lưu trên trình duyệt này. Đóng biểu mẫu hoặc chuyển trang vẫn giữ nội dung."}
+          </p>
+          <small>
+            Tệp chưa gửi bài có hạn giữ 1 giờ từ lúc bắt đầu tải. Khi tải lại
+            trang/đóng trình duyệt, lượt tải đang chạy có thể bị gián đoạn.
+          </small>
+        </div>
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => setConfirmDiscard(true)}
+          disabled={busy}
+        >
+          Bỏ bản nháp
+        </button>
+      </aside>
+      {draft.status.notice && (
+        <p className="notice" role="status">
+          {draft.status.notice}
+        </p>
+      )}
+      {confirmDiscard && (
+        <div className="notice">
+          <p>
+            Xóa nội dung nháp và bỏ các tệp mới? Hồ sơ đã lưu trước đó được giữ
+            nguyên.
+          </p>
+          <div className="actions">
+            <button
+              type="button"
+              onClick={() => {
+                draft.clear();
+                onCancel();
+              }}
+            >
+              Xóa bản nháp
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => setConfirmDiscard(false)}
+            >
+              Giữ bản nháp
+            </button>
+          </div>
+        </div>
+      )}
+      <form
+        ref={formRef}
+        noValidate
+        onSubmit={submit}
+        onChange={() => setEditRevision((v) => v + 1)}
+      >
         <fieldset disabled={busy}>
           <div data-step="0" hidden={step !== 0}>
             {editableBook ? (
@@ -267,7 +296,10 @@ export default function PostForm({
                 <div className="form-grid">
                   {input("ten_sach", "Tên sách", 300, true)}
                   {input("tac_gia", "Tác giả", 200)}
-                  <GenreSelect initialValue={source?.the_loai || ""} />
+                  <GenreSelect
+                    initialValue={initial.the_loai || ""}
+                    onValueChange={() => setEditRevision((v) => v + 1)}
+                  />
                   {input("nha_xuat_ban", "Nhà xuất bản", 200)}
                   {input("nam_xuat_ban", "Năm xuất bản", 4, false, "number")}
                   <div className="isbn-field">
@@ -328,7 +360,7 @@ export default function PostForm({
                     name="mo_ta"
                     aria-label="Giới thiệu sách"
                     maxLength={12000}
-                    defaultValue={source?.mo_ta || ""}
+                    defaultValue={initial.mo_ta || ""}
                   />
                 </label>
               </>
@@ -347,7 +379,7 @@ export default function PostForm({
               <textarea
                 name="mo_ta_tinh_trang"
                 aria-label="Tình trạng, yếu tố quý hiếm và bằng chứng"
-                defaultValue={source?.mo_ta_tinh_trang || ""}
+                defaultValue={initial.mo_ta_tinh_trang || ""}
                 required
                 maxLength={12000}
                 rows={7}
@@ -365,13 +397,22 @@ export default function PostForm({
             <h3>Ảnh và video</h3>
             {mode === "relist" && (
               <label className="check-label">
-                <input type="checkbox" name="reuse_media" defaultChecked />
+                <input
+                  type="checkbox"
+                  name="reuse_media"
+                  defaultChecked={
+                    initial.reuse_media !== undefined
+                      ? initial.reuse_media === "on"
+                      : true
+                  }
+                  disabled={uploading}
+                />
                 Dùng lại media của bài cũ
               </label>
             )}
             <p className="field-hint">
               {config
-                ? `Không giới hạn số lượng ảnh (${config.imageMaxBytes / 1048576} MB/ảnh). Tối đa ${config.maxVideos} video (${config.videoMaxBytes / 1048576} MB/video). JPEG, PNG, WebP, MP4, WebM.`
+                ? `Không giới hạn số lượng ảnh (${config.imageMaxBytes / 1048576} MB/ảnh). Tối đa ${config.maxVideos} video (${config.videoMaxBytes / 1048576} MB/video). ${config.formatLabel}.`
                 : "Đang tải cấu hình…"}
             </p>
             {config && !config.configured && (
@@ -384,8 +425,8 @@ export default function PostForm({
               <input
                 type="file"
                 multiple
-                accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
-                disabled={!config?.configured || busy}
+                accept={config?.accept || mediaAccept}
+                disabled={!config?.configured || locked}
                 onChange={upload}
               />
             </label>
@@ -405,7 +446,7 @@ export default function PostForm({
                   key={item.upload_id}
                   item={item}
                   onRemove={remove}
-                  disabled={busy}
+                  disabled={locked}
                 />
               ))}
             </div>
@@ -414,7 +455,7 @@ export default function PostForm({
                 <h4>Media đã gắn với bản sách</h4>
                 <p className="field-hint">
                   {mode === "resubmit"
-                    ? "Nhấn × để gỡ khỏi hồ sơ gửi duyệt mới. Chỉ áp dụng khi gửi thành công; đóng biểu mẫu sẽ giữ nguyên dữ liệu cũ và file Cloudinary."
+                    ? "Nhấn × để gỡ khỏi hồ sơ gửi duyệt mới. Chỉ áp dụng khi gửi thành công; bản nháp giữ các thay đổi này; dữ liệu cũ và file Cloudinary chỉ thay đổi khi gửi thành công."
                     : "Media đã lưu của bài nguồn được giữ nguyên cùng lịch sử."}
                 </p>
                 <div className="media-grid">
@@ -423,16 +464,23 @@ export default function PostForm({
                       <UploadMediaCard
                         key={`${item.kind}:${item.id}`}
                         item={item}
-                        disabled={busy || !item.id}
+                        disabled={locked || !item.id}
                         onRemove={stageRemoval}
                         removeTitle="Gỡ khỏi hồ sơ gửi duyệt mới"
                       />
                     ) : (
                       <figure key={item.url}>
                         {item.kind === "image" ? (
-                          <img src={item.url} alt={item.title || "Ảnh sách"} />
+                          <img
+                            src={mediaDisplayUrl(item.url, item.kind)}
+                            alt={item.title || "Ảnh sách"}
+                          />
                         ) : (
-                          <video src={item.url} controls preload="metadata" />
+                          <video
+                            src={mediaDisplayUrl(item.url, item.kind)}
+                            controls
+                            preload="metadata"
+                          />
                         )}
                         <figcaption>{item.title}</figcaption>
                       </figure>
@@ -479,17 +527,17 @@ export default function PostForm({
               <MoneyInput
                 name="gia_khoi_diem"
                 label="Giá khởi điểm (VND)"
-                initialValue={source?.gia_khoi_diem}
+                initialValue={initial.gia_khoi_diem}
               />
               <MoneyInput
                 name="gia_toi_thieu"
                 label="Giá kết thúc sớm — chỉ chủ sách/Admin thấy (VND)"
-                initialValue={source?.gia_toi_thieu}
+                initialValue={initial.gia_toi_thieu}
               />
               <MoneyInput
                 name="buoc_gia"
                 label="Bước giá (VND)"
-                initialValue={source?.buoc_gia}
+                initialValue={initial.buoc_gia}
               />
               <label>
                 Chờ đặt lại (10–30 giây)
@@ -599,8 +647,8 @@ export default function PostForm({
                 Tiếp tục
               </button>
             ) : (
-              <button className="primary">
-                {busy ? "Đang xử lý…" : "Gửi kiểm duyệt"}
+              <button className="primary" disabled={locked}>
+                {locked ? "Đang xử lý…" : "Gửi kiểm duyệt"}
               </button>
             )}
             <button type="button" className="text-button" onClick={onCancel}>
@@ -609,10 +657,10 @@ export default function PostForm({
           </div>
         </fieldset>
       </form>
-      {progress && <p role="status">{progress}</p>}
-      {error && (
+      {draft.status.progress && <p role="status">{draft.status.progress}</p>}
+      {(error || draft.status.error) && (
         <p className="error" role="alert">
-          {error}
+          {error || draft.status.error}
         </p>
       )}
     </section>

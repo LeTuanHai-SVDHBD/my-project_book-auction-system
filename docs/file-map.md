@@ -212,3 +212,9 @@ Bộ lọc/cursor riêng của trang Kiểm duyệt nằm ở `backend/src/servi
 `backend/src/models/bookProfile.js` thống nhất hồ sơ sách riêng theo bài cho đọc/AI/tìm kiếm/giao dịch; migration `007_resubmission_profiles.sql` thêm JSON và hai cờ media active. `backend/test/postResubmit.test.js` kiểm tra model transaction/HTTP/quyền/rollback/lịch sử với SQL adapter fixture; SQL opt-in mở rộng ở reviewExportSql.test.js.
 
 `backend/src/services/mediaErrors.js` giữ thông báo/diagnostic Cloudinary thuộc allowlist; `backend/src/utils/providerJson.js` đọc body JSON trong deadline và giới hạn byte. `backend/test/mediaUpload.test.js` kiểm tra upload-timeout/metadata recovery/URL/HTTP/quota/stream và ngân sách client bằng fixture. Hướng dẫn vận hành tại `docs/media-upload.md`.
+
+- `shared/mediaFormats.js`: danh mục và nhận diện chữ ký nội dung, dùng chung browser/API.
+- `shared/mediaDelivery.js`: URL xem/chấm AI cho định dạng cần chuyển đổi, giữ link gốc trong hồ sơ.
+- `frontend/src/services/postDrafts.js`: nháp theo người/chế độ/bài, lưu cục bộ và upload qua chuyển route.
+- `backend/test/mediaFormats.test.js`, `backend/test/postDrafts.test.js`: kiểm tra tệp đổi đuôi,
+  container, chuyển đổi AI, vòng đời upload/nháp, cô lập tài khoản và nháp hết hạn.

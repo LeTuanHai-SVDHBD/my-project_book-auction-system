@@ -1,4 +1,5 @@
 /** Cloudinary và giới hạn kỹ thuật upload; không đưa bí mật vào cấu hình trả cho React. */
+import {mediaFormats,mediaAccept,mediaFormatLabel} from '../../../shared/mediaFormats.js';
 export function parseMediaConfig(env) {
   const integer = (name, fallback, max, min=1) => {
     const value = Number(env[name] || fallback);
@@ -23,7 +24,8 @@ export function publicMediaConfig(config) {
   return { configured: config.configured, imageMaxBytes: config.imageMaxBytes, videoMaxBytes: config.videoMaxBytes,
     maxImages: config.maxImages, maxVideos: config.maxVideos,
     uploadTimeoutMs: {image:mediaUploadBudget(config,'image'),video:mediaUploadBudget(config,'video')},
-    imageTypes: ['image/jpeg', 'image/png', 'image/webp'], videoTypes: ['video/mp4', 'video/webm'] };
+    accept:mediaAccept,formatLabel:mediaFormatLabel,
+    imageTypes: mediaFormats.filter(x=>x.kind==='image').map(x=>x.mime), videoTypes: mediaFormats.filter(x=>x.kind==='video').map(x=>x.mime) };
 }
 
 // Client includes time for the incoming binary body (Node request timeout), provider and bounded recovery.

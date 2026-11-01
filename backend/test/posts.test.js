@@ -97,7 +97,7 @@ test('retry mã đã commit không claim lại vé đã dùng; đua idempotency 
 test('nhận diện ảnh/video theo magic bytes; Cloudinary REST không lộ secret, kiểm tra URL/public_id và destroy idempotent',async()=>{
   assert.doesNotThrow(()=>verifyMedia(Buffer.from([255,216,255,0]),'image/jpeg','image'));
   assert.throws(()=>verifyMedia(Buffer.from('not an image'),'image/jpeg','image'),{status:415});
-  assert.doesNotThrow(()=>verifyMedia(Buffer.from([26,69,223,163]),'video/webm','video'));
+  assert.doesNotThrow(()=>verifyMedia(Buffer.from('1a45dfa3874282847765626d','hex'),'video/webm','video'));
   const publicId='bookauction/1/test';let calls=0;
   const provider=createCloudinary({config:mediaConfig,fetchImpl:async(url,options)=>{
     calls++;assert(url.startsWith('https://api.cloudinary.com/v1_1/demo/'));assert(!url.includes('testsecret'));
@@ -130,7 +130,7 @@ async function serverFixture(t,{providerUpload,mediaOverrides={},moderationRows}
   const service={create:async(owner,input)=>{writes++;createdInput=input;return {id:7};},review:async()=>{writes++;return {id:7};}};
   const authRouter=createAuthRouter({authConfig,sessionMiddleware,users,passwords:{verify:async()=>true},limiter:{consume:async()=>0}});
   const postRouter=createPostRouter({sessionMiddleware,users,model,service,limits:mediaConfig});
-  const mediaRouter=createMediaRouter({sessionMiddleware,users,config:{...mediaConfig,...mediaOverrides},provider:{upload:async()=>{uploads++;if(providerUpload)return providerUpload();return {url:'https://res.cloudinary.com/demo/image/upload/x.png'};}},ledger:{begin:async(owner,kind)=>({publicId:'test',owner,kind}),ready:async(ticket,url)=>({upload_id:randomUUID(),url,kind:ticket.kind})}});
+  const mediaRouter=createMediaRouter({sessionMiddleware,users,config:{...mediaConfig,...mediaOverrides},provider:{upload:async input=>{uploads++;if(providerUpload)return providerUpload(input);return {url:'https://res.cloudinary.com/demo/image/upload/x.png'};}},ledger:{begin:async(owner,kind)=>({publicId:'test',owner,kind}),ready:async(ticket,url)=>({upload_id:randomUUID(),url,kind:ticket.kind})}});
   const server=createServer(createApp({config:{origins:[],mode:'development',probeToken:'x'},deps:{},probes:{},authRouter,postRouter,mediaRouter}));
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(async()=>{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));});
   const base=`http://127.0.0.1:${server.address().port}`;
@@ -250,4 +250,12 @@ test('HTTP video: Cloudinary đã nhận nhưng timeout vẫn trả vé sau đ�
  const f=await serverFixture(t,{providerUpload:()=>cloud.upload({kind:'video',publicId:'test',bytes,mime:'video/mp4'})}),c=f.client();await c.login('a@example.test');
  const ok=await c.call('/media/video','POST',bytes,c.token,'video/mp4');assert.equal(ok.status,201);assert.equal(ok.data.kind,'video');assert.equal(ok.data.url,'https://res.cloudinary.com/demo/video/upload/test.mp4');assert(ok.data.upload_id);assert.equal(uploads,1);assert.equal(lookups,1);
  mode='reject';const failed=await c.call('/media/video','POST',bytes,c.token,'video/mp4');assert.equal(failed.status,502);assert.equal(failed.data.error,'MEDIA_PROVIDER_REJECTED');assert(!failed.data.message.includes('Docker'));assert(!JSON.stringify(failed.data).includes('testsecret'));assert(!failed.data.upload_id);assert.equal(uploads,2);assert.equal(lookups,1);
+});
+
+test('HTTP renamed 1.jpg: sniff actual bytes and send canonical MIME; reject non-media and wrong route before provider',async t=>{
+ const seen=[];const fixture=await serverFixture(t,{providerUpload:async input=>{seen.push(input);return {url:'https://res.cloudinary.com/demo/'+input.kind+'/upload/a'};}}),c=fixture.client();await c.login('a@example.test');
+ const gif=Buffer.from('GIF89a');assert.equal((await c.call('/media/image','POST',gif,c.token,'image/jpeg')).status,201);assert.equal(seen[0].mime,'image/gif');assert.deepEqual(seen[0].bytes,gif);
+ const heic=Buffer.from('00000010667479706865696300000000','hex');assert.equal((await c.call('/media/image','POST',heic,c.token,'image/heic')).status,201);assert.equal(seen[1].mime,'image/heic');
+ assert.equal((await c.call('/media/video','POST',gif,c.token,'video/mp4')).status,415);
+ assert.equal((await c.call('/media/image','POST',Buffer.from('<svg/>'),c.token,'image/jpeg')).status,415);assert.equal(seen.length,2);
 });

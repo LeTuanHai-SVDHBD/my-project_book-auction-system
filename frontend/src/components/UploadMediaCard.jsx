@@ -1,4 +1,5 @@
 /** Media preview; the caller decides whether removal discards an upload or stages a resubmission edit. */
+import { mediaDisplayUrl } from "../../../shared/mediaDelivery.js";
 import { Icon } from "./DesignUi.jsx";
 export default function UploadMediaCard({
   item,
@@ -15,13 +16,13 @@ export default function UploadMediaCard({
       <div className="upload-media-preview">
         {item.kind === "video" ? (
           <video
-            src={item.url}
+            src={mediaDisplayUrl(item.url, item.kind)}
             controls
             preload="metadata"
             aria-label={label}
           />
         ) : (
-          <img src={item.url} alt={label} />
+          <img src={mediaDisplayUrl(item.url, item.kind)} alt={label} />
         )}
       </div>
       <figcaption>

@@ -1,4 +1,5 @@
 /** Upload nhị phân từng tệp qua API sau xác thực/CSRF; không dùng multipart parser hay dependency mới. */
+import {mediaFormats} from '../../../shared/mediaFormats.js';
 import express from 'express';
 import { requireUser, requireCsrf, requireRole } from '../middlewares/auth.js';
 import { HttpError } from '../middlewares/errorHandler.js';
@@ -11,7 +12,7 @@ export function createMediaRouter({ sessionMiddleware, users, config, provider, 
   router.use(sessionMiddleware,requireUser(users),requireRole('nguoi_dung'),requireCsrf);
   for (const kind of ['image','video']) {
     const limit=kind==='image'?config.imageMaxBytes:config.videoMaxBytes;
-    const types=kind==='image'?['image/jpeg','image/png','image/webp']:['video/mp4','video/webm'];
+    const types=mediaFormats.filter(x=>x.kind===kind).map(x=>x.mime);
     router.post(`/${kind}`,(req,res,next)=>{
       if (!config.configured) return next(mediaFailure('MEDIA_NOT_CONFIGURED'));
       if (!types.includes(req.get('content-type'))) return next(new HttpError(415,'UNSUPPORTED_MEDIA','Định dạng tệp không được hỗ trợ.'));

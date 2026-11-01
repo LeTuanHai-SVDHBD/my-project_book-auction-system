@@ -497,6 +497,7 @@ export default function PostsPanel({
       {form ? (
         <PostForm
           key={`${form}-${post?.bai_dang_id || "new"}`}
+          owner={user.nguoi_dung_id}
           source={form === "create" ? null : post}
           mode={form}
           onSaved={saved}

@@ -42,7 +42,7 @@ export function createMediaLedger({ getRedis, provider, isReferenced, config, no
       // Upload timeout is shorter than staging lifetime; an expired ticket is never reused.
       if (now() >= item.expires) throw new HttpError(409, 'UPLOAD_EXPIRED', 'Tệp tải lên đã hết hạn.');
       await getRedis().set(prefix+item.uploadId,JSON.stringify(value));
-      return { upload_id:item.uploadId, url, kind:item.kind };
+      return { upload_id:item.uploadId, url, kind:item.kind, expires_at:item.expires };
     },
     async claim(owner, requested) {
       if (!requested.length) return { token:randomUUID(), items:[] };

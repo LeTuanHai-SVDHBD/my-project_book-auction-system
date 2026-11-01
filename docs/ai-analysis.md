@@ -43,8 +43,8 @@ Khởi động lại API và worker sau khi đổi cấu hình:
 npm.cmd run dev:all
 ```
 
-Bật AI cũng xử lý các bài đang chờ duyệt chưa có phân tích của phiên bản hiện tại; cân nhắc quota cho số bài tồn.
-`AI_ENABLED=false` giữ toàn bộ luồng kiểm duyệt thủ công. Không có khóa hợp lệ thì không xếp phân tích tự động.
+Bật AI chỉ cho phép Admin yêu cầu phân tích; không tự chạy bài mới hoặc quét các bài tồn.
+`AI_ENABLED=false` giữ toàn bộ luồng kiểm duyệt thủ công. Không có khóa hợp lệ thì nút phân tích bị khóa.
 
 ## Hai điểm độc lập
 
@@ -160,9 +160,12 @@ Tài liệu Google: [Thinking levels](https://ai.google.dev/gemini-api/docs/thin
 
 ## Vòng đời, lưu trữ và phục hồi
 
-Sau COMMIT đăng mới, đăng lại hoặc gửi duyệt lại, API xếp job vào stream AI riêng.
+Sau COMMIT đăng mới, đăng lại hoặc gửi duyệt lại, hồ sơ chờ Admin; API không xếp job AI.
+Chỉ `POST /api/ai/:id` của Admin có CSRF và row_version hợp lệ mới xếp job manual vào stream AI riêng.
 Một vòng worker riêng xử lý một job tại một thời điểm, dùng kết nối BLOCK khác với đặt giá/chốt hạn.
-Mỗi 15 giây đối soát bài pending chưa có phân tích của `row_version` hiện tại để bù enqueue lỗi.
+Không còn vòng đối soát tự quét bài pending. GET chi tiết/trạng thái, tải lại trang và khởi động worker không tạo yêu cầu AI.
+Khi nâng cấp, worker bỏ qua/ACK job `auto` tồn từ bản cũ trước khi đọc SQL/gọi provider; yêu cầu manual mới không bị admission gộp vào job auto cũ.
+Dừng và khởi động lại cả API lẫn worker để chính sách này có hiệu lực. Giữ các phân tích đã lưu SQL cùng lịch sử, không xóa/giả thành chưa chạy.
 
 Job mang request UUID, ID bài, version và hash đầu vào. Redis giữ trạng thái queued/running/done/skipped,
 cache kết quả đã kiểm tra trước khi ghi SQL; lease theo bài bảo vệ xử lý đồng thời.
@@ -186,9 +189,18 @@ Lỗi SQL giữ stream pending, có thể reclaim sau ba phút; lease còn sốn
 Khi worker chết, chờ lease hết hạn và lượt reclaim tiếp theo để xử lý lại. Replay sau SQL COMMIT tìm receipt trước và không ghi/gọi lại.
 Cache kết quả giúp retry SQL không tốn thêm lượt Gemini khi cache còn tồn tại.
 Crash trước khi cache hoặc mất Redis có thể gọi provider lại; không cam kết gọi Gemini đúng một lần.
-Redis mất dữ liệu được bù bài pending từ SQL; không tự khôi phục lịch sử trạng thái job Redis đã mất.
+Redis mất dữ liệu không tự tạo job từ SQL. Kết quả đã lưu SQL vẫn đọc được; job/tiến độ Redis đã mất không tự khôi phục, Admin kiểm tra kết quả rồi chủ động yêu cầu lại khi cần.
 
 ## Quyền và giao diện
+
+| Trạng thái Admin | Hiển thị |
+|---|---|
+| Chưa có lần phân tích | “Chưa phân tích”, nút **Phân tích bằng AI**, chưa có hai ô điểm |
+| Yêu cầu đang queued/running | Thông báo tiến độ, nút **Đang phân tích…** bị khóa; nếu có kết quả trước thì ghi rõ đó là lần trước |
+| Đã phân tích, đủ hoặc thiếu bằng chứng | Hiện hai điểm độc lập; NULL mới hiển thị “Chưa đủ dữ liệu” và lý do; nút **Phân tích lại bằng AI** |
+| Lỗi provider/timeout | Hiện **Phân tích thất bại**, chẩn đoán và nút **Phân tích lại bằng AI**; không hiện hai ô NULL như thiếu bằng chứng |
+
+Admin vẫn được quyết định thủ công. Quyền người bán chỉ xem kết quả được công bố sau quyết định giữ nguyên.
 
 - `GET /api/ai/:id?analysis=<id>`: chủ bài hoặc Admin; lần phân tích phải thuộc đúng bài.
 - `POST /api/ai/:id`: chỉ Admin, đăng nhập + CSRF, body chỉ có `row_version` hiện tại; trả 202 khi xếp hàng.
@@ -268,7 +280,7 @@ npm.cmd run smoke:ai
 Smoke dùng chính provider/retry của worker (tối đa hai lượt mặc định) cho bài mẫu không có ảnh: kiểm tra JSON/SQL, giữ hai điểm NULL;
 chủ bài chưa thấy AI khi đang chờ. Admin từ chối fixture thiếu ảnh rồi chủ bài mới xem cùng kết quả.
 Dọn đúng tài khoản/bài/quyết định SQL của lần chạy;
-job chưa rõ hoàn tất giữ fixture và báo FAIL để đối soát. Smoke chờ theo deadline cấu hình cộng 180 giây cho hàng đợi/lưu SQL. Redis job hết TTL, không FLUSHDB.
+job chưa rõ hoàn tất giữ fixture và báo FAIL để đối soát. Smoke xác nhận bài mới chưa có job/kết quả, gửi yêu cầu AI bằng tài khoản Admin rồi chờ theo deadline cấu hình cộng 180 giây cho hàng đợi/lưu SQL. Redis job hết TTL, không FLUSHDB.
 Smoke này không thay nghiệm thu chất lượng thẩm định ảnh/video thật hoặc xác thực nguồn.
 Nếu chỉ nghiệm thu đấu giá/media mà không muốn phát sinh lượt Gemini cho fixture, tắt AI rồi khởi động lại API/worker.
 

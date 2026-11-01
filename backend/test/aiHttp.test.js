@@ -26,6 +26,7 @@ test('HTTP phân tích giữ quyền sở hữu/Admin, CSRF, version, key ở ba
   const guest=client(),owner=client(),other=client(),admin=client();await owner.login(1);await other.login(2);await admin.login(3);
   assert.equal((await guest.call('/ai/7')).status,401);assert.equal((await other.call('/ai/7')).status,404);
   const status=await owner.call('/ai/7');assert.equal(status.status,200);assert.equal(status.data.analysis,null);assert(!JSON.stringify(status).includes(config.key));
+  for(let i=0;i<3;i++){const initial=await admin.call('/ai/7');assert.equal(initial.data.analysis,null);assert.equal(initial.data.job,null);assert.deepEqual(initial.data.history,[]);}assert.equal(enqueued,0);
   assert.equal((await owner.call('/ai/7','POST',{row_version:'0000000000000001'})).status,403);
   assert.equal((await admin.call('/ai/7','POST',{row_version:'0000000000000001'},false)).status,403);
   assert.equal((await admin.call('/ai/7','POST',{row_version:'0000000000000002'})).status,409);

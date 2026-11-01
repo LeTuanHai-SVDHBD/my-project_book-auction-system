@@ -85,9 +85,13 @@ export default function AiPanel({ post, user }) {
     setBusy(true);
     setError("");
     try {
-      await apiPost(`/ai/${post.bai_dang_id}`, {
+      const job = await apiPost(`/ai/${post.bai_dang_id}`, {
         row_version: post.row_version,
       });
+      setData((previous) => ({
+        ...previous,
+        job: { ...job, source_version: post.row_version },
+      }));
       setSelected("");
       await load("");
     } catch (failure) {
@@ -97,7 +101,9 @@ export default function AiPanel({ post, user }) {
     }
   }
   const analysis = data?.analysis,
-    pending = ["queued", "running"].includes(data?.job?.state);
+    pending = ["queued", "running"].includes(data?.job?.state),
+    hasAttempt = Boolean(data?.analysis || data?.history?.length),
+    hasScores = analysis && analysis.trang_thai !== "that_bai";
   if (!visible) return null;
   return (
     <section
@@ -130,9 +136,11 @@ export default function AiPanel({ post, user }) {
         >
           {busy
             ? "Đang gửi…"
-            : analysis
-              ? "Phân tích lại bằng AI"
-              : "Yêu cầu phân tích AI"}
+            : pending
+              ? "Đang phân tích…"
+              : hasAttempt
+                ? "Phân tích lại bằng AI"
+                : "Phân tích bằng AI"}
         </button>
       )}
       {admin && data?.history?.length > 0 && (
@@ -153,11 +161,15 @@ export default function AiPanel({ post, user }) {
           </select>
         </label>
       )}
-      {!admin && !data && !error && <p role="status">Đang tải kết quả AI…</p>}
+      {!data && !error && (
+        <p role="status">
+          {admin ? "Đang tải trạng thái AI…" : "Đang tải kết quả AI…"}
+        </p>
+      )}
       {!analysis && !pending && data && (
-        <p>
+        <p role="status">
           {admin
-            ? "Chưa có phân tích AI cho bài này. Admin có thể kiểm duyệt thủ công."
+            ? "Chưa phân tích. Nhấn Phân tích bằng AI để bắt đầu; Admin vẫn có thể kiểm duyệt thủ công."
             : "Chưa có kết quả AI phù hợp cho lần kiểm duyệt này. Vui lòng xem quyết định và lý do của Admin ở trên."}
         </p>
       )}
@@ -179,18 +191,20 @@ export default function AiPanel({ post, user }) {
                 bản đầu vào. Cần đối chiếu lại trước khi sử dụng.
               </p>
             )}
-            <div className="ai-score-grid">
-              <div>
-                <h4>Hỗ trợ đánh giá độ hiếm</h4>
-                <strong>{score(analysis.diem_do_hiem)}</strong>
-                <p>{analysis.tinh_diem?.do_hiem?.ly_do_null}</p>
+            {hasScores && (
+              <div className="ai-score-grid">
+                <div>
+                  <h4>Hỗ trợ đánh giá độ hiếm</h4>
+                  <strong>{score(analysis.diem_do_hiem)}</strong>
+                  <p>{analysis.tinh_diem?.do_hiem?.ly_do_null}</p>
+                </div>
+                <div>
+                  <h4>Tình trạng vật lý</h4>
+                  <strong>{score(analysis.diem_tinh_trang)}</strong>
+                  <p>{analysis.tinh_diem?.tinh_trang?.ly_do_null}</p>
+                </div>
               </div>
-              <div>
-                <h4>Tình trạng vật lý</h4>
-                <strong>{score(analysis.diem_tinh_trang)}</strong>
-                <p>{analysis.tinh_diem?.tinh_trang?.ly_do_null}</p>
-              </div>
-            </div>
+            )}
             {admin && analysis.thong_tin && (
               <p className="field-hint">
                 Mô hình: {analysis.thong_tin.model} · Bộ quy tắc:{" "}

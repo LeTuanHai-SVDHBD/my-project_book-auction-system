@@ -11,14 +11,6 @@ export function createAiModel({getPool,sql}) {
     return rows.recordset[0]||null;
   }
   return {find,
-    async forVersion(job){return (await request(await getPool()).input('post',sql.Int,job.postId).input('version',sql.VarChar(16),job.sourceVersion).input('meta',sql.NVarChar(200),META_CRITERION).query(`SELECT TOP(1) p.phan_tich_id FROM dbo.PhanTichAI p JOIN dbo.ChiTietPhanTichAI c ON c.phan_tich_id=p.phan_tich_id WHERE p.bai_dang_id=@post AND c.tieu_chi=@meta AND JSON_VALUE(CASE WHEN ISJSON(c.bang_chung)=1 THEN c.bang_chung ELSE N'{}' END,'$.source_version')=@version ORDER BY p.phan_tich_id DESC`)).recordset[0]||null;},
-    async pending() {
-      return (await request(await getPool()).input('meta',sql.NVarChar(200),META_CRITERION).query(`SELECT TOP(20) b.bai_dang_id FROM dbo.BaiDang b JOIN dbo.PhienDauGia p ON p.bai_dang_id=b.bai_dang_id
-        WHERE b.trang_thai='cho_kiem_duyet' AND p.trang_thai='cho_kiem_duyet' AND NOT EXISTS(
-          SELECT 1 FROM dbo.PhanTichAI a JOIN dbo.ChiTietPhanTichAI c ON c.phan_tich_id=a.phan_tich_id
-          WHERE a.bai_dang_id=b.bai_dang_id AND c.tieu_chi=@meta AND JSON_VALUE(CASE WHEN ISJSON(c.bang_chung)=1 THEN c.bang_chung ELSE N'{}' END,'$.source_version')=CONVERT(VARCHAR(16),CONVERT(BINARY(8),p.row_version),2))
-        ORDER BY b.bai_dang_id`)).recordset.map(x=>x.bai_dang_id);
-    },
     async history(postId) {
       return (await request(await getPool()).input('post',sql.Int,postId).query('SELECT TOP(20) phan_tich_id,diem_do_hiem,diem_tinh_trang,trang_thai,ngay_phan_tich FROM dbo.PhanTichAI WHERE bai_dang_id=@post ORDER BY phan_tich_id DESC')).recordset;
     },

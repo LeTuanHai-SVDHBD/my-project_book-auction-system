@@ -2,6 +2,25 @@
 
 # Kết quả kiểm tra
 
+## 2026-11-01 — Admin chủ động chạy AI
+
+- `npm run check`: PASS 153 tệp JS server/script/shared; `npm test`: PASS 185, SKIP 12 bài
+  cần dịch vụ thật (197 tổng); `npm run build`: PASS 94 modules.
+- Đăng mới/đăng lại/gửi duyệt lại/replay và GET trạng thái không enqueue; sau yêu cầu Admin mới
+  có job. Bỏ qua job auto cũ trước khi gọi provider, giữ lịch sử SQL, chỉ trả tiến độ manual hiện tại.
+  Giữ kiểm tra HTTP session/CSRF/Admin/version, cache/receipt và NULL khi thực sự thiếu chứng cứ.
+- Chromium production + HTTP session/CSRF/router/service thật với model/queue/provider fixture:
+  PASS bài mới và reload có nút “Phân tích bằng AI”, chưa có ô điểm, không có enqueue tự động;
+  queued/running khóa nút, có tiến độ; provider HTTP 503 hiện thất bại và retry, không có ô điểm NULL;
+  kết quả thiếu bằng chứng mới hiện “Chưa đủ dữ liệu”, điểm 100.00 hiển thị 100/100.
+  Reload/chọn lịch sử không tạo job. PASS 1440/768/390/320 px không tràn/lỗi JS; đã xem ảnh trước/sau.
+- Đã sửa `smoke:ai` để xác nhận trạng thái mới rồi Admin yêu cầu trước khi đợi SQL; chưa chạy smoke
+  trên Gemini/Redis/SQL Server thật. Kiểm thử admission Lua với job auto tồn và request manual mới
+  nằm trong bộ Redis opt-in, đang SKIP vì không có dịch vụ. Không báo PASS tích hợp dịch vụ thật.
+- Không thêm schema/dependency, không sửa API key, tiêu chí/điểm hoặc xóa phân tích đã lưu.
+  Sau pull phải khởi động lại cả API và worker; worker bản cũ còn chạy vẫn có chính sách tự động cũ.
+
+
 ## 2026-11-01 — Nhiều định dạng tệp và nháp đăng sách
 
 - `npm run check`: PASS 153 tệp JS phía server/script/shared.

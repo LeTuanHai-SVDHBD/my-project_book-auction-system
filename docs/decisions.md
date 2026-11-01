@@ -226,7 +226,7 @@ Gemini chỉ trả quan sát có cấu trúc; Backend giữ bảng quy đổi/tr
 Ảnh không thấy không chứng minh bộ phận bị mất; chữ ký quan sát được không có nghĩa chữ ký thật.
 Không dùng điểm cao hoặc sự cố AI để tự duyệt/từ chối bài.
 
-Hàng đợi AI và kết nối BLOCK riêng không chặn vòng đặt giá/chốt hạn. Đối soát SQL bù enqueue bị mất;
+Hàng đợi AI và kết nối BLOCK riêng không chặn vòng đặt giá/chốt hạn. Chỉ yêu cầu chủ động từ Admin được xếp lịch;
 lưu kết quả và chi tiết trong transaction kiểm tra lại version/pending. Receipt request trong metadata
 chống ghi trùng, cache kết quả đã kiểm tra hạn chế gọi lại Gemini khi SQL lỗi. Không cam kết gọi provider đúng một lần:
 crash trước cache có thể tốn thêm lượt gọi. Không thêm bảng/cột hoặc dependency.
@@ -310,9 +310,20 @@ Theo chốt của người dùng, gửi duyệt lại cho sửa đủ thông tin
 Không UPDATE Sach dùng chung: mỗi BaiDang lưu ho_so_sach; dữ liệu cũ NULL fallback về Sach.
 Đăng lại copy hồ sơ nguồn và giữ sach_id. HinhAnh/Video dùng cờ active, không DELETE/destroy file lịch sử.
 Trước resubmit chụp quyết định legacy hiện tại nếu thiếu snapshot; lịch sử/PDF không dùng đầu vào vòng mới.
-Dùng transaction/version/owner/state guard, chỉ enqueue AI sau COMMIT. Không thêm bảng/dependency;
+Dùng transaction/version/owner/state guard, AI chỉ xếp lịch khi Admin chủ động nhấn nút. Không thêm bảng/dependency;
 migration 007 thêm ba cột, schema 21/165 và 99 check. Client cũ không gửi sách/gỡ media vẫn giữ dữ liệu.
 
 ## Cloudinary lưu tệp nhưng API chưa xác nhận — 01/11/2026
 
 Tách timeout video 300 giây khỏi ảnh 120 giây và cho client chờ đủ cả body/provider/lookup. Sau lỗi tạm thời, tra đọc đúng public ID đã cấp tối đa ba lần; không upload lại bytes hay đoán URL. Chỉ trả ready sau xác minh identity/kind/URL và Redis; trạng thái chưa rõ vẫn thất bại. Lookup cần quyền/hạn mức Admin API, không cam kết đúng một upload qua crash hoặc mọi lần chọn lại. Media error trả thông báo tĩnh và log HTTP/transport an toàn, không quy mọi lỗi thành Docker hoặc lộ body provider. Không đổi nghiệp vụ/quyền/SQL/dependency; staging cleanup và SQL reference guard giữ nguyên.
+
+
+## AI theo yêu cầu Admin — 01/11/2026
+
+Bài mới, đăng lại, gửi duyệt lại và thao tác đọc trạng thái không tự tạo phân tích.
+Bỏ callback enqueue sau lưu và vòng quét pending của worker. Admin dùng endpoint có CSRF/version
+để bắt đầu; admission vẫn gộp yêu cầu manual đang chạy cùng phiên bản. Job auto cũ bị bỏ qua,
+không gộp vào yêu cầu manual mới; lịch sử SQL đã lưu được giữ nguyên.
+Phân biệt chưa chạy, đang chạy, thất bại và phân tích thiếu dữ liệu. Chỉ hiện ô điểm khi có kết quả
+không thất bại; chưa chạy dùng “Phân tích bằng AI”, đã chạy dùng “Phân tích lại bằng AI”.
+Không đổi tiêu chí, trọng số, NULL, quyền xem của người bán hoặc quyền quyết định thủ công.

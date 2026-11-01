@@ -144,8 +144,8 @@ Thể loại giữ lựa chọn cũ; ISBN có thể sửa hoặc chọn Không c
 số media giữ/gỡ/mới; không lấy ISBN cũ thay cho lựa chọn NULL mới. Chỉ chủ bài bị từ chối gửi lại được.
 
 Media đã lưu có nút × đánh dấu gỡ khỏi hồ sơ mới, danh sách Giữ lại và chú thích chưa áp dụng tới khi gửi thành công.
-Đóng biểu mẫu không gửi chỉnh sửa, chỉ dọn vé upload mới. Video cũ bị gỡ giải phóng chỗ trong giới hạn video;
-không cho Giữ lại nếu cộng video mới vượt giới hạn. Sau khi gửi, bài về chờ và AI tự phân tích lại nếu đã bật.
+Đóng biểu mẫu không gửi chỉnh sửa, giữ nội dung/vé mới trong nháp. Video cũ bị gỡ giải phóng chỗ trong giới hạn video;
+không cho Giữ lại nếu cộng video mới vượt giới hạn. Sau khi gửi, bài về chờ; Admin chủ động yêu cầu AI khi cần.
 Cập nhật API/frontend và migration 007 cùng nhau, không cần thay .env hoặc xóa database/Cloudinary.
 
 ## Lỗi tải video và phản hồi Cloudinary
@@ -159,3 +159,12 @@ không hủy upload hoặc bỏ vé; quay lại tiếp tục đúng bước và 
 “Bỏ bản nháp” có xác nhận và chỉ bỏ các tệp mới. Tải lại trang giữ thông tin + tệp đã xác nhận,
 lượt upload chưa có phản hồi được báo gián đoạn; vé hết hạn 1 giờ cần chọn lại.
 Xem [định dạng, bản chuyển đổi và giới hạn nháp](media-upload.md).
+
+
+### Admin chủ động phân tích AI
+
+Bài chưa phân tích hiển thị trạng thái và nút **Phân tích bằng AI**, chưa có ô điểm.
+Đang queued/running hiển thị tiến độ, khóa nút để chặn yêu cầu lặp. Khi đã có lần phân tích,
+nút đổi thành **Phân tích lại bằng AI**. Lỗi Gemini/timeout hiện thất bại và chẩn đoán;
+“Chưa đủ dữ liệu” trong ô điểm chỉ dùng cho kết quả thực sự thiếu bằng chứng.
+Đọc bài, tải lại trang, đăng mới hoặc gửi duyệt lại không gọi Gemini; kết quả cũ không bị xóa.

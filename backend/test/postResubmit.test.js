@@ -59,12 +59,12 @@ test('hợp đồng gỡ media kiểm tra loại/ID/trùng/chèn trường và c
  const data=body();delete data.remove_media;data.ma_yeu_cau='00000000-0000-4000-8000-000000000001';assert.throws(()=>validatePost({...data,remove_media:[]}),{status:400});
 });
 
-test('HTTP gửi lại: session/CSRF/owner/state guard, hồ sơ mới và AI chỉ sau COMMIT',async t=>{
+test('HTTP gửi lại: session/CSRF/owner/state guard, hồ sơ mới không tự gọi AI',async t=>{
  const [{createServer},{default:session},{createApp},{createAuthRouter},{createPostRouter},{createPostService},{createSessionMiddleware},{parseAuthConfig}]=await Promise.all([
   import('node:http'),import('express-session'),import('../src/app.js'),import('../src/routes/auth.routes.js'),import('../src/routes/post.routes.js'),import('../src/services/post.service.js'),import('../src/middlewares/session.js'),import('../src/config/auth.js')]);
  const f=fixture(),rows=[1,2,3].map(id=>({nguoi_dung_id:id,email:`r${id}@example.test`,ho_ten:'Fixture',vai_tro:id===3?'admin':'nguoi_dung'})),users={findById:async id=>rows.find(x=>x.nguoi_dung_id===id),findByEmail:async email=>rows.find(x=>x.email===email)},authConfig=parseAuthConfig({SESSION_SECRET:'resubmit-http-fixture-'.repeat(4)}),sessionMiddleware=createSessionMiddleware(authConfig,new session.MemoryStore());
  let enqueued=0,bound=0,released=0;
- const service=createPostService({model:f.model,limits:{maxVideos:3},ledger:{claim:async()=>({items:[]}),bound:async()=>{bound++;},release:async()=>{released++;}},enqueueAi:async id=>{assert(f.commits()>0);assert.equal((await f.model.detail(id,{admin:true})).ten_sach,body().sach.ten_sach);enqueued++;}});
+ const service=createPostService({model:f.model,limits:{maxVideos:3},ledger:{claim:async()=>({items:[]}),bound:async()=>{bound++;},release:async()=>{released++;}},enqueueAi:async()=>{enqueued++;}});
  const authRouter=createAuthRouter({authConfig,sessionMiddleware,users,passwords:{verify:async()=>true},limiter:{consume:async()=>0}}),postRouter=createPostRouter({sessionMiddleware,users,model:f.model,service,limits:{maxVideos:3}});
  const server=createServer(createApp({config:{mode:'development',origins:[],probeToken:'fixture'},deps:{},probes:{},authRouter,postRouter}));await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{server.closeAllConnections();await new Promise(r=>server.close(r));});
  const base=`http://127.0.0.1:${server.address().port}/api`;
@@ -72,7 +72,7 @@ test('HTTP gửi lại: session/CSRF/owner/state guard, hồ sơ mới và AI ch
  const guest=client(),owner=client(),other=client(),admin=client();assert.equal((await guest.call('/posts/7/resubmit','POST',body())).status,401);await owner.login(1);await other.login(2);await admin.login(3);
  assert.equal((await admin.call('/posts/7/resubmit','POST',body())).status,403);assert.equal((await other.call('/posts/7/resubmit','POST',body())).status,404);assert.equal((await owner.call('/posts/7/resubmit','POST',body(),'')).status,403);
  const bad=body();bad.remove_media=[{kind:'image',id:99}];assert.equal((await owner.call('/posts/7/resubmit','POST',bad)).status,409);assert.equal(enqueued,0);assert(released>=2);
- const response=await owner.call('/posts/7/resubmit','POST',body());assert.equal(response.status,200);assert.equal(enqueued,1);assert.equal(bound,1);
+ const response=await owner.call('/posts/7/resubmit','POST',body());assert.equal(response.status,200);assert.equal(enqueued,0);assert.equal(bound,1);
  const read=await owner.call('/posts/7');assert.equal(read.data.ten_sach,body().sach.ten_sach);assert.equal(read.data.isbn,null);assert.equal(read.data.media.length,2);assert.equal(read.data.ai,null);assert.equal(read.data.kiem_duyet[0].co_the_xuat,true);
- assert.equal((await owner.call('/posts/7/resubmit','POST',body())).status,409);assert.equal(enqueued,1);
+ assert.equal((await owner.call('/posts/7/resubmit','POST',body())).status,409);assert.equal(enqueued,0);
 });

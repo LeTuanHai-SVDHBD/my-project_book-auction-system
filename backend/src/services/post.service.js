@@ -1,6 +1,5 @@
 /** Điều phối upload/SQL: chỉ nhận vé của chủ sách, không gọi Cloudinary trong transaction. */
-export function createPostService({ model, ledger, limits, notify=async()=>{}, enqueueAi=async()=>{}, log=()=>{} }) {
-  async function analyzeAfterCommit(result){try{await enqueueAi(result.id);}catch(error){log(error,{component:'ai-enqueue'});}return result;}
+export function createPostService({ model, ledger, limits, notify=async()=>{}, log=()=>{} }) {
   async function attach(owner,input,operation) {
     const claim=await ledger.claim(owner,input.media);
     try {
@@ -17,10 +16,10 @@ export function createPostService({ model, ledger, limits, notify=async()=>{}, e
     async create(owner,input,sourceId=null) {
       const code=`BK${input.requestId.replaceAll('-','')}`;
       const existing=await model.findRequest(code,owner);
-      if (existing) return analyzeAfterCommit({id:existing,replayed:true});
-      return analyzeAfterCommit(await attach(owner,input,items=>model.create({owner,input,sourceId,code,items,limits})));
+      if (existing) return {id:existing,replayed:true};
+      return attach(owner,input,items=>model.create({owner,input,sourceId,code,items,limits}));
     },
-    resubmit: async(owner,postId,input)=>analyzeAfterCommit(await attach(owner,input,items=>model.resubmit({owner,postId,input,items,limits}))),
+    resubmit: (owner,postId,input)=>attach(owner,input,items=>model.resubmit({owner,postId,input,items,limits})),
     review: (admin,postId,input)=>model.review({admin,postId,input}),
     async activate(owner,postId,input) {
       const result=await model.activate({owner,postId,input});

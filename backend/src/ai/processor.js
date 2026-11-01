@@ -4,6 +4,8 @@ import {RULE_VERSION} from './criteria.js';
 import {aiFailureMessage,safeAiDiagnostics,safeAiExecution} from './errors.js';
 export function createAiProcessor({posts,model,queue,provider,locks,config,signal}) {
   return async job=>{
+    // A queued auto job from an older deployment must not call Gemini after this policy change.
+    if(job.trigger!=='manual'){await queue.update(job,{state:'skipped'});return;}
     const stored=await model.find(job);if(stored){await queue.update(job,{state:'done',analysisId:stored.phan_tich_id});return;}
     const lease=await locks.acquire(job.postId);if(!lease)throw Error('AI_BUSY');
     const ownership=new AbortController();let renewTimer,renewTask,stopped=false;
@@ -15,7 +17,6 @@ export function createAiProcessor({posts,model,queue,provider,locks,config,signa
     renewTimer=setTimeout(()=>{renewTask=renew();},config.leaseRenewMs||15000);renewTimer.unref();
     const assertOwnership=()=>{ownership.signal.throwIfAborted();signal?.throwIfAborted();};
     try{
-      if(job.trigger!=='manual'&&model.forVersion){const existing=await model.forVersion(job);if(existing){await queue.update(job,{state:'done',analysisId:existing.phan_tich_id});return;}}
       let row;try{row=await posts.detail(job.postId,{admin:true});}catch(error){if(error.status===404){await queue.update(job,{state:'skipped'});return;}throw error;}
       if(!config.configured||row.row_version!==job.sourceVersion||row.trang_thai_phien!=='cho_kiem_duyet'){await queue.update(job,{state:'skipped'});return;}
       let cached=await queue.get(job.requestId),result=cached?.result,metadata=cached?.metadata;

@@ -16,8 +16,12 @@ try{
   const seller=new Client(),admin=new Client();assert((await seller.call('/health/ready')).ok,'API/worker/SQL/Redis chưa sẵn sàng.');
   pool=await getPool();const users=createUserModel({getPool,sql}),hash=await passwords.hash(secret);
   for(const [label,role,client] of [['seller','nguoi_dung',seller],['admin','admin',admin]]){const user=await users.create({ho_ten:'AI smoke fixture',email:`ai-${label}-${runId}@example.test`,passwordHash:hash,role});accounts.push(user);await client.call('/auth/csrf');await client.call('/auth/login','POST',{email:user.email,mat_khau:secret});}
-  stage='đăng bài và nhận job AI tự động';
-  const created=await seller.call('/posts','POST',{ma_yeu_cau:randomUUID(),sach:{ten_sach:`AI SMOKE ${runId}`,tinh_trang_sach:'Fixture không có ảnh, không được suy ra tình trạng tốt.'},bai_dang:{tieu_de:`AI SMOKE ${runId}`,mo_ta_tinh_trang:'Không có dữ liệu hình ảnh. Chỉ kiểm thử kết nối và NULL.'},phien:{gia_khoi_diem:'100000',gia_toi_thieu:'200000',buoc_gia:'1000',thoi_gian_cho_dat_lai:20},media:[]});postId=created.id;cleanupSafe=false;
+  stage='đăng bài, chưa phân tích khi Admin chưa yêu cầu';
+  const created=await seller.call('/posts','POST',{ma_yeu_cau:randomUUID(),sach:{ten_sach:`AI SMOKE ${runId}`,tinh_trang_sach:'Fixture không có ảnh, không được suy ra tình trạng tốt.'},bai_dang:{tieu_de:`AI SMOKE ${runId}`,mo_ta_tinh_trang:'Không có dữ liệu hình ảnh. Chỉ kiểm thử kết nối và NULL.'},phien:{gia_khoi_diem:'100000',gia_toi_thieu:'200000',buoc_gia:'1000',thoi_gian_cho_dat_lai:20},media:[]});postId=created.id;
+  const initialAi=await admin.call(`/ai/${postId}`);assert.equal(initialAi.analysis,null);assert.equal(initialAi.job,null);assert.deepEqual(initialAi.history,[]);
+  const initialPost=await admin.call(`/posts/${postId}`);
+  stage='Admin chủ động yêu cầu AI';cleanupSafe=false;
+  await admin.call(`/ai/${postId}`,'POST',{row_version:initialPost.row_version});
   stage='chờ Gemini/worker lưu SQL';console.log('Đang kiểm tra Gemini thật; dữ liệu mẫu thiếu ảnh nên điểm phải giữ NULL.');
   let data;const deadline=Date.now()+parseAiConfig(process.env).jobTimeout+180000;
   while(Date.now()<deadline){data=await admin.call(`/ai/${postId}`);if(data.analysis&&(!data.job||data.job.state==='done')){cleanupSafe=true;break;}await delay(1000);}
@@ -39,4 +43,4 @@ finally{
   catch{console.error(`Chưa dọn xong fixture AI, bài #${postId}, run=${runId}.`);process.exitCode=1;}
   await closeDatabase();
 }
-if(finished&&!process.exitCode)console.log('PASS AI thật: Gemini JSON → Backend kiểm tra/tính điểm → SQL, thiếu ảnh giữ NULL; chủ bài chỉ thấy kết quả sau quyết định Admin.');
+if(finished&&!process.exitCode)console.log('PASS AI thật: bài mới chưa chạy; Admin yêu cầu Gemini JSON → Backend kiểm tra/tính điểm → SQL, thiếu ảnh giữ NULL; chủ bài chỉ thấy kết quả sau quyết định Admin.');

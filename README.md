@@ -216,9 +216,9 @@ cấp CSRF 60 lần/IP/phút. Bộ đếm tính cả lần thành công. Khi b�
 7. Sau khi được duyệt, chủ sách đặt giờ bắt đầu trong tương lai và giờ kết thúc sau đó, rồi kích hoạt đúng phiên hiện có.
 8. Phiên đã kích hoạt xuất hiện trong **Danh mục**. API công khai không trả `gia_toi_thieu`.
 
-Khi đã bật Gemini, worker tự phân tích bài mới/gửi duyệt lại, lưu hai điểm độc lập cùng bằng chứng, cảnh báo và lịch sử.
+Khi đã bật Gemini, bài mới/gửi duyệt lại vẫn chờ Admin nhấn **Phân tích bằng AI**; worker chỉ xử lý yêu cầu đó, lưu hai điểm độc lập cùng bằng chứng, cảnh báo và lịch sử.
 Với nhiều ảnh/video, Admin thấy tiến độ chuẩn bị và lượt chờ/thử lại. `setup:ai` bổ sung cấu hình còn thiếu, giữ API key hiện có; xem [thời gian chờ và phục hồi](docs/ai-analysis.md#thời-gian-chờ-và-thử-lại-hữu-hạn).
-Admin xem **AI hỗ trợ kiểm duyệt**, mở từng tiêu chí/phép tính hoặc yêu cầu phân tích lại.
+Admin xem **AI hỗ trợ kiểm duyệt**: chưa chạy thì hiện **Chưa phân tích**, chưa hiện ô điểm; sau khi chạy có nút **Phân tích lại bằng AI**. Lỗi provider hiện thất bại và chẩn đoán, không dùng hai ô NULL để mô tả lỗi.
 Người bán đang chờ duyệt chỉ thấy tiến độ. Sau phê duyệt/từ chối, xem quyết định/lý do của Admin
 và mở **Kết quả AI tham khảo** bên dưới; gửi duyệt lại sẽ ẩn AI cho tới quyết định mới.
 Thiếu dữ liệu giữ NULL; lỗi AI không từ chối bài. Khi AI tắt, kiểm duyệt thủ công vẫn hoạt động.
@@ -354,7 +354,7 @@ xem [hướng dẫn](docs/after-sales.md). Bản giao dịch mới không thêm 
 | HTTP 409 khi duyệt/kích hoạt | Tải lại chi tiết trước khi thao tác; không dùng `row_version` cũ |
 | Hai tab vẫn đổi tài khoản cùng nhau | Cập nhật cả Backend/Frontend, khởi động lại API/web và F5 từng tab |
 | Báo thiếu phiên bản dữ liệu | Khởi động API bản mới, F5 và mở lại chi tiết bài; token API phải có 16 ký tự hex |
-| Chưa có kết quả AI | Chạy `setup:ai`, kiểm tra `AI_ENABLED=true` và khóa Gemini, khởi động lại API/worker; xem hàng đợi/lịch sử ở chi tiết |
+| Chưa có kết quả AI | Chạy `setup:ai`, kiểm tra `AI_ENABLED=true` và khóa Gemini, khởi động lại API/worker; vào chi tiết chờ duyệt và nhấn **Phân tích bằng AI** (hoặc **Phân tích lại bằng AI** nếu đã có lần chạy) |
 | AI_TIMEOUT với nhiều ảnh | Pull bản mới, chạy `setup:ai`, khởi động lại API/worker rồi Admin nhấn **Phân tích lại bằng AI**; tải media tối đa bốn luồng, timeout tăng theo số tệp, tối đa hai lượt; [cấu hình/giới hạn](docs/ai-analysis.md#thời-gian-chờ-và-thử-lại-hữu-hạn) |
 | AI báo thất bại hoặc chưa đầy đủ | Xem mã HTTP/provider và cảnh báo; chạy `npm.cmd run ai:check` để chẩn đoán trực tiếp Gemini; xem [hướng dẫn](docs/ai-analysis.md) |
 | Cập nhật trực tiếp đang kết nối lại | Kiểm tra API/Redis, mạng và origin; giao diện vẫn tự lấy lại trạng thái khi HTTP hoạt động |

@@ -14,5 +14,9 @@ test('Redis AI: enqueue trùng chỉ một job, SQL lỗi giữ pending và recl
   await processAiMessage({client,message,settings,handle:async()=>{throw Error('SQL unavailable');}});assert.equal((await client.xPending(settings.stream,settings.group)).pending,1);
   const claimed=await client.xAutoClaim(settings.stream,settings.group,'replacement',0,'0-0',{COUNT:1});let writes=0;
   await processAiMessage({client,message:claimed.messages[0],settings,handle:async job=>{writes++;await queue.update(job,{state:'done'});}});assert.equal(writes,1);assert.equal((await client.xPending(settings.stream,settings.group)).pending,0);
+  const auto={...jobs[0],requestId:randomUUID(),trigger:'auto',state:'queued'};
+  await client.set(prefix+'post:7',auto.requestId);await client.set(prefix+'job:'+auto.requestId,JSON.stringify(auto));
+  const manual=await queue.enqueue(row);assert.notEqual(manual.requestId,auto.requestId);assert.equal(manual.trigger,'manual');
+  assert.equal((await queue.enqueue(row)).requestId,manual.requestId);assert.equal((await queue.status(7)).trigger,'manual');
   const next=await queue.enqueue({...row,row_version:'0000000000000002'});assert.notEqual(next.requestId,jobs[0].requestId);
 });

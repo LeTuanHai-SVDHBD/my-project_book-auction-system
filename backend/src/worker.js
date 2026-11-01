@@ -24,8 +24,6 @@ import {createAiQueue} from './ai/queue.js';
 import {createGemini} from './ai/gemini.js';
 import {createAiProcessor} from './ai/processor.js';
 import {ensureAiGroup,consumeAi} from './ai/consumer.js';
-import {createAiService} from './services/ai.service.js';
-import {reconcileAi} from './ai/reconcile.js';
 const consumer = `${hostname()}-${process.pid}`;
 const reader = makeRedisClient('redis-blocking-reader');
 const auctionReader=makeRedisClient('redis-auction-reader');
@@ -34,7 +32,6 @@ const publisher=createAuctionPublisher({getRedis:()=>redis});
 const processAuction=createAuctionProcessor({model:auctionModel,locks:createAuctionLock({getRedis:()=>redis,leaseMs:AUCTION.leaseMs}),notify:createAuctionNotifier({getRedis:()=>redis}),log:logError});
 const controller = new AbortController();
 const aiReader=makeRedisClient('redis-ai-reader'),aiConfig=parseAiConfig(process.env),aiModel=createAiModel({getPool,sql}),posts=createPostModel({getPool,sql}),aiQueue=createAiQueue({getRedis:()=>redis});
-const aiService=createAiService({posts,model:aiModel,queue:aiQueue,config:aiConfig});
 const processAi=createAiProcessor({posts,model:aiModel,queue:aiQueue,provider:createGemini({config:aiConfig}),locks:createAuctionLock({getRedis:()=>redis,keyPrefix:'bookauction:ai:lock:',leaseMs:60000}),config:aiConfig,signal:controller.signal});
 let heartbeatTimer; let heartbeatTask; let loops=[]; let stopping = false;
 async function pulse() {
@@ -52,8 +49,7 @@ async function start() {
     handle: event => processProbe({ event, client: redis, getPool, consumer }) }),
     consumeAuctions({client:redis,reader:auctionReader,consumer,signal:controller.signal,handle:processAuction,log:logError}),
     runAuctionExpiry({model:auctionModel,publisher,signal:controller.signal,log:logError}),
-    consumeAi({client:redis,reader:aiReader,consumer,signal:controller.signal,handle:processAi,log:logError}),
-    reconcileAi({model:aiModel,service:aiService,config:aiConfig,signal:controller.signal,log:logError})];
+    consumeAi({client:redis,reader:aiReader,consumer,signal:controller.signal,handle:processAi,log:logError})];
   await Promise.all(loops);
 }
 async function shutdown(code = 0) {

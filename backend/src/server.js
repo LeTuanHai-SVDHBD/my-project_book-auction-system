@@ -57,7 +57,7 @@ const provider = createCloudinary({config:mediaConfig});
 const ledger = createMediaLedger({getRedis:requireRedis,provider,isReferenced:id=>model.isMediaReferenced(id),config:mediaConfig});
 const communityModel=createCommunityModel({getPool,sql});
 const communityRouter=createCommunityRouter({sessionMiddleware,users,model:communityModel,service:createCommunityService({model:communityModel,ledger,log:logError})});
-const service = createPostService({model,ledger,limits:mediaConfig,notify:createAuctionNotifier({getRedis:requireRedis}),enqueueAi:aiService.enqueue,log:logError});
+const service = createPostService({model,ledger,limits:mediaConfig,notify:createAuctionNotifier({getRedis:requireRedis}),log:logError});
 const postRouter = createPostRouter({sessionMiddleware,users,model,service,limits:mediaConfig});
 const mediaRouter = createMediaRouter({sessionMiddleware,users,config:mediaConfig,provider,ledger});
 const auctionModel=createAuctionModel({getPool,sql});

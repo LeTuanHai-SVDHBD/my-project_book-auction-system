@@ -169,7 +169,7 @@ Thư mục rỗng được giữ bằng `.gitkeep`; file này không chứng min
 | `backend/src/ai/media.js`, `transport.js` | Tải bốn media song song theo lô/ngân sách; bounded stream có deadline và hủy body |
 | `frontend/src/utils/aiProgress.js` | Thông điệp tiến độ chuẩn bị/chờ Gemini/thử lại cho Admin |
 | `backend/src/config/ai.js` | Cờ bật, khóa, model và giới hạn tài nguyên |
-| `backend/src/ai/queue.js`, `consumer.js`, `processor.js`, `reconcile.js` | Admission, pending/reclaim, cache, SQL receipt và bù enqueue |
+| `backend/src/ai/queue.js`, `consumer.js`, `processor.js` | Admission manual, pending/reclaim, cache và SQL receipt |
 | `backend/src/models/ai.model.js` | Lưu nguyên tử, version, lịch sử và truy vấn kết quả |
 | `backend/src/services/ai.service.js`, `routes/ai.routes.js` | Quyền chủ bài/Admin, yêu cầu phân tích và trạng thái |
 | `frontend/src/components/AiPanel.jsx` | Hai điểm, bằng chứng, cảnh báo, lịch sử và nút Admin |
@@ -218,3 +218,5 @@ Bộ lọc/cursor riêng của trang Kiểm duyệt nằm ở `backend/src/servi
 - `frontend/src/services/postDrafts.js`: nháp theo người/chế độ/bài, lưu cục bộ và upload qua chuyển route.
 - `backend/test/mediaFormats.test.js`, `backend/test/postDrafts.test.js`: kiểm tra tệp đổi đuôi,
   container, chuyển đổi AI, vòng đời upload/nháp, cô lập tài khoản và nháp hết hạn.
+
+- `backend/test/aiManual.test.js`: đăng/đăng lại/bổ sung/replay và GET không tự enqueue, chỉ yêu cầu Admin tạo job; bỏ tiến độ auto cũ nhưng giữ lịch sử SQL.

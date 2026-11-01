@@ -197,7 +197,7 @@ Sửa bài bị từ chối của lần đăng sau không đổi hồ sơ phiên
 
 Trước chỉnh sửa, chụp quyết định hiện tại nếu bản cũ chưa có snapshot. Sau đó cập nhật hồ sơ, đánh dấu media gỡ
 không còn dùng, thêm media mới theo thứ tự sau cả các hàng đã gỡ, đổi trạng thái/version và ghi lịch sử cùng transaction.
-Lỗi/version/quyền/video vượt giới hạn thì rollback tất cả; acknowledgement/enqueue AI chỉ sau COMMIT.
+Lỗi/version/quyền/video vượt giới hạn thì rollback tất cả; acknowledgement chỉ sau COMMIT; AI chỉ xếp lịch khi Admin chủ động yêu cầu.
 Media lịch sử không bị DELETE/destroy Cloudinary và vẫn được isMediaReferenced bảo vệ khỏi cleanup.
 Bản bìa/gallery/AI chỉ lấy media dang_su_dung=1; hash/version làm kết quả AI vòng trước không thành kết quả mới.
 Nút × trên media cũ chỉ đổi draft: Hủy giữ nguyên, Giữ lại phục hồi draft (không vượt giới hạn video).

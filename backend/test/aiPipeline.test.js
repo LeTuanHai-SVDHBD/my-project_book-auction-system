@@ -7,7 +7,7 @@ import {createAiService} from '../src/services/ai.service.js';
 import {analysisView} from '../src/ai/input.js';
 import {META_CRITERION} from '../src/ai/criteria.js';
 import {setTimeout as delay} from 'node:timers/promises';
-const job=()=>({postId:1,requestId:randomUUID(),sourceVersion:'0000000000000001',inputHash:'a'.repeat(64),state:'queued'});
+const job=()=>({postId:1,requestId:randomUUID(),sourceVersion:'0000000000000001',inputHash:'a'.repeat(64),trigger:'manual',state:'queued'});
 function fixture(){
   let cached=null,receipt=null,output=null,calls=0,writes=0;const row={row_version:'0000000000000001',trang_thai_phien:'cho_kiem_duyet'};
   const queue={get:async()=>cached,update:async(j,patch)=>(cached={...j,...patch})};
@@ -33,12 +33,12 @@ test('lỗi Gemini lưu thất bại với hai điểm NULL; dữ liệu đã th
 });
 test('tắt AI không enqueue hoặc sinh phân tích giả; Redis lỗi không chặn đọc SQL đã có',async()=>{
   const service=createAiService({posts:{detail:async()=>({row_version:'0000000000000001',ai:null})},model:{history:async()=>[]},queue:{enqueue:()=>assert.fail(),status:async()=>{throw Error('Redis down');}},config:{configured:false}});
-  assert.equal(await service.enqueue(1),null);await assert.rejects(service.request(1,{vai_tro:'admin'},'0000000000000001'),{status:503});
+  await assert.rejects(service.request(1,{vai_tro:'admin'},'0000000000000001'),{status:503});
   assert.equal((await service.status(1,{vai_tro:'admin'})).analysis,null);
 });
-test('job tự động trùng phiên bản dùng kết quả đã lưu, Admin yêu cầu mới vẫn được phân tích lại',async()=>{
-  const f=fixture();f.model.forVersion=async()=>({phan_tich_id:9});const handle=createAiProcessor(f.options);
-  await handle({...job(),trigger:'auto'});assert.equal(f.calls(),0);assert.equal(f.writes(),0);
+test('bỏ qua job tự động tồn từ bản cũ; chỉ yêu cầu manual của Admin được gọi provider',async()=>{
+  const f=fixture();const handle=createAiProcessor(f.options);
+  await handle({...job(),trigger:'auto'});assert.equal(f.calls(),0);assert.equal(f.writes(),0);assert.equal(f.cached().state,'skipped');
   await handle({...job(),trigger:'manual'});assert.equal(f.calls(),1);assert.equal(f.writes(),1);
 });
 test('gia hạn khóa trong khi provider chậm, mất quyền thì ngắt và không lưu thất bại giả',async()=>{

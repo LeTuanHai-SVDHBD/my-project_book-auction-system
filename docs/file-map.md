@@ -1,227 +1,120 @@
-<!-- Mục đích: Tra cứu thư mục, trách nhiệm và trạng thái thành phần mã nguồn. -->
+<!-- Mục đích: Bản đồ mô-đun thực tế; chỉ liệt kê thành phần có trong repository. -->
 
 # Bản đồ mã nguồn
 
-## Thành phần xử lý đấu giá
+Đọc [kiến trúc](architecture.md) trước nếu cần hiểu luồng giữa các mô-đun. Dự án dùng JavaScript ES Modules,
+React JSX và npm workspaces; không phải source TypeScript/Vue. Cây dưới đây nhóm theo trách nhiệm,
+không liệt kê từng tài nguyên font hoặc từng bài test.
 
-| File/nhóm | Trách nhiệm |
+## Gốc và môi trường
+
+| Vị trí | Trách nhiệm |
 |---|---|
-| `backend/migrations/003_auction_decisions.sql` | Receipt quyết định, backfill lượt hợp lệ cũ và lý do kết thúc |
-| `backend/scripts/schemaMigrations.js` | Chạy cùng danh sách migration cho init/migrate |
-| `backend/src/services/bidPolicy.js` | Validator, giá/lịch/cooldown và suy ra kết quả |
-| `backend/src/models/auction.model.js` | Transaction quyết định, lượt giá, kết quả/giao dịch; snapshot công khai |
-| `backend/src/services/auction.service.js` | Admission và kết quả, SQL trước Redis |
-| `backend/src/routes/auction.routes.js`, `backend/src/controllers/auction.controller.js` | Quyền/CSRF, hợp đồng HTTP và projection |
-| `backend/src/constants/auction.js` | Stream/group/prefix và thời hạn phối hợp |
-| `backend/src/events/auctionPublisher.js`, `backend/src/events/auctionConsumer.js` | Lua admission, xếp hạn, pending/reclaim, ACK và dead-letter |
-| `backend/src/concurrency/auctionLock.js`, `backend/src/processors/auction.processor.js` | Token/lease, gia hạn, bảo vệ trước COMMIT |
-| `backend/src/jobs/auctionExpiry.js` | Tìm hạn SQL và xếp sự kiện chốt |
-| `backend/test/auctionHttp.test.js`, `auctionStream.test.js`, `auctionSql.test.js` | HTTP, Redis thật, SQL thật opt-in và phục hồi |
-| `backend/test/bidPolicy.test.js`, `auctionLock.test.js` | Biên nghiệp vụ/tiền và quyền sở hữu khóa |
-| `frontend/src/components/AuctionPanel.jsx`, `frontend/src/services/auctionApi.js` | Gửi giá, theo dõi quyết định, retry cùng mã và snapshot |
-| `frontend/src/utils/bidAvailability.js`, `backend/test/bidAvailability.test.js` | Đếm chờ từ giờ SQL, xử lý biên thời gian và dữ liệu thiếu/sai |
-| `scripts/smokeM5.mjs` | Smoke API/worker/SQL/Redis thật và cleanup fixture riêng |
-| `docs/auction-processing.md` | Hợp đồng, lưu quyết định, kết thúc và phục hồi |
-| `backend/src/events/auctionUpdates.js` | Pub/Sub chỉ ID phiên, sau COMMIT; subscriber riêng tại API |
-| `backend/src/realtime/auctionSockets.js` | Kiểm tra quyền xem công khai, room phiên/danh mục và tín hiệu thay đổi |
-| `frontend/src/services/auctionRealtime.js` | Join/rejoin, gộp tín hiệu và đọc lại định kỳ |
-| `frontend/src/components/BidHistory.jsx`, `frontend/src/utils/auctionClock.js` | Lịch sử phân trang và đồng hồ dựa trên SQL |
-| `backend/test/auctionRealtime.test.js`, `auctionClock.test.js` | Ranh giới COMMIT, room, Pub/Sub/Streams thật theo opt-in và biên thời gian |
-| `scripts/smokeM6.mjs`, `docs/realtime.md` | Nghiệm thu và hợp đồng thời gian thực; dùng chung fixture với smokeM5 |
-
-## Cấu trúc chung
-
-| Đường dẫn | Trách nhiệm |
-|---|---|
-| `README.md` | Cài đặt, cấu hình, sử dụng và kiểm tra |
-| `VALIDATION.md` | Bằng chứng chạy và giới hạn xác minh |
-| `AGENTS.md` | Quy tắc thay đổi repository |
-| `package.json`, `package-lock.json` | npm workspaces, lệnh và dependency khóa phiên bản |
-| `compose.yaml` | SQL Server, Redis và volume phát triển |
-| `.env.example`, `frontend/.env.example` | Cấu hình mẫu; không chứa credentials thật |
-| `backend/` | HTTP API, worker và nghiệp vụ |
-| `frontend/` | React và client HTTP |
-| `scripts/` | Công cụ điều phối/cài đặt/kiểm thử |
-| `docs/` | Tài liệu kỹ thuật theo chủ đề |
-| `academic/` | Hướng dẫn lưu báo cáo, slide, UML và bằng chứng được chọn |
-| `shared/bookGenres.js`, `shared/accountControl.js` | Danh mục thể loại chung và thông báo thay cửa sổ |
-| `shared/bookCondition.js` | Mô tả kiểm duyệt chung, giữ tình trạng cũ khác biệt và bản xem trước tương thích SQL |
-| `shared/aiVisibility.js`, `backend/src/services/aiPresentation.js` | Quyết định kiểm duyệt hiện tại và kết quả AI được công bố cho người bán, tách chẩn đoán Admin |
-| `backend/test/aiVisibility.test.js` | Công bố đúng vòng kiểm duyệt, dữ liệu nguồn và thời gian SQL; projection riêng theo vai trò |
-
-## Quyền cửa sổ và đầu vào biểu mẫu
-
-| File/nhóm | Trách nhiệm |
-|---|---|
-| `backend/src/services/accountControl.service.js` | Login đổi owner, xóa session cũ nguyên tử; assert/release và Pub/Sub |
-| `backend/src/realtime/accountSockets.js` | Cookie/tab/control handshake, ngắt chủ cũ và heartbeat bù sự kiện |
-| `frontend/src/services/controlIdentity.js`, `accountControl.js` | Socket/HTTP nhận thu hồi phiên, xóa tài khoản và CSRF, dừng thao tác cũ |
-| `frontend/src/App.jsx` | Chuyển về màn hình đăng nhập khi session bị thu hồi |
-| `frontend/src/components/GenreSelect.jsx`, `shared/bookGenres.js` | Combobox một lựa chọn, lọc không dấu và danh mục dùng chung API |
-| `frontend/src/components/MoneyInput.jsx` | Nhập số thuần, không đổi định dạng khi focus/gõ; xem trước nhóm nghìn và xử lý composition |
-| `backend/test/accountControl.test.js` | Hai API/Redis/Socket thật opt-in; takeover, reconnect, CSRF và heartbeat |
-| `backend/test/bookGenres.test.js` | Danh mục, tìm không dấu và kiểm tra bài mới/giữ sách cũ |
-| `backend/test/bookCondition.test.js` | Không lặp mô tả, giữ dữ liệu cũ và hash nguồn phân tích |
-| `docs/account-control.md` | Chính sách quyền, API, khôi phục và nghiệm thu |
-
-## Giao dịch và tương tác sau phiên
-
-| File/nhóm | Trách nhiệm |
-|---|---|
-| `backend/src/services/communityPolicy.js` | Quyền hai bên, liên kết kết quả, hai xác nhận, đánh giá, giờ bình luận và đầu vào chặt |
-| `backend/src/models/community.model.js` | SQL giao dịch/chat/đã đọc, đánh giá, bình luận, khiếu nại và phân công Admin |
-| `backend/src/services/community.service.js` | Claim ảnh, COMMIT/rollback và bind bằng chứng |
-| `backend/src/controllers/community.controller.js`, `routes/community.routes.js` | Hợp đồng /api/community, phân quyền, CSRF và cursor |
-| `frontend/src/components/TransactionsPanel.jsx` | Giao dịch riêng, trace, xác nhận và đánh giá |
-| `frontend/src/components/CommunityFeed.jsx`, `CommentsPanel.jsx` | Poll/cursor, chat text, bình luận và uy tín công khai |
-| `frontend/src/components/ComplaintForm.jsx`, `ComplaintsPanel.jsx` | Upload ảnh, hồ sơ của mình, tiếp nhận/phản hồi của Admin |
-| `frontend/src/services/communityApi.js` | Client dùng cookie/tab/CSRF chung |
-| `backend/test/community*.test.js`, `helpers/communityFixture.js` | Policy, HTTP/session, media service và SQL opt-in; fixture giả phân biệt rõ |
-| `scripts/smokeM8.mjs`, `smokeAfterSales.mjs` | Nghiệm thu dịch vụ thật, dùng fixture và cleanup của smokeM5 |
-| `docs/after-sales.md` | Quy tắc, API, quyền media/chat và nghiệm thu |
-
-Cài dependency từ gốc bằng `npm.cmd ci`. Không chỉnh thủ công node_modules, frontend/dist hoặc lockfile;
-lockfile được cập nhật bằng npm khi dependency thay đổi.
-
-`npm.cmd run dev:all` dùng devDependency `concurrently` ở gốc để chạy API, worker và React cùng lúc,
-gắn nhãn màu cho log và dừng cả nhóm bằng `Ctrl+C`. Các lệnh `dev:api`, `dev:worker`, `dev:web`
-vẫn dùng được khi cần kiểm tra riêng. SQL Server và Redis được khởi động bằng Docker Compose trước đó.
+| `package.json`, `package-lock.json` | Workspaces, scripts chung, Node 24.x và phiên bản dependency |
+| `.env.example`, `frontend/.env.example` | Cấu hình mẫu; không là credentials thật |
+| `compose.yaml` | SQL Server/Redis, healthcheck, loopback ports, named volumes |
+| `.gitignore`, `AGENTS.md` | File không commit và quy tắc làm việc |
+| `README.md`, `VALIDATION.md` | Điểm bắt đầu và trạng thái kiểm chứng |
+| `academic/` | Khung lưu báo cáo/slide/UML/evidence; chưa có các bản học thuật trong source hiện tại |
 
 ## Backend
 
-Các đường dẫn bên dưới tương đối với `backend/`.
+| Vị trí trong `backend/` | Trách nhiệm |
+|---|---|
+| `src/server.js`, `src/app.js` | Lắp các router/dependency, HTTP/Socket, subscriber, cleanup và shutdown |
+| `src/worker.js` | Consumer probe/đấu giá/AI, job hết hạn và heartbeat; không có vòng tự enqueue AI |
+| `src/config/` | Parse env, SQL/Redis, auth, media và AI; không chứa key cố định |
+| `src/routes/`, `src/controllers/` | HTTP boundary: health, auth, posts, media, auctions, ai, community, notifications |
+| `src/middlewares/` | Session theo tab, auth/role/CSRF/rate limit và lỗi tập trung |
+| `src/services/auth.service.js`, `password.service.js`, `authRateLimit.service.js` | Tài khoản, kiểm tra/băm mật khẩu và giới hạn thử |
+| `src/services/accountControl.service.js` | Owner phiên, thu hồi session cũ, Redis Lua/PubSub |
+| `src/services/post.service.js`, `postValidation.js`, `postPolicy.js` | Claim/bind vé, hợp đồng sách/bài/giá, trạng thái/quyền |
+| `src/services/moderationList.js`, `catalogSearch.js` | Bộ lọc/cursor kiểm duyệt, tìm kiếm/allowlist sắp xếp |
+| `src/services/cloudinary.service.js`, `mediaLedger.service.js`, `mediaErrors.js` | Upload/recovery/metadata, lifecycle vé, cleanup bảo vệ SQL và lỗi provider an toàn |
+| `src/services/auction.service.js`, `bidPolicy.js` | Admission/đọc quyết định và quy tắc giá/giờ/cooldown |
+| `src/services/ai.service.js`, `aiPresentation.js` | Chỉ Admin yêu cầu AI, đọc status/history và công bố kết quả đúng vòng cho người bán |
+| `src/services/community.service.js`, `communityPolicy.js` | Khiếu nại/media và quyền/liên kết giao dịch/chat/đánh giá |
+| `src/services/reviewExport.js` | Snapshot và lọc dữ liệu xuất kết quả |
+| `src/services/infrastructure.service.js` | Probe/schema/readiness hạ tầng |
+| `src/models/` | Truy vấn SQL tham số hóa và transaction: user, post, auction, ai, community, notification |
+| `src/models/bookProfile.js` | Hồ sơ sách theo bài, OPENJSON và fallback legacy |
+| `src/events/` | Publisher/consumer probe, đấu giá và tín hiệu cập nhật sau COMMIT |
+| `src/processors/` | Quyết định đấu giá, probe; replay/khóa/SQL |
+| `src/concurrency/auctionLock.js` | SET NX PX, token/lease, gia hạn và compare-delete |
+| `src/jobs/auctionExpiry.js` | Đọc phiên hết hạn theo SQL, enqueue chốt |
+| `src/realtime/` | Namespace `/account` xác thực và `/auctions` công khai |
+| `src/utils/` | Logger an toàn, bounded provider JSON và rowversion |
 
-| Nhóm | File | Trách nhiệm |
-|---|---|---|
-| Khởi động | `src/app.js`, `src/server.js`, `src/worker.js` | Ghép HTTP middleware/router, Socket.IO, dịch vụ và worker |
-| Cấu hình | `src/config/env.js`, `parseConfig.js`, `database.js`, `redis.js` | Nạp/kiểm tra môi trường, pool SQL, Redis |
-| Xác thực | `src/config/auth.js`, `src/middlewares/session.js`, `auth.js` | Cookie/session, chọn phiên tab, CSRF, quyền và rate limit |
-| Tài khoản | `src/routes/auth.routes.js`, `src/controllers/auth.controller.js` | HTTP tài khoản và vòng đời phiên |
-| Tài khoản | `src/services/auth.service.js`, `password.service.js`, `authRateLimit.service.js` | Đầu vào, đăng ký/đăng nhập, Argon2id và Redis Lua |
-| Tài khoản | `src/models/user.model.js` | NguoiDung qua SQL tham số hóa |
-| Bài đăng | `src/routes/post.routes.js`, `src/controllers/post.controller.js` | Endpoint, quyền, phân trang và projection công khai |
-| Bài đăng | `src/services/post.service.js`, `postValidation.js`, `postPolicy.js` | Điều phối claim/commit, hợp đồng và quy tắc chuyển trạng thái |
-| Bài đăng | `src/models/post.model.js` | Transaction SQL tạo/duyệt/bổ sung/kích hoạt/đăng lại |
-| Media | `src/config/media.js`, `src/routes/media.routes.js`, `src/controllers/media.controller.js` | Giới hạn, raw upload sau xác thực và HTTP vé media |
-| Media | `src/services/cloudinary.service.js`, `mediaLedger.service.js` | REST provider, kiểm tra bytes, vé Redis và cleanup |
-| Hạ tầng | `src/constants/infrastructure.js`, `src/controllers/health.controller.js`, `src/services/infrastructure.service.js` | Readiness, heartbeat và hằng số probe |
-| Sự kiện | `src/events/eventPublisher.js`, `eventConsumer.js`, `src/processors/systemProbe.processor.js` | Xuất bản, đọc/nhận lại/xác nhận và xử lý probe |
-| Utility | `src/utils/rowVersion.js`, `logger.js`, `src/middlewares/errorHandler.js` | Mã hóa version, log che bí mật và lỗi HTTP |
-| Schema | `migrations/001_schema.sql`, `002_cloudinary_metadata.sql`, `003_auction_decisions.sql`, `004_notifications.sql`, `005_review_exports.sql`, `006_isbn_input.sql`, `schema-manifest.json` | DDL nền, migration media/quyết định/thông báo/bản kết quả và cấu trúc dự kiến |
-| CLI | `scripts/initDatabase.js`, `migrateDatabase.js`, `createAdmin.js` | Tạo/nâng schema và tạo Admin qua terminal |
+Các file `.gitkeep` chỉ giữ cấu trúc, không phải mô-đun chức năng chưa hoàn thiện.
 
-`src/concurrency/`, `src/jobs/` và `src/ai/` có logic phối hợp, tác vụ và phân tích đang dùng.
+### AI
+
+| Vị trí trong `backend/src/ai/` | Trách nhiệm |
+|---|---|
+| `criteria.js`, `scoring.js` | Chín tiêu chí, bảng quy đổi, hai tổng độc lập và NULL |
+| `input.js` | Projection/hash đầu vào và đọc metadata/đánh dấu kết quả cũ |
+| `gemini.js` | Interactions REST/schema, prompt, retry hữu hạn, chống gửi giá/tài khoản |
+| `media.js` | Ảnh inline có ngân sách, video tuần tự riêng, manifest M1… |
+| `files.js` | Gemini Files resumable, kiểm tra host/name/URI, poll ACTIVE, cleanup |
+| `transport.js`, `errors.js` | Đọc stream có giới hạn/deadline, mã lỗi và chẩn đoán allowlist |
+| `queue.js`, `consumer.js`, `processor.js` | Admission manual/Streams/reclaim, lease/cache/receipt và lưu SQL |
+
+`reconcile.js` của cơ chế tự phân tích đã được bỏ; không mô tả file này như thành phần còn chạy.
+
+### SQL và script Backend
+
+| Vị trí | Vai trò |
+|---|---|
+| `backend/migrations/001_schema.sql` | DDL nền, dùng khi khởi tạo |
+| `002_cloudinary_metadata.sql` | Metadata/index Cloudinary |
+| `003_auction_decisions.sql` | Receipt YeuCauDatGia, lý do kết thúc/backfill |
+| `004_notifications.sql` | ThongBao, nguồn chống trùng và chỉ mục |
+| `005_review_exports.sql` | Snapshot JSON theo quyết định KiemDuyet |
+| `006_isbn_input.sql` | ISBN NVARCHAR(100), không ép 10/13 ký tự |
+| `007_resubmission_profiles.sql` | BaiDang.ho_so_sach, HinhAnh/Video.dang_su_dung |
+| `backend/schema-manifest.json` | Chữ ký đích: 21 bảng, 165 cột, 99 CHECK, 15 UNIQUE |
+| `backend/scripts/` | Init/migrate, danh sách migration dùng chung và CLI tạo Admin |
+
+Các dòng tên migration 002–007 ở bảng trên đều nằm trong `backend/migrations/`.
 
 ## Frontend
 
-Các đường dẫn bên dưới tương đối với `frontend/`.
-
-| File | Trách nhiệm |
+| Vị trí trong `frontend/src/` | Trách nhiệm |
 |---|---|
-| `src/main.jsx`, `src/App.jsx` | Khởi tạo React và điều hướng theo tài khoản/vai trò |
-| `src/components/AccountPanel.jsx` | Đăng ký/đăng nhập/đăng xuất và thông tin tài khoản |
-| `src/components/InfrastructurePanel.jsx` | Kiểm tra hạ tầng/probe |
-| `src/components/PostsPanel.jsx` | Danh sách/chi tiết, duyệt, bổ sung và lịch kích hoạt |
-| `src/components/PostForm.jsx` | Thông tin sách/bài/giá và upload trước khi gửi |
-| `src/components/MoneyInput.jsx` | Input tiền có phân cách, lọc chữ và giá trị nguyên gửi API |
-| `src/services/authApi.js` | HTTP dùng cookie, CSRF trong bộ nhớ và selector tab |
-| `src/services/tabIdentity.js` | Mã tab trong sessionStorage, giữ khi reload, xoay khi tài liệu mới |
-| `src/services/postApi.js` | HTTP bài đăng/media qua client xác thực chung |
-| `src/utils/moneyInput.js` | Định dạng tiền/caret không dùng Number |
-| `src/style.css` | Giao diện và responsive |
-| `vite.config.js`, `index.html` | Cấu hình dev/build và HTML khởi đầu |
+| `main.jsx`, `App.jsx` | Khởi tạo React, hash routes và điều phối trang theo tài khoản |
+| `components/BookBidShell.jsx`, `DesignUi.jsx`, `Home.jsx` | Shell, sidebar Admin, header người dùng, icon và trang chủ |
+| `components/AccountPanel.jsx`, `InfrastructurePanel.jsx` | Tài khoản và công cụ hạ tầng |
+| `components/PostsPanel.jsx`, `PostForm.jsx` | Danh mục/mine/pending/chi tiết, bốn bước tạo/bổ sung/đăng lại |
+| `components/GenreSelect.jsx`, `MoneyInput.jsx` | Combobox tìm/chọn thể loại, tiền chuỗi/IME/caret |
+| `components/BookCard.jsx`, `BookGallery.jsx`, `ImageZoom.jsx`, `UploadMediaCard.jsx` | Ảnh/video một bản sách, magnifier, thumbnails và gỡ media |
+| `components/AuctionPanel.jsx`, `BidHistory.jsx` | Giá, quyết định riêng, lịch sử/kết quả, trạng thái chờ |
+| `components/AiPanel.jsx`, `ReviewExportButton.jsx` | AI theo yêu cầu, lịch sử/manifest/điểm và xuất snapshot |
+| `components/TransactionsPanel.jsx`, `CommentsPanel.jsx`, `CommunityFeed.jsx`, `ComplaintForm.jsx`, `ComplaintsPanel.jsx` | Giao dịch, chat, bình luận/uy tín và khiếu nại |
+| `components/Notifications.jsx` | Hộp thông báo riêng, chưa đọc/đã đọc và điều hướng |
+| `services/authApi.js`, `tabIdentity.js`, `controlIdentity.js`, `accountControl.js` | Cookie/CSRF/selector, thu hồi và tránh phản hồi cũ xóa phiên mới |
+| `services/postApi.js`, `postDrafts.js` | HTTP bài/media, nhận diện tệp và nháp/upload qua điều hướng SPA |
+| `services/auctionApi.js`, `auctionRealtime.js`, `communityApi.js` | Đọc/ghi nghiệp vụ, Socket và lấy lại snapshot |
+| `services/apiBase.js`, `navigation.js`, `reviewDocument.js` | API base/hash routes và bản in snapshot |
+| `utils/` | Đồng hồ SQL, điều kiện đặt tiếp, số tiền, geometry kính lúp và tiến độ AI |
+| `style.css`, `design.css`, `integration.css`, `styles/fonts.css` | Style nền, phong cách BookBid, kết nối component và font local |
 
-## Script và kiểm thử
+`frontend/public/assets/` chứa ảnh trang trí thư viện và font/OFL. Ảnh/video sách lấy từ Backend/Cloudinary,
+không tráo ảnh minh họa thành bằng chứng của người bán.
 
-| File | Trách nhiệm |
+## Shared, kiểm tra và tài liệu
+
+| Vị trí | Trách nhiệm |
 |---|---|
-| `scripts/setup.mjs`, `setupAuth.mjs`, `setupMedia.mjs` | Tạo/bổ sung cấu hình còn thiếu |
-| `scripts/check.mjs` | Kiểm tra cú pháp Backend/script |
-| `scripts/smoke.mjs` | Hạ tầng thật |
-| `scripts/smokeAuth.mjs` | Tài khoản qua API/SQL/Redis thật |
-| `scripts/smokeM4.mjs` | Bài đăng/Cloudinary/duyệt/kích hoạt/đăng lại với dữ liệu UUID riêng |
-| `backend/test/infrastructure.test.js` | Hợp đồng hạ tầng và probe |
-| `backend/test/auth.test.js`, `authRedis.test.js` | Auth HTTP/Argon2 và Redis thật theo opt-in |
-| `backend/test/posts.test.js`, `mediaRedis.test.js` | Policy/HTTP/provider và claim/cleanup Redis |
-| `backend/test/rowVersion.test.js` | Binary SQL → JSON → HTTP và optimistic version |
-| `backend/test/tabSession.test.js` | Cookie jar chung, quyền/CSRF, rotate/logout độc lập và Redis opt-in |
-| `backend/test/inputFormatting.test.js` | Vòng đời selector tab, tiền nguyên và caret |
-| `backend/test/setupAuth.test.js` | Setup giữ cấu hình cũ, idempotency và secret mẫu |
+| `shared/accountControl.js`, `aiVisibility.js` | Thông báo phiên và điều kiện công bố kết quả AI |
+| `shared/bookGenres.js`, `bookIdentifiers.js`, `bookCondition.js` | Danh mục chung, ISBN và gộp mô tả |
+| `shared/mediaFormats.js`, `mediaDelivery.js` | Nhận diện nhị phân/allowlist và URL xem/chấm phù hợp, giữ link gốc |
+| `scripts/setup*.mjs` | Tạo/bổ sung cấu hình, bảo toàn giá trị riêng |
+| `scripts/check.mjs` | Cú pháp server/scripts/shared |
+| `scripts/checkAi.mjs`, `aiScoreExample.mjs` | Gemini văn bản một lượt và ví dụ tính điểm |
+| `scripts/smoke*.mjs` | Nghiệm thu dịch vụ thật, readiness và fixture/cleanup; chỉ lệnh khai báo ở package.json là entrypoint npm |
+| `backend/test/` | Test policy, HTTP/fixture và Redis/SQL opt-in; không phải mọi bài đều dùng dịch vụ thật |
+| `docs/` | Hướng dẫn/chức năng/kiến trúc hiện hành; mục lục ở README |
+| `docs/archive/` | Bằng chứng kiểm thử cũ, không dùng thay hướng dẫn chạy hiện tại |
 
-## Tài liệu và quy ước
-
-- `architecture.md`: thành phần, kết nối và tính nhất quán.
-- `flows.md`: luồng thực thi, API và quy tắc dự kiến.
-- `decisions.md`: các ADR còn hiệu lực và quyết định chưa hoàn tất.
-- `tasks.md`: trạng thái chức năng và backlog.
-- `docker-migration.md`: chuyển project, kiểm tra volume và dữ liệu.
-
-File mã nguồn viết tay có comment đầu file mô tả trách nhiệm. JSON chuẩn không chèn comment.
-Thư mục rỗng được giữ bằng `.gitkeep`; file này không chứng minh chức năng đã triển khai.
-
-## Phân tích AI
-
-| File/nhóm | Trách nhiệm |
-|---|---|
-| `backend/src/ai/criteria.js`, `scoring.js` | Tiêu chí, trọng số, quy đổi, NULL và audit hai điểm độc lập |
-| `backend/src/ai/errors.js`, `scripts/checkAi.mjs` | Phân loại lỗi an toàn, HTTP/provider/DNS/TLS và chẩn đoán mẫu không cần SQL/Redis |
-| `backend/src/ai/input.js`, `gemini.js` | Whitelist/hash đầu vào, Gemini Interactions JSON, timeout thích ứng và retry hữu hạn |
-| `backend/src/ai/media.js`, `transport.js` | Tải bốn media song song theo lô/ngân sách; bounded stream có deadline và hủy body |
-| `frontend/src/utils/aiProgress.js` | Thông điệp tiến độ chuẩn bị/chờ Gemini/thử lại cho Admin |
-| `backend/src/config/ai.js` | Cờ bật, khóa, model và giới hạn tài nguyên |
-| `backend/src/ai/queue.js`, `consumer.js`, `processor.js` | Admission manual, pending/reclaim, cache và SQL receipt |
-| `backend/src/models/ai.model.js` | Lưu nguyên tử, version, lịch sử và truy vấn kết quả |
-| `backend/src/services/ai.service.js`, `routes/ai.routes.js` | Quyền chủ bài/Admin, yêu cầu phân tích và trạng thái |
-| `frontend/src/components/AiPanel.jsx` | Hai điểm, bằng chứng, cảnh báo, lịch sử và nút Admin |
-| `backend/test/ai*.test.js`, `fixtures/ai-observations.json` | Bộ quy tắc, hợp đồng provider, HTTP, pipeline, Redis/SQL opt-in và mẫu đối chiếu |
-| `scripts/setupAi.mjs`, `aiScoreExample.mjs`, `smokeAi.mjs` | Cấu hình, tính mẫu không gọi AI và smoke Gemini thật |
-| `docs/ai-analysis.md` | Cấu hình, tiêu chí, công thức, quyền và nghiệm thu |
-
-## Tích hợp BookBid
-
-- `frontend/src/components/BookBidShell.jsx`, `Home.jsx`, `BookCard.jsx`, `BookGallery.jsx`, `DesignUi.jsx`: layout, trang chủ, card và media theo thiết kế đã chốt.
-- `frontend/src/design.css`, `integration.css`, `styles/fonts.css`, `public/assets/`: màu/font/style và tài nguyên có giấy phép; không có fixture sách giả trong ứng dụng.
-- `frontend/src/services/apiBase.js`: chuẩn hóa tên host loopback cho HTTP/Socket để cookie phiên hoạt động khi web mở bằng localhost hoặc 127.0.0.1.
-- `frontend/src/services/navigation.js`: route hash; ID bài đăng tách biệt với ID phiên/giao dịch.
-- `frontend/src/components/UploadMediaCard.jsx`: thẻ tệp vừa tải lên và nút ×, không xóa media đã lưu trong lịch sử.
-- `frontend/src/components/Notifications.jsx`: đọc hộp thông báo của session, cập nhật 10 giây, đọc lại khi focus/online; không dùng room công khai.
-- `backend/src/services/catalogSearch.js`: giới hạn từ khóa/bộ lọc/sắp xếp và xác minh nhóm thể loại theo danh mục dùng chung; model bài đăng truy vấn SQL tham số hóa.
-- `backend/src/models/notification.model.js`, `routes/notification.routes.js`: dựng hộp thông báo từ sự kiện SQL đã COMMIT, chống trùng theo người nhận/nguồn và API riêng có CSRF.
-- `backend/migrations/004_notifications.sql`: bảng ThongBao và index, có thể chạy lại, giữ dữ liệu.
-- `backend/test/catalogSearch.test.js`, `notificationHttp.test.js`, phần mở rộng `communitySql.test.js`/`scripts/smokeAfterSales.mjs`: quyền, tìm kiếm và nghiệm thu SQL thật khi môi trường sẵn sàng.
-
-## Xuất kết quả kiểm duyệt
-
-- `backend/migrations/005_review_exports.sql`: một cột JSON nullable trong KiemDuyet, giữ dữ liệu và chạy lại được.
-- `backend/src/services/reviewExport.js`: tạo/đọc bản kết quả theo danh sách trường cho người bán; dùng bộ lọc AI hiện có.
-- `backend/src/models/post.model.js`: lưu bản kết quả trong transaction duyệt; khóa và kiểm tra chủ bài khi xuất đúng ID quyết định.
-- `frontend/src/components/ReviewExportButton.jsx`: mở bản in, báo lỗi popup/API, chỉ hiện ở kết quả người bán.
-- `frontend/src/services/reviewDocument.js`: bản in A4 có tiếng Việt, liên kết Cloudinary/nguồn được kiểm tra và nội dung được escape.
-- `backend/test/reviewExport*.test.js`: hợp đồng/quyền, snapshot, bản in và SQL Server opt-in.
-- `docs/review-exports.md`: cách cập nhật, xuất PDF, giới hạn dữ liệu cũ và nghiệm thu.
-
-## Ô ISBN
-
-- `shared/bookIdentifiers.js`: ngưỡng kỹ thuật ISBN dùng chung cho input, validator và tham số SQL.
-- `backend/migrations/006_isbn_input.sql`: mở rộng Sach.isbn giữ dữ liệu, bỏ ép 10/13 và giữ chỉ mục/check không rỗng.
-
-Bộ lọc/cursor riêng của trang Kiểm duyệt nằm ở `backend/src/services/moderationList.js`; model bài đăng lấy lý do/ngày từ KiemDuyet hiện có.
-
-Ảnh chi tiết dùng `frontend/src/components/ImageZoom.jsx`; hình học kính lúp/ảnh contain tách ở `frontend/src/utils/imageZoom.js`. `BookGallery.jsx` tiếp tục quản lý lựa chọn ảnh/video; không đổi nguồn media hoặc endpoint.
-
-`backend/src/models/bookProfile.js` thống nhất hồ sơ sách riêng theo bài cho đọc/AI/tìm kiếm/giao dịch; migration `007_resubmission_profiles.sql` thêm JSON và hai cờ media active. `backend/test/postResubmit.test.js` kiểm tra model transaction/HTTP/quyền/rollback/lịch sử với SQL adapter fixture; SQL opt-in mở rộng ở reviewExportSql.test.js.
-
-`backend/src/services/mediaErrors.js` giữ thông báo/diagnostic Cloudinary thuộc allowlist; `backend/src/utils/providerJson.js` đọc body JSON trong deadline và giới hạn byte. `backend/test/mediaUpload.test.js` kiểm tra upload-timeout/metadata recovery/URL/HTTP/quota/stream và ngân sách client bằng fixture. Hướng dẫn vận hành tại `docs/media-upload.md`.
-
-- `shared/mediaFormats.js`: danh mục và nhận diện chữ ký nội dung, dùng chung browser/API.
-- `shared/mediaDelivery.js`: URL xem/chấm AI cho định dạng cần chuyển đổi, giữ link gốc trong hồ sơ.
-- `frontend/src/services/postDrafts.js`: nháp theo người/chế độ/bài, lưu cục bộ và upload qua chuyển route.
-- `backend/test/mediaFormats.test.js`, `backend/test/postDrafts.test.js`: kiểm tra tệp đổi đuôi,
-  container, chuyển đổi AI, vòng đời upload/nháp, cô lập tài khoản và nháp hết hạn.
-
-- `backend/test/aiManual.test.js`: đăng/đăng lại/bổ sung/replay và GET không tự enqueue, chỉ yêu cầu Admin tạo job; bỏ tiến độ auto cũ nhưng giữ lịch sử SQL.
-
-- `backend/src/ai/files.js`: upload video tới Gemini Files, xác minh upload URL/File ID/URI,
-  poll ACTIVE và cleanup tệp tạm có giới hạn; chỉ dùng nội bộ worker.
-- `backend/test/aiFiles.test.js`: video >12 MiB, dài >5 phút theo metadata, tách ngân sách ảnh,
-  tuần tự từng video, retry dùng lại URI, timeout/codec/URL/quyền và cleanup; Google HTTP fixture.
+Không có script `lint`, `smoke:m3`, `smoke:m7` hoặc `smoke:media` trong package.json hiện tại.
+Các tệp `smokeAfterSales.mjs`, `smokeReadiness.mjs` là mô-đun dùng chung, không có npm script riêng.

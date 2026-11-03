@@ -1,178 +1,128 @@
-# BookBid: giao diện thật, tìm kiếm và hộp thông báo
+<!-- Mục đích: Màn hình BookBid và hành vi frontend gắn API thực tế. -->
 
-## Cập nhật trên Windows
+# Giao diện BookBid, tìm kiếm và thông báo
 
-Tại thư mục gốc `my-project_book-auction-system`, dừng terminal `dev:all` bằng Ctrl+C. Giữ Docker SQL Server/Redis chạy. Sau khi lưu các thay đổi cục bộ cần thiết:
+Đây là frontend đang tích hợp trong repository chính, dùng React/JavaScript/Vite và API thật.
+`frontend-book`/Figma là nguồn phong cách đã chốt, không phải dependency chạy ứng dụng hoặc một bộ mock
+đang thay dữ liệu nghiệp vụ. Khi chưa có sách hoặc media, giao diện hiển thị trạng thái rỗng.
+Cài đặt/cập nhật tại [setup-guide.md](setup-guide.md); tài nguyên font/ảnh trang trí nằm trong source.
 
-```powershell
-git switch feat/Hai
-git pull --ff-only origin feat/Hai
-npm.cmd ci
-npm.cmd run db:migrate
-npm.cmd run dev:all
-```
+## Màn hình và điều hướng
 
-Mở `http://localhost:5173`. Không cần pnpm, không đổi `.env` và không tạo lại database. Migration 004 thêm `ThongBao`/index; migration 005 thêm `KiemDuyet.ket_qua_snapshot` để lưu bản kết quả theo từng quyết định. Chạy lại được; schema mới 21 bảng/165 cột sau migration 007. Các bản cũ 20/152, 21/161 và 21/162 được init nhận diện để nâng cấp giữ dữ liệu.
-
-## Phiên biểu mẫu và giao diện khách
-
-`services/apiBase.js` dùng chung cho HTTP, Socket tài khoản, Socket đấu giá và công cụ hạ tầng. Nếu web/API là hai tên loopback `localhost`/`127.0.0.1` cùng giao thức, lấy hostname đang mở ở web và giữ cổng/giao thức API. Không sửa `.env` cá nhân hoặc đổi URL API ở host khác. Ví dụ web `http://localhost:5173` + cấu hình API `http://127.0.0.1:5000` sẽ gọi `http://localhost:5000` để cookie không bị chặn vì khác site.
-
-Khi POST bị Backend từ chối bằng HTTP 403/`INVALID_CSRF` trước khi xử lý nghiệp vụ, client lấy lại CSRF rồi gửi lại đúng một lần trong cùng phiên. Không tự thử lại lỗi mạng, sai mật khẩu, lỗi nghiệp vụ hoặc yêu cầu thuộc phiên cũ; không thay CSRF/token mới theo một phản hồi lỗi cũ. Cookie HttpOnly/SameSite=Lax và cơ chế thu hồi đăng nhập giữ nguyên.
-
-Khách chỉ có các liên kết điều hướng/đăng nhập và tìm kiếm, không có avatar hoặc chuông. Đăng nhập thành công mới hiện hai phần đó; đăng xuất/thu hồi phiên gỡ chúng và đóng hộp thông báo.
-
-## Giao diện và đường dẫn
-
-Phong cách tham chiếu: [frontend-book tại 83add59](https://github.com/LeTuanHai-SVDHBD/frontend-book/tree/83add5905dc2b0ed1da23c46af7b1367d260c94d). Navy/vàng/kem, Inter/Playfair tự phục vụ, chữ 20px desktop/18px mobile, trang chủ có ảnh thư viện, card, sidebar Admin với chuông/tài khoản. Màn hình nhỏ mở sidebar qua Menu quản trị. Không dùng bộ chọn vai trò/trạng thái mẫu, ảnh sách tạo bởi AI, giá hoặc đồng hồ mẫu trong ứng dụng chính. Khi không có sách/media, hiển thị trạng thái rỗng.
-
-| Hash | Nội dung |
+| Hash route | Nội dung / quyền |
 |---|---|
-| `#/home` | Trang chủ, phiên công khai lấy từ Backend |
-| `#/catalog?q=…&phase=live&sort=price` | Tìm kiếm/bộ lọc |
-| `#/catalog/:postId` | Chi tiết công khai, ảnh/video thật cùng bản sách, đặt giá/lịch sử/kết quả |
-| `#/create` | Đăng sách bốn bước, upload Cloudinary, gửi kiểm duyệt |
-| `#/mine`, `#/mine/:postId` | Bài của mình, AI riêng, bổ sung, kích hoạt/đăng lại |
-| `#/pending`, `#/pending/:postId` | Admin: danh sách bài chờ duyệt, chi tiết bằng chứng/AI/quyết định |
+| `#/home` | Trang chủ, phiên công khai và bốn nhóm thể loại chung |
+| `#/catalog`, `#/catalog/:postId` | Danh mục/tìm kiếm, chi tiết bản sách/ảnh/video, phiên/giá/kết quả |
+| `#/create` | Người dùng: đăng sách bốn bước, có nháp |
+| `#/mine`, `#/mine/:postId` | Bài của mình, bổ sung/kích hoạt/đăng lại, quyết định và PDF |
+| `#/pending`, `#/pending/:postId` | Admin: bài chờ/từ chối, bằng chứng/AI và quyết định |
 | `#/trades`, `#/trades/:tradeId` | Hai bên giao dịch/chat/xác nhận/đánh giá/khiếu nại |
-| `#/complaints`, `#/complaints/:complaintId` | Hồ sơ người gửi/Admin, chat chỉ đọc đúng người xử lý |
-| `#/account` | Đăng ký/đăng nhập/tài khoản/đăng xuất thật |
-| `#/infra` | Công cụ hạ tầng hiện có |
+| `#/complaints`, `#/complaints/:complaintId` | Người gửi hoặc Admin; chat chỉ đọc theo quyền phân công |
+| `#/account` | Đăng ký/đăng nhập/tài khoản/đăng xuất |
+| `#/infra` | Công cụ health/probe của môi trường phát triển |
 
-`postId` khác `auctionId`; API phiên vẫn nhận `phien_dau_gia_id` từ chi tiết bài, không suy đoán hai ID bằng nhau. Điều hướng hash giữ được F5 và Back. Thông báo chỉ điều hướng; Backend đích kiểm tra quyền như cũ.
+`postId`, `auctionId`, `tradeId` là các ID khác nhau. API phiên lấy `phien_dau_gia_id` từ chi tiết bài,
+không giả định bằng mã bài. Hash route giữ được Back/F5; Backend vẫn quyết định quyền mỗi request.
 
-Trang kiểm duyệt hiển thị bài chờ duyệt bằng lưới thẻ dùng toàn chiều rộng, có ảnh, tên sách, mã bài và liên kết xem bài. Không còn cột **Hàng đợi** hoặc khung **Chọn hồ sơ để kiểm duyệt**. Mở bài sẽ hiển thị chi tiết riêng, **Về danh sách** quay lại các thẻ; giữ API/cursor và nút tải thêm hiện có, số đếm là số bài đang hiển thị.
+Admin chỉ có sidebar, chứa avatar/tài khoản và thông báo, không có header ngang hoặc nút đăng sách.
+Người dùng dùng header/menu responsive. Khách không thấy avatar/hộp thông báo của người dùng.
+Login mới cùng tài khoản thu hồi phiên cũ, tab cũ về đăng nhập, không dùng lớp phủ F5 để giành quyền.
+CSRF chỉ giữ trong bộ nhớ; lỗi INVALID_CSRF được lấy token mới/thử lại tối đa một lần, không tự retry lỗi mạng.
 
-Chi tiết sách dùng hai cột cân nhau trên desktop: ảnh/video bên trái, thông tin sách và giá bên phải. Mô tả dài cùng tình trạng/bằng chứng nằm trong phần toàn chiều rộng phía dưới; mobile xếp một cột. Ảnh thu nhỏ nằm trong một hàng cuộn ngang, có nút cuộn và vẫn chọn được mọi ảnh/video của cùng bản sách, không cắt danh sách media.
+## Danh mục và tìm kiếm
 
-Điểm AI chỉ bỏ số 0 thừa khi hiển thị: `100.00` → `100 / 100`, `75.50` → `75.5 / 100`; `76.39` và NULL được giữ đúng nghĩa. Cách hiển thị này áp dụng cho cả hai điểm và phần đối chiếu phép tính; không sửa giá trị lưu SQL hoặc bộ chấm điểm.
+Form tìm kiếm điều hướng sang catalog; Backend tìm tên sách, tiêu đề, tác giả, ISBN, thể loại với SQL
+tham số hóa, collation không phân biệt hoa/thường/dấu và escape ký tự LIKE. Không thêm bảng tìm kiếm,
+không có Elasticsearch/full-text index hoặc tự truy cập Google.
 
-## Tìm kiếm
+| Query | Giá trị |
+|---|---|
+| `q` | Tối đa 120 ký tự, trim/NFKC |
+| `genre`, `group` | Thể loại cụ thể/nhóm thuộc danh mục chung |
+| `phase` | `all`, `live`, `scheduled`, `ended` |
+| `sort` | `newest`, `price` tăng dần, `ending` |
+| `page` | Từ 1; 30 mục, `nextPage` |
 
-`GET /api/posts/catalog?q=&genre=&group=&phase=all&sort=newest&page=1`. Từ khóa tối đa 120 ký tự; thể loại/nhóm tối đa 100; phase `all|live|scheduled|ended`; sort `newest|price|ending`; page 1–9999, 30 kết quả/trang. Phản hồi `{items,nextPage}`. Endpoint cũ không có bộ lọc vẫn hỗ trợ `before`/`nextBefore`; không trộn hai cơ chế phân trang.
+Chỉ bài đã duyệt và phiên kích hoạt/kết thúc được công khai; ẩn ngưỡng giá, email và AI nội bộ.
+Bốn nhóm lấy từ `shared/bookGenres.js`: **Văn học và hư cấu**, **Kiến thức và phi hư cấu**,
+**Tư liệu và sách cổ**, **Đối tượng độc giả**. Chọn nhóm lọc tập thể loại con, không thay bằng nhóm tên tự đặt.
 
-Trang chủ lấy đúng bốn nhóm chính từ `BOOK_GENRE_GROUPS` trong `shared/bookGenres.js`. `group` phải là tên nhóm có trong danh mục; Backend mở rộng nhóm thành các thể loại con và truyền từng giá trị bằng tham số SQL. Bộ lọc giao diện chọn nhóm hoặc một thể loại cụ thể; chọn lại một loại sẽ bỏ điều kiện nhóm cũ.
+## Đăng sách và nháp
 
-SQL dùng tham số, collation `Vietnamese_100_CI_AI` và quy đổi đ/d cho từ khóa; `%`, `_`, `[`, `~` trong từ khóa là ký tự thường. Tìm trong tên sách, tiêu đề, tác giả, ISBN và thể loại. Bộ lọc áp dụng trước phân trang. Sort là biểu thức máy chủ cố định; có ID phụ để thứ tự ổn định. Danh mục thay đổi trực tiếp có thể dịch vị trí giữa các trang; UI chống lặp ID và đọc lại trang đầu khi đồng bộ. Không tạo chỉ mục full-text hay dependency mới. Khi dữ liệu lớn cần đo truy vấn và cân nhắc full-text riêng.
+Bốn bước: **Thông tin sách → Ảnh và video → Thông số đấu giá → Kiểm tra và gửi**.
+Chọn thể loại bằng combobox; gõ để tìm, phải chọn mục hợp lệ. ISBN có/không, tối đa 100 ký tự nếu nhập,
+không ép 10/13. Một ô bắt buộc tình trạng/quý hiếm/bằng chứng; Giới thiệu sách vẫn riêng.
+Backend giữ tương thích trường tình trạng cũ, lấy preview tối đa 1000 ký tự khi không gửi trường đó.
 
-Danh sách công khai chỉ trả bài đã duyệt/đã công bố, thêm `anh_bia` thật từ HinhAnh; không có giá kết thúc sớm, rowversion, AI hay thông tin tài khoản. Không có ảnh thì hiển thị placeholder trung tính.
+Ba ô tiền nhận chữ số, không chèn dấu khi đang gõ/IME/focus/blur, giữ chuỗi tối đa 18 chữ số;
+dòng Giá trị có nhóm nghìn. Cooldown chọn 10/15/20/25/30 giây; API chấp nhận nguyên 10–30.
+Không tự thêm lịch khi đăng, chỉ đặt lịch sau phê duyệt.
 
-## Media, ISBN và trình bày hồ sơ
+Nháp theo tài khoản/chế độ/bài, nằm trên trình duyệt hiện tại, giữ trường/bước/vé media và dự kiến gỡ media cũ.
+Đổi trang trong SPA giữ upload đang chạy; reload/đóng trình duyệt có thể ngắt lượt chưa xong.
+Vé chưa gửi bài hết hạn sau một giờ; file đã gắn SQL có vòng đời khác. Gửi thành công mới xóa nháp hoặc
+người dùng xác nhận **Bỏ bản nháp**; đóng biểu mẫu giữ nháp, không gửi sửa đổi lên hồ sơ SQL.
 
-Ảnh ở thẻ sách dùng chung khung 4:3 cho Trang chủ, Đấu giá và Kiểm duyệt Admin. Ảnh nằm thẳng,
-canh giữa trên nền sáng, giữ nguyên tỷ lệ và hiển thị đầy đủ bằng `object-fit: contain`.
-Bỏ bóng đổ/hiệu ứng xoay của mô phỏng bìa sách cũ; hover không làm nghiêng ảnh.
-Nhãn trạng thái có khoảng riêng phía trên; ảnh dọc, ngang, vuông dùng cùng khung, chưa có ảnh giữ placeholder.
-Không sửa file ảnh, URL Cloudinary, dữ liệu media hoặc cách chọn ảnh/video ở chi tiết.
+Bổ sung bài bị từ chối cho sửa đủ trường sách. Nút × media cũ đánh dấu gỡ, có **Giữ lại**;
+chỉ áp dụng khi gửi thành công. Media cũ/URL/snapshot lịch sử không bị xóa. Giới hạn video tính cả
+video giữ lại sau khi gỡ và cộng video mới. Chi tiết tại [media-upload.md](media-upload.md).
 
-Hai nút **← / →** cạnh ảnh nhỏ chuyển sang media trước/tiếp theo (ảnh hoặc video), không chỉ cuộn dải ảnh. Đầu/cuối danh sách thì nút tương ứng bị vô hiệu, không quay vòng. Có số vị trí hiện tại/tổng media; ảnh nhỏ đang chọn tự cuộn ngang vào vùng nhìn thấy, giữ vị trí cuộn dọc của trang và tôn trọng reduced-motion.
+## Danh sách kiểm duyệt và AI
 
-Khi focus trong thư viện ảnh, **Home** chọn media đầu, **End** chọn media cuối; ở dải ảnh nhỏ, **← / →** cũng đổi media và đưa focus đến ảnh nhỏ đang chọn. Tab chỉ dừng ở ảnh nhỏ đang chọn thay vì đi qua mọi tệp. Ở ảnh lớn, mũi tên vẫn điều khiển kính lúp; trong video, Home/End/mũi tên vẫn thuộc controls gốc của trình phát, không bị thư viện chiếm. Chuột/chạm cũng dùng cùng hai nút chuyển media ở cả Admin và người dùng.
+Danh sách Admin dùng lưới thẻ toàn chiều rộng, không còn cột Hàng đợi/khung Chọn hồ sơ.
+Mặc định chờ trước, từ chối sau; lọc Tất cả/Chờ/Đã từ chối, cursor nhóm-ID và nút xem thêm.
+Bài từ chối có lý do/ngày gần nhất, mở để xem chi tiết; muốn duyệt lượt mới phải do chủ sách gửi lại.
+Bài đã phê duyệt rời danh sách này, quyết định/lịch sử vẫn giữ. Nút Về danh sách đưa về lưới thẻ.
 
-Ảnh lớn ở chi tiết dùng `ImageZoom`: desktop từ 960px và còn đủ chỗ bên phải có kính lúp khi rê chuột lên vùng ảnh thật, khung soi bên cạnh với mức phóng mặc định 2,5 lần (tăng thêm khi ảnh quá hẹp để khung không trống). Vùng soi bỏ phần đệm của `object-fit: contain`, không đổi tỷ lệ hay ảnh nguồn. Khung soi là lớp phủ tạm trên cột thông tin, không làm dịch bố cục; rời ảnh, cuộn, resize hoặc đổi ảnh/video thì ẩn.
+Bài mới **Chưa phân tích**, nút **Phân tích bằng AI**, chưa hiện điểm. Yêu cầu manual queued/running
+hiện tiến độ/khóa nút; đã chạy dùng **Phân tích lại bằng AI**. Chỉ kết quả phân tích không thất bại
+mới có hai ô điểm; NULL là thiếu bằng chứng, lỗi provider là thất bại/chẩn đoán riêng. Điểm `100.00` hiển thị `100/100`.
+Video có tiến độ lấy Cloudinary/chuyển Files/chờ ACTIVE; manifest giữ link gốc, cách gửi toàn tệp
+(Gemini lấy mẫu), bytes/thời lượng nếu có. Không coi “đã gửi” là xác minh mọi frame/trang sách.
 
-Tab vào ảnh mở kính lúp ở giữa; mũi tên di chuyển, Escape tắt, Enter mở ảnh gốc ở tab mới. Điện thoại/chạm hoặc không đủ chỗ chỉ dùng **Phóng to ảnh** để mở đúng ảnh gốc trong trình duyệt và thu phóng bằng thao tác của trình duyệt. Chưa tải được ảnh thì không tạo kính lúp; báo lỗi xem trước và giữ liên kết ảnh gốc. Áp dụng cùng component ở chi tiết công khai, chủ sách và Admin; video giữ controls, thẻ danh sách giữ khung thẳng 4:3 đã chốt.
+Người bán chờ duyệt không có panel AI nội bộ. Sau quyết định chỉ công bố kết quả đúng vòng;
+AI lỗi không lộ mã provider cho người bán. Nút PDF nằm trong kết quả/lịch sử có snapshot hợp lệ,
+không gọi lại AI; xem [ai-analysis.md](ai-analysis.md) và [review-exports.md](review-exports.md).
 
-Bài đăng không còn giới hạn 12 ảnh. `GET /api/media/config` trả `maxImages: null`; cấu hình cũ `MEDIA_MAX_IMAGES` bị bỏ qua. Giữ giới hạn dung lượng mỗi ảnh (mặc định 10 MB), 3 video/50 MB mỗi video theo cấu hình, hạn vé và kiểm soát tài nguyên upload hiện có. Cả Backend và frontend đều kiểm tra số video gồm media giữ lại. JSON body và khả năng lưu trữ vẫn tuân giới hạn kỹ thuật của hạ tầng; không đổi schema hoặc thông số tải AI.
+## Gallery và đấu giá
 
-Mỗi media vừa tải có nút × với tên truy cập theo tệp. Nút gọi DELETE vé của chính người dùng và chỉ gỡ khỏi danh sách sau thành công; vé đã bỏ không được gửi cùng bài. Media đã lưu trong lịch sử bài không bị xóa qua giao diện này. Thay đổi này chỉ áp dụng ảnh sách, không đổi quy tắc tối đa 5 ảnh bằng chứng khiếu nại.
+Ảnh/video thuộc cùng một bản sách, giữ tỷ lệ/contain, không giả lập bìa nghiêng. Thumbnails có nút trước/sau,
+Home/End chọn đầu/cuối; trong dải thumbnails, ←/→ đổi mục và đưa mục chọn vào vùng nhìn.
+Phím điều khiển video native được giữ. Kính lúp desktop phóng đúng vùng ảnh, không phóng nền trống;
+chạm/Enter mở ảnh gốc. Bản chuyển JPEG/MP4 để xem không ghi đè URL Cloudinary gốc trong hồ sơ.
 
-Chọn **Có ISBN** sẽ hiện ô **Mã ISBN**, bắt buộc khi đã chọn, tối đa 100 ký tự và không ép độ dài 10/13. Giữ nguyên dấu gạch nối, khoảng trắng bên trong, số 0 đầu và chữ hoa/thường; Backend chỉ bỏ khoảng trắng ở hai đầu và không xác thực chuẩn/checksum ISBN. Admin đối chiếu mã người bán nhập. Chọn **Không có ISBN** sẽ không gửi giá trị ISBN cũ đang gõ và Backend lưu NULL. ISBN của bản sách đã lưu vẫn bất biến khi gửi duyệt lại/đăng lại.
+Chủ sách không có thao tác đặt giá. Người mua chờ cooldown chỉ thấy thời gian còn lại;
+đang chờ xử lý không được báo thành công trước quyết định SQL. Giá đang gõ không bị snapshot nền thay.
+Đồng hồ dựa giờ SQL; hết giờ chờ kết quả từ server. Snapshot sau tín hiệu/reconnect và mỗi 5 giây
+bù thông báo lỡ, xem [realtime.md](realtime.md).
 
-Biểu mẫu chỉ có một ô **Tình trạng, yếu tố quý hiếm và bằng chứng**, bắt buộc và tối đa 12.000 ký tự, lưu đầy đủ vào `BaiDang.mo_ta_tinh_trang`. Không còn ô nhập `tinh_trang_sach` riêng; **Giới thiệu sách** dành cho nội dung tác phẩm.
+## Hộp thông báo
 
-API tạo sách chấp nhận bỏ `sach.tinh_trang_sach`. Để tương thích cột SQL `Sach.tinh_trang_sach NVARCHAR(1000) NOT NULL`, Backend tự lấy phần đầu tối đa 1.000 ký tự làm bản xem trước, không cắt toàn văn của bài. Client cũ vẫn có thể gửi trường riêng với giới hạn cũ. Bản preview ban đầu không đổi Sach; từ migration 007, gửi duyệt lại lưu bản sửa ở ho_so_sach của riêng bài, giữ Sach/lịch sử phiên trước. Chi tiết bài và prompt Gemini dùng cùng hàm gộp: bỏ phần xem trước đã có trong mô tả, giữ tình trạng cũ khác biệt dưới nhãn **Tình trạng đã lưu trước đây**. Không biến thông tin thiếu thành một đánh giá tình trạng tự động.
+Migration 004 thêm **ThongBao**, không thêm bảng tìm kiếm. Mỗi tài khoản chỉ đọc hộp của mình;
+30 mục/trang, số chưa đọc, đánh dấu từng thông báo bằng POST có CSRF và giữ thời điểm đọc đầu.
+Nguồn gồm gửi duyệt → Admin; quyết định → chủ bài; kết quả → chủ/người thắng; tin nhắn → người nhận;
+xác nhận → bên còn lại; khiếu nại mới → Admin; phản hồi → người gửi.
 
-Nút Tìm kiếm có chiều rộng gọn trên desktop, dành chỗ cho ô nhập; màn hình nhỏ xếp nút ở hàng riêng. Chuông chỉ có một huy hiệu chưa đọc, không chồng chấm đỏ; khách không có chuông. Hộp thông báo mở thành bảng bên phải, có vùng cuộn riêng, bộ lọc Tất cả/Chưa đọc, tải thêm, trạng thái rỗng/lỗi và thời gian; không thay quyền hay cách ghi nhận thông báo.
+Hộp được **đồng bộ khi đọc** từ các bản ghi nguồn đã COMMIT, trong transaction riêng với khóa người nhận
+và UNIQUE `(nguoi_dung_id,nguon)`. Lỗi đồng bộ không rollback nghiệp vụ đã xong; lần đọc sau bổ sung nguồn còn lưu.
+Không có trigger/outbox; đừng xóa nguồn trước khi hộp đồng bộ. Lưu nội dung ngắn cố định/ID đích,
+không chép chat, bằng chứng, phản hồi riêng hoặc giá ẩn vào thông báo.
+Frontend lấy lại mỗi 10 giây/focus/online; không cam kết push tức thời, email hay thông báo hệ điều hành.
+Backend đích luôn kiểm tra quyền lại, kể cả thông báo cũ vẫn hiện.
 
-Trong giao dịch, khiếu nại hiển thị dạng thẻ có mã, lý do, trạng thái và giờ gửi. **Xem hồ sơ và phản hồi** mở dialog tách rõ nội dung, ảnh bằng chứng và phản hồi Admin. **Gửi khiếu nại mới** mở biểu mẫu riêng; quyền xem hồ sơ và chat giữ nguyên.
+## Giao dịch và kiểm tra giao diện
 
-Trong **Bài của tôi**, chủ sách đang chờ duyệt không thấy phần AI. Sau quyết định, lý do Admin hiện trước **Kết quả AI tham khảo** dạng thu gọn; gửi duyệt lại ẩn AI và giữ quyết định cũ dưới lịch sử. Khi tải lại trạng thái/F5 sau quyết định, lấy kết quả phù hợp của lần hiện tại; dữ liệu cũ/không xác định không hiện như kết quả mới. Admin vẫn có AI, lịch sử, mã lỗi và nút yêu cầu/phân tích lại khi bài chờ duyệt. Chi tiết hợp đồng công bố: [ai-analysis.md](ai-analysis.md).
+Giao dịch hiển thị hai xác nhận riêng; đánh giá chỉ phía người mua sau hoàn tất, không hiện lời mời
+đánh giá người bán ở phía người bán. Khiếu nại tách lý do/nội dung, trạng thái, bằng chứng và phản hồi Admin.
+Chỉ Admin được phân công/hồ sơ đang xử lý mới mở chat chỉ đọc. Chi tiết tại [after-sales.md](after-sales.md).
 
-## Thông báo
+Checklist bàn giao: khách/role, tìm kiếm rỗng/lọc/phân trang, nhập tiền/IME, nháp/upload,
+M4 video dài, pending/rejected/approved, PDF, nhiều trình duyệt/reconnect và màn hình nhỏ.
+Nguồn kiểm chứng và thành phần thật/fixture: [VALIDATION.md](../VALIDATION.md).
 
-- `GET /api/notifications?before=id`: session hiện hành, tối đa 30 mục, `{items,unread,nextBefore}`; `Cache-Control: no-store`.
-- `POST /api/notifications/:id/read`, body `{}` và CSRF: chỉ chủ thông báo, gọi lại giữ thời điểm đọc đầu. Admin cũng không được đọc/đánh dấu hộ thông báo người khác.
-- Nguồn: lịch sử tạo/gửi duyệt lại → Admin; KiemDuyet → chủ sách; KetQuaDauGia → chủ/người thắng; TinNhan → bên nhận; hai thời điểm xác nhận GiaoDich → bên còn lại; KhieuNai mới → Admin, đã phản hồi → người gửi.
-- Chỉ lưu tiêu đề/nội dung ngắn cố định và ID đích. Không chép nội dung chat, ngưỡng giá, bằng chứng hoặc phản hồi riêng vào thông báo.
+## Tài nguyên và giấy phép
 
-Hộp thư **được dựng khi tài khoản đọc thông báo**, từ các bản ghi nguồn bền vững đã COMMIT, bao gồm lịch sử đã có. Khóa ứng dụng SQL theo người nhận phối hợp hai lần đồng bộ; UNIQUE `(nguoi_dung_id,nguon)` chống nhân đôi. Việc đồng bộ và ghi thông báo nằm trong transaction riêng. Rollback nghiệp vụ không tạo bản ghi nguồn nên không có thông báo; lỗi đồng bộ không làm nghiệp vụ đã hoàn thành bị báo thất bại. Khi lỗi được khắc phục, lần đọc tiếp lấy lại nguồn còn lưu và bổ sung mục thiếu. Không thêm trigger, không đổi transaction đặt giá hay luồng SQL OUTPUT đang dùng.
-
-Frontend lấy lại hộp mỗi 10 giây, khi focus và khi online; dùng cùng xác thực theo tab. Không cam kết thông báo xuất hiện tức thời; không dùng room đấu giá công khai để phát thông tin riêng. Tắt trang/mất mạng không mất lịch sử đã lưu. Chưa có push hệ điều hành, email, tùy chọn nhận tin, nhắc phiên sắp kết thúc hoặc theo dõi phiên. API đích tiếp tục kiểm tra quyền dù thông báo đã tồn tại.
-
-Lưu ý vận hành: dựng hộp từ lịch sử là phương án cho quy mô hiện tại; không xóa nguồn nghiệp vụ trước khi hộp được đồng bộ. Với lượng sự kiện lớn cần đo tải, bổ sung watermark/outbox theo quyết định kiến trúc riêng. Chưa tự xóa/lưu trữ thông báo cũ.
-
-## Kiểm chứng
-
-```powershell
-npm.cmd run check
-npm.cmd test
-npm.cmd run build
-```
-
-Khi API/worker/SQL/Redis đã chạy và migration thành công:
-
-```powershell
-npm.cmd run smoke:m8
-```
-
-Smoke M8 đã mở rộng kiểm tra tìm kiếm, thông báo của đúng người nhận, CSRF, đọc bền và gọi lại không nhân đôi. Chỉ tạo/dọn fixture của lần chạy; không xóa database hoặc volume. SQL opt-in `backend/test/communitySql.test.js` cũng kiểm tra inbox đồng thời và tìm kiếm, chỉ được bật với database kiểm thử `BookAuctionTest_*` theo điều kiện của test.
-
-Kiểm tra thủ công: người bán gửi sách → Admin nhận thông báo/duyệt → chủ nhận quyết định → kích hoạt → người mua đặt giá → đối chiếu kết quả → nhắn tin/xác nhận → đánh giá → gửi và xử lý khiếu nại. F5/mất mạng rồi mở lại chuông, kiểm tra số chưa đọc và liên kết; kiểm tra tài khoản khác không đọc được hộp của mình.
-
-Nghiệm thu SQL Server/Redis/Cloudinary thật chưa được thay bằng kiểm tra trình duyệt với model HTTP fixture. Xem VALIDATION.md để phân biệt bằng chứng đã chạy và phần cần chạy trên máy triển khai.
-
-## Tài nguyên
-
-Ảnh thư viện lấy từ mã thiết kế gốc: [Unsplash](https://images.unsplash.com/photo-1600181982553-ce7d36051c01), lưu tại `frontend/public/assets/library.jpg`, dùng trang trí trang chủ. Inter và Playfair Display có giấy phép OFL trong `frontend/public/assets/fonts`. Ảnh/video của sách và bằng chứng chỉ lấy từ media thật của bài đăng, không thay bằng ảnh thư viện hoặc ảnh sinh cho bản thiết kế.
-
-## Xuất kết quả kiểm duyệt cho người bán
-
-Sau phê duyệt/từ chối, phần kết quả có nút **Xuất kết quả kiểm duyệt (PDF)**. Bản in A4 lấy đúng bản dữ liệu Backend đã lưu; chọn **Lưu dưới dạng PDF / Save as PDF** trong hộp thoại in. Ảnh/video là liên kết Cloudinary, không nhúng. Lịch sử có bản kết quả đã lưu cũng xuất được; không xuất kết quả của vòng đang chờ. Chi tiết, tương thích bài cũ và kiểm tra quyền tại [review-exports.md](review-exports.md).
-
-## Cập nhật ô ISBN ngày 31/10/2026
-
-Dừng dev:all, pull feat/Hai rồi chạy `npm.cmd run db:migrate` trước khi khởi động lại. Migration 006 đổi `Sach.isbn` từ VARCHAR(13) sang NVARCHAR(100), bỏ check ép định dạng 10/13, giữ check không rỗng và chỉ mục IX_Sach_isbn. Không thêm bảng/cột; schema vẫn 21 bảng/162 cột, còn 98 check. Dữ liệu cũ không được cắt, đổi mã hoặc chuẩn hóa lại. Chạy lại migration được; nếu phát hiện dữ liệu vượt sức chứa thì dừng và rollback.
-
-ISBN chuẩn gồm 10 ký tự ở bản cũ hoặc 13 chữ số ở bản mới; dấu phân cách làm chuỗi hiển thị dài hơn. Theo yêu cầu của người dùng, đây là trường nhập theo thông tin trên sách, có thể nhận mã ngoài định dạng đó; lưu được không đồng nghĩa đã xác minh ISBN hợp lệ. Nguồn: [International ISBN Agency](https://www.isbn-international.org/index.php/content/what-isbn/10). Chọn Không có ISBN tiếp tục lưu NULL; không sửa ISBN của sách đã lưu khi gửi duyệt lại/đăng lại.
-
-
-## Bổ sung và gửi duyệt lại sau từ chối
-
-Bốn bước điền sẵn dữ liệu đang dùng. Bước Thông tin sách cho sửa toàn bộ trường sách, tiêu đề và tình trạng/bằng chứng.
-Thể loại giữ lựa chọn cũ; ISBN có thể sửa hoặc chọn Không có ISBN để lưu NULL. Bước Kiểm tra hiển thị dữ liệu đã sửa,
-số media giữ/gỡ/mới; không lấy ISBN cũ thay cho lựa chọn NULL mới. Chỉ chủ bài bị từ chối gửi lại được.
-
-Media đã lưu có nút × đánh dấu gỡ khỏi hồ sơ mới, danh sách Giữ lại và chú thích chưa áp dụng tới khi gửi thành công.
-Đóng biểu mẫu không gửi chỉnh sửa, giữ nội dung/vé mới trong nháp. Video cũ bị gỡ giải phóng chỗ trong giới hạn video;
-không cho Giữ lại nếu cộng video mới vượt giới hạn. Sau khi gửi, bài về chờ; Admin chủ động yêu cầu AI khi cần.
-Cập nhật API/frontend và migration 007 cùng nhau, không cần thay .env hoặc xóa database/Cloudinary.
-
-## Lỗi tải video và phản hồi Cloudinary
-
-Biểu mẫu dùng uploadTimeoutMs từ /media/config cho ảnh/video, không còn cắt cố định ở 150 giây. Khi tải video có gợi ý chờ Cloudinary xác nhận; lỗi hiển thị kèm tên tệp, không xóa các vé thành công trước đó. API chỉ trả vé sau xác minh tệp/metadata và Redis ready. Mã media được hiện bằng thông báo tĩnh, không đổi thành lỗi Docker. Client không tự upload lại khi mất phản hồi; xem [media-upload.md](media-upload.md) để cấu hình và đối soát.
-
-### Nháp biểu mẫu và nhiều định dạng media
-
-Đăng sách tự lưu nháp riêng từng tài khoản/bài/chế độ trên trình duyệt. Chuyển route trong ứng dụng
-không hủy upload hoặc bỏ vé; quay lại tiếp tục đúng bước và xem kết quả. Đóng biểu mẫu giữ nháp;
-“Bỏ bản nháp” có xác nhận và chỉ bỏ các tệp mới. Tải lại trang giữ thông tin + tệp đã xác nhận,
-lượt upload chưa có phản hồi được báo gián đoạn; vé hết hạn 1 giờ cần chọn lại.
-Xem [định dạng, bản chuyển đổi và giới hạn nháp](media-upload.md).
-
-
-### Admin chủ động phân tích AI
-
-Bài chưa phân tích hiển thị trạng thái và nút **Phân tích bằng AI**, chưa có ô điểm.
-Đang queued/running hiển thị tiến độ, khóa nút để chặn yêu cầu lặp. Khi đã có lần phân tích,
-nút đổi thành **Phân tích lại bằng AI**. Lỗi Gemini/timeout hiện thất bại và chẩn đoán;
-“Chưa đủ dữ liệu” trong ô điểm chỉ dùng cho kết quả thực sự thiếu bằng chứng.
-Đọc bài, tải lại trang, đăng mới hoặc gửi duyệt lại không gọi Gemini; kết quả cũ không bị xóa.
-
-
-### Video dài trong AI
-
-Tiến độ tách lấy video Cloudinary, chuyển sang Gemini Files API và chờ Google chuẩn bị video.
-Sau khi gửi, mục “Dữ liệu media đã dùng” giữ link gốc và ghi cách gửi Files API, toàn bộ tệp
-(Gemini lấy mẫu), dung lượng/thời lượng nếu có. Tệp bị bỏ qua vẫn có cảnh báo; hết ngân sách ảnh
-không làm video bị loại. Không tự chạy AI; Admin vẫn chủ động bấm nút và quyết định kiểm duyệt.
+Ảnh thư viện trang chủ theo mã thiết kế gốc: [nguồn Unsplash](https://images.unsplash.com/photo-1600181982553-ce7d36051c01),
+lưu tại `frontend/public/assets/library.jpg`. Đây là ảnh trang trí, không thay cho ảnh/video hoặc bằng chứng của sách.
+Font local Inter và Playfair Display có các tệp giấy phép [Inter OFL](../frontend/public/assets/fonts/inter-OFL.txt)
+và [Playfair Display OFL](../frontend/public/assets/fonts/playfairdisplay-OFL.txt); giữ chúng khi phân phối tài nguyên.

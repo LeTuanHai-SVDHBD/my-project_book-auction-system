@@ -4,21 +4,21 @@
 
 AI hỗ trợ Admin đọc sách/media và đối chiếu bằng chứng. Backend tính điểm theo quy tắc cố định;
 Admin tiếp tục quyết định phê duyệt hoặc từ chối có lý do. Không có ngưỡng điểm tự động duyệt/từ chối.
-Bộ quy tắc `book-review-2026-10-v1` bám phần tiêu chí trong báo cáo `TieuLuanDAMH-Tuan7-Nhom15(1).docx`.
+Bộ quy tắc `book-review-2026-10-v1` được định nghĩa trong
+[criteria.js](../backend/src/ai/criteria.js) và [scoring.js](../backend/src/ai/scoring.js).
+Tài liệu đối chiếu source ngày 03/11/2026; không thay thế thử chất lượng thẩm định bằng sách thật.
 
 ## Cấu hình và khởi động
 
-Dừng `dev:all`, cập nhật nhánh rồi chạy tại thư mục gốc:
+Cài mới/nâng schema theo [setup-guide.md](setup-guide.md). Tại gốc repository:
 
 ```powershell
-git switch feat/Hai
-git pull --ff-only origin feat/Hai
 npm.cmd run setup:ai
 ```
 
-Script bổ sung biến còn thiếu vào `.env`, giữ giá trị đang có và tắt AI mặc định.
-Với máy mới, hoàn thành cài đặt trong README trước. Bản AI không thêm dependency hoặc migration;
-schema phần AI giữ nguyên; toàn hệ thống có 21 bảng/165 cột sau migration 007 lưu hồ sơ sách và media dùng cho lần gửi duyệt hiện tại.
+Script chỉ bổ sung biến thiếu, giữ key/cờ bật/timeout đang có; AI tắt mặc định.
+Phần AI dùng các bảng đã có, không thêm SDK hoặc yêu cầu FFmpeg để chạy ứng dụng.
+Toàn hệ thống hiện có 21 bảng/165 cột sau migration 007; không dùng số schema của phiên bản trước.
 
 Mở `.env` ở thư mục gốc trên máy phát triển:
 
@@ -156,7 +156,7 @@ không lặng lẽ trích vài frame thay thế video. Quota/token/context/model
 Files API không làm video dài miễn phí. Luồng này dùng video đã upload, chưa thêm ô YouTube;
 link YouTube trong mô tả vẫn chỉ là nguồn văn bản cần Admin xác minh.
 
-Tham chiếu Google kiểm tra ngày 01/11/2026:
+Tham chiếu protocol Google đã dùng khi triển khai ngày 01/11/2026 (quyền/quota/giới hạn dịch vụ do nhà cung cấp quản lý):
 [Video/Files với Interactions](https://ai.google.dev/gemini-api/docs/video-understanding),
 [REST File resource](https://ai.google.dev/api/files),
 [File input methods](https://ai.google.dev/gemini-api/docs/file-input-methods).
@@ -246,7 +246,7 @@ Khi đang chạy lại, kết quả cũ có nhãn rõ là lần trước, không
 Admin xem được số media đã gửi và thời gian chờ; người bán không nhận các chẩn đoán này.
 `ai:check` PASS với văn bản không chứng minh phân tích đầy đủ ảnh đã đạt.
 
-## Chẩn đoán khi smoke báo AI_PROVIDER_ERROR
+## Chẩn đoán lỗi provider và media
 
 `Đang kiểm tra Gemini thật; dữ liệu mẫu thiếu ảnh nên điểm phải giữ NULL` là mô tả dữ liệu thử,
 không phải lỗi. Smoke cố ý gửi bài không ảnh để kiểm tra NULL. Nếu đã nhận bản ghi `that_bai`,
@@ -282,6 +282,7 @@ Có thể gửi kết quả lệnh để đối soát, không gửi `.env`, khó
 | `AI_TIMEOUT` | Hết thời gian từng lượt dù đã thử lại hữu hạn; xem số media/thời gian ở Admin và kiểm tra mạng/dịch vụ Google |
 | `AI_JOB_TIMEOUT` | Hết deadline tổng, gồm chuẩn bị media và gọi provider |
 | `AI_INVALID_RESPONSE` / `AI_INCOMPLETE_RESPONSE` | JSON không hợp đồng hoặc chưa hoàn tất |
+| `AI_FILE_INVALID_RESPONSE`, `AI_FILE_PROCESSING_FAILED`, `AI_FILE_PROCESSING_TIMEOUT` | Files API sai metadata/URI, codec không xử lý được hoặc quá thời gian chuẩn bị |
 
 Không kết luận key sai hoặc tự đổi model chỉ từ `AI_PROVIDER_ERROR` cũ.
 Sau khi sửa nguyên nhân/cấu hình, khởi động lại `dev:all`, chạy lại `smoke:ai` để nghiệm thu toàn luồng.
@@ -291,6 +292,11 @@ Bản ghi `AI_TIMEOUT` đã lưu SQL vẫn thuộc lần trước: vào **Admin 
 để tạo lượt mới. Không tự thay kết quả cũ hoặc chạy lại AI cho bài đã có quyết định.
 
 ## Kiểm tra và nghiệm thu
+
+Bài M4 báo “vượt ngân sách media” từ lần chạy trước vẫn là dữ liệu lịch sử. Sau cập nhật Files API,
+Admin cần nhấn **Phân tích lại bằng AI**; không sửa/xóa kết quả cũ để làm nó trông như đã xem video.
+`sent` trong manifest là đã đưa media vào yêu cầu, không chứng minh mô hình đã xem mọi frame hoặc kết luận đúng.
+Chuẩn bị schema test hiện tại 007 và bật từng SQL opt-in riêng theo [VALIDATION](../VALIDATION.md).
 
 ```powershell
 npm.cmd run test:ai

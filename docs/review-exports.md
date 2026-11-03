@@ -1,20 +1,10 @@
 # Xuất kết quả kiểm duyệt cho người bán
 
-## Cập nhật
+## Cấu hình và dữ liệu
 
-Dừng `dev:all` bằng Ctrl+C, giữ SQL Server/Redis đang chạy. Tại thư mục gốc:
-
-```powershell
-git switch feat/Hai
-git pull --ff-only origin feat/Hai
-npm.cmd run db:migrate
-npm.cmd run dev:all
-```
-
-Migration `005_review_exports.sql` thêm đúng một cột nullable `KiemDuyet.ket_qua_snapshot`
-và ràng buộc JSON; không thêm bảng, dependency hoặc cấu hình. Có thể chạy lại, giữ dữ liệu cũ.
-Schema hiện tại sau migration 007: **21 bảng, 165 cột**. `db:init` nhận diện bản 21/161 để nâng cấp;
-readiness chưa đạt nếu chỉ pull mà chưa migration. Không tạo lại database/volume.
+Cập nhật theo [setup-guide.md](setup-guide.md), giữ cấu hình/volume và chạy migration 002–007.
+005 thêm KiemDuyet.ket_qua_snapshot cùng check JSON, không thêm bảng. 007 cho sửa hồ sơ sách theo bài
+và gỡ media active mà giữ lịch sử; schema đích **21 bảng/165 cột**. Không chạy lại DDL nền để xóa dữ liệu.
 
 ## Cách dùng
 
@@ -55,7 +45,7 @@ Bản PDF để lưu/đối chiếu; chưa có chữ ký số. Người có tệ
 
 `POST /api/posts/:id/reviews/:reviewId/export` nhận body `{}`; dùng phiên người bán và CSRF.
 Backend khóa bài/phiên, kiểm tra chủ sở hữu và quyết định thuộc đúng bài, rồi trả bản kết quả JSON đã lưu.
-Không nhận snapshot, điểm hoặc URL do client cung cấp. Không có truy cập công khai; trả `Cache-Control: no-store`.
+Không sử dụng snapshot, điểm hoặc URL do client cung cấp để dựng kết quả. Không có truy cập công khai; trả `Cache-Control: no-store`.
 Người khác nhận 404; Admin không dùng endpoint dành riêng cho người bán này.
 Với bản cũ chưa có snapshot, POST có thể lưu lần đầu nên vẫn yêu cầu CSRF; gọi lại không tạo thêm quyết định.
 
@@ -67,13 +57,15 @@ npm.cmd run build
 
 `reviewExport.test.js` dùng model SQL fixture và HTTP/session/CSRF thật; `rowVersion.test.js`
 kiểm tra rollback quyết định khi ghi snapshot lỗi. Đây không phải bằng chứng SQL Server thật.
-`reviewExportSql.test.js` chỉ chạy khi `REVIEW_TEST_SQL=true` và database riêng có tên `BookAuctionTest_*`;
-kiểm tra migration chạy lại, hai vòng từ chối/gửi lại/phê duyệt, xuất đồng thời, quyền và dữ liệu cũ.
+`reviewExportSql.test.js` chỉ chạy khi `REVIEW_TEST_SQL=true` và database riêng có tên `BookAuctionTest_*`.
+Chuẩn bị đủ schema test 007 trước theo [VALIDATION](../VALIDATION.md); bộ test kiểm tra migration chạy lại,
+hai vòng từ chối/gửi lại/phê duyệt, xuất đồng thời, quyền và dữ liệu cũ.
 
 Khi API/worker/SQL/Redis/Cloudinary đã sẵn sàng trên máy nhóm, `npm.cmd run smoke:m4`
 kiểm tra thêm xuất quyết định từ chối, giữ nguyên sau gửi lại, phê duyệt có bản riêng và quyền/CSRF.
 Lệnh vẫn upload/dọn media thử và chỉ thao tác fixture UUID; xem README trước khi chạy.
-Nếu AI đang bật, các bài thử có thể phát sinh lượt Gemini theo luồng tự động hiện có.
+AI không tự chạy từ bài thử: chỉ Admin POST yêu cầu mới tạo job. Xuất PDF không gọi Gemini;
+smoke:m4 không thay kiểm chứng AI/video thật.
 
 Nghiệm thu giao diện: mở cả hai kết quả phê duyệt/từ chối, lưu PDF nhiều trang, bấm một link ảnh/video,
 so hai điểm với màn hình, thử bài không có AI/AI thất bại, bài chờ, lịch sử sau gửi lại và chặn popup.

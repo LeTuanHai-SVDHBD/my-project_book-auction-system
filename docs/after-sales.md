@@ -7,23 +7,15 @@ SQL Server giữ liên kết và trạng thái; xác nhận đủ hai bên mới
 Khiếu nại lưu hồ sơ và bằng chứng riêng, không tự đổi người thắng, giá thắng hoặc xác nhận giao dịch.
 Không tích hợp cổng thanh toán, đối soát tài chính, vận chuyển, hoàn tiền hoặc xử phạt tự động.
 
-## Cập nhật và chạy
+## Cài đặt và phạm vi
 
-Tại thư mục gốc, dừng dev:all trước khi pull:
+Cài/nâng cấp và các lệnh chạy tại [setup-guide.md](setup-guide.md). Schema hiện tại sau migration 007:
+**21 bảng/165 cột**, theo manifest. Các bảng giao dịch/chat/đánh giá/khiếu nại/bình luận có từ nền;
+004 thêm thông báo, 005 snapshot kiểm duyệt, 006 mở ô ISBN, 007 hồ sơ theo bài/media active.
+Không thay cơ chế xác thực; thông tin sách lấy theo hồ sơ của đúng bài, giữ lịch sử phiên khác.
 
-```powershell
-git switch feat/Hai
-git pull --ff-only origin feat/Hai
-npm.cmd run check
-npm.cmd run test:community
-npm.cmd run build
-npm.cmd run dev:all
-```
-
-Phần sau phiên không thêm dependency hoặc đổi xác thực. Migration 004 bổ sung hộp thông báo riêng; migration 005 lưu bản kết quả kiểm duyệt; schema hiện tại 21 bảng/162 cột. Cấu hình và volume giữ nguyên. Xem [ui-integration.md](ui-integration.md).
-Các bảng GiaoDich, CuocTroChuyen, TinNhan, DanhGia, KhieuNai, BangChungKhieuNai và BinhLuan đã có từ schema nền.
-Phiên có người thắng mới tạo chat trong cùng transaction kết quả/giao dịch; replay không tạo thêm.
-Giao dịch cũ chưa có phòng có nút **Mở cuộc trò chuyện**, kiểm tra quyền và UNIQUE khi tạo bổ sung.
+Có người thắng mới tạo chat/giao dịch cùng transaction kết quả; replay không tạo thêm.
+Giao dịch cũ thiếu phòng có nút **Mở cuộc trò chuyện**, kiểm tra quyền và UNIQUE khi tạo bổ sung.
 
 ## Liên kết và xác nhận
 
@@ -69,7 +61,7 @@ ngưỡng kết thúc sớm, tin nhắn hoặc hồ sơ khiếu nại qua phần
 
 Người mua hoặc người bán gửi lý do tối đa 300 ký tự, nội dung tối đa 12.000 ký tự và 0–5 ảnh.
 Có thể gửi không ảnh khi cần trình bày vấn đề, nhưng cần bổ sung thông tin phù hợp để Admin đối chiếu.
-Ảnh JPEG/PNG/WebP upload qua luồng Cloudinary/vé Redis hiện có; chỉ claim vé của người gửi, không nhận URL tự chèn hoặc vé video.
+Biểu mẫu bằng chứng hiện chọn JPEG/PNG/WebP (khác danh sách mở rộng ở Đăng sách), qua luồng Cloudinary/vé Redis; chỉ claim vé của người gửi, không nhận URL tự chèn hoặc vé video.
 Lưu KhieuNai và các BangChungKhieuNai cùng transaction với phòng/giao dịch đã kiểm tra.
 
 Sau COMMIT, lỗi bind Redis không làm thao tác thành thất bại giả. Chỉ release vé nếu rollback chắc chắn;
@@ -137,13 +129,18 @@ SQL opt-in yêu cầu database riêng `BookAuctionTest_*`, không dùng database
 
 ```powershell
 $env:DB_DATABASE = "BookAuctionTest_Local"
-$env:COMMUNITY_TEST_SQL = "true"
-npm.cmd run test:community
-Remove-Item Env:COMMUNITY_TEST_SQL
-Remove-Item Env:DB_DATABASE
+try {
+  npm.cmd run db:init
+  $env:COMMUNITY_TEST_SQL = "true"
+  npm.cmd run test:community
+} finally {
+  Remove-Item Env:COMMUNITY_TEST_SQL -ErrorAction SilentlyContinue
+  Remove-Item Env:DB_DATABASE -ErrorAction SilentlyContinue
+}
 ```
 
-Có thể tạo/nâng schema trên database test, chỉ dọn fixture UUID của lần chạy. Bài này không cần Redis vì dùng model SQL trực tiếp;
+Khởi tạo đủ schema hiện tại trên database test trước khi bật cờ; chỉ dọn fixture UUID của lần chạy.
+Bật một bộ SQL mỗi lần theo [VALIDATION](../VALIDATION.md). Bài này không cần Redis vì dùng model SQL trực tiếp;
 claim/bind Redis được kiểm tra riêng và qua giao diện. Không coi HTTP/model giả là bằng chứng SQL nguyên tử.
 
 Giữ SQL/Redis/API/worker đang chạy, mở terminal khác tại gốc:

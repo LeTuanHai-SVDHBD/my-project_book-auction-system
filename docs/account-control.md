@@ -60,6 +60,9 @@ Client terminal dùng cookie chung vẫn theo chính sách một phiên; smoke d
 
 ## Kiểm tra
 
+Cài/nâng cấp và khởi động lại đúng API/worker/web theo [setup-guide.md](setup-guide.md);
+SQL readiness hiện tại là 21 bảng/165 cột. Bật Redis opt-in trên dịch vụ test theo [VALIDATION](../VALIDATION.md).
+
 `accountControl.test.js` bật qua AUTH_TEST_REDIS_URL: hai API/Socket.IO/RedisStore/Lua thật,
 model tài khoản/đấu giá giả. Kiểm tra session cũ thực sự bị xóa, replay cookie và /me/bids/control nhận 401,
 F5 không hồi sinh, login sai mật khẩu không thay phiên mới, login đúng mới thu hồi phiên hiện tại,

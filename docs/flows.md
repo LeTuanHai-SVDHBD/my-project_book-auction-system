@@ -1,204 +1,162 @@
-<!-- Mục đích: Mô tả luồng đã triển khai, hợp đồng API và quy tắc nghiệp vụ dự kiến. -->
+<!-- Mục đích: Vòng đời và hợp đồng HTTP đã triển khai trên feat/Hai. -->
 
 # Luồng nghiệp vụ và API
 
-## Tài khoản
+Mọi endpoint dưới đây có prefix `/api`. Chủ thể thao tác lấy từ session, không nhận ID người thực hiện
+trong body để cấp quyền. POST/DELETE riêng yêu cầu CSRF; API đích và SQL vẫn kiểm tra quyền/trạng thái
+khi người dùng đi vào từ một thông báo hoặc link đã lưu.
 
-1. React tạo mã chọn tab; gửi `X-Tab-ID` và cookie tương ứng khi gọi API.
-2. `GET /api/auth/csrf` tạo session ẩn danh và CSRF token gắn với session Redis.
-3. Đăng ký kiểm tra dữ liệu, CSRF và giới hạn thử, băm Argon2id rồi ghi NguoiDung.
-4. API công khai chỉ tạo `nguoi_dung`; UNIQUE email bảo vệ yêu cầu đăng ký đồng thời.
-5. Đăng nhập kiểm tra SQL/hash, đổi session ID và CSRF; lưu session, đổi owner và xóa session cũ ở Redis trước khi trả thành công.
-6. Yêu cầu bảo vệ đọc lại tài khoản/vai trò từ SQL và kiểm tra chủ điều khiển Redis. Không tin mã người dùng do client khai báo.
-7. Đăng xuất hủy session được chọn và xóa đúng cookie của tab; không thu hồi tab khác.
+## 1. Tài khoản
 
-F5 giữ phiên tab; tài liệu mới tạo mã tab mới để không kế thừa tài khoản từ storage sao chép.
-Cookie session ký/HttpOnly và CSRF mới là thông tin xác thực, mã tab chỉ chọn phiên.
-Client HTTP không gửi `X-Tab-ID` dùng cookie chung độc lập với các cookie tab.
+Client cấp X-Tab-ID để chọn cookie HttpOnly của đúng tab, lấy CSRF bằng GET, đăng ký/đăng nhập qua HTTP.
+Đăng nhập đúng mật khẩu regenerate session/CSRF, đổi owner và thu hồi session cũ nguyên tử ở Redis.
+Tab cũ tự về đăng nhập; F5/Socket/GET không claim quyền. Khác tài khoản dùng đồng thời được.
+Client terminal không có selector dùng cookie chung; xem [account-control.md](account-control.md).
 
-## Đăng sách và media
-
-1. Sau xác thực/quyền/CSRF, API kiểm tra MIME, magic bytes và kích thước của từng tệp.
-2. Tạo vé Redis trước khi gọi Cloudinary để theo dõi cả upload bị ngắt.
-3. Cloudinary trả URL/public_id; khi phản hồi bị gián đoạn, API tra metadata đúng ID đã cấp, tối đa ba lần và không upload lại. Chỉ sau xác minh/Redis ready mới trả vé UUID và URL xem trước cho đúng chủ sách. Xem [media-upload.md](media-upload.md).
-4. React gửi nội dung sách/bài/giá cùng vé; các ô tiền nhập số thuần, dòng xem trước nhóm nghìn; API nhận chuỗi nguyên.
-5. Service claim tất cả vé nguyên tử, xác nhận owner/trạng thái/tuổi vé; không tin URL do client khai báo.
-6. Transaction SQL tạo Sach, BaiDang, PhienDauGia pending, media và lịch sử; chưa có lịch đấu giá.
-7. Sau COMMIT, acknowledgement dọn vé. Cùng UUID yêu cầu trả lại bài đã tạo, không tạo trùng.
-8. Rollback chắc chắn release vé để retry; kết quả commit chưa rõ giữ claim để đối soát.
-
-Không upload, gọi AI hay destroy Cloudinary trong transaction SQL.
-Cleanup chỉ xóa vé bỏ dở/hết hạn sau kiểm tra SQL reference. File lịch sử và file đang dùng được giữ lại.
-Hiện không có luồng xóa bài; xóa bản ghi SQL thủ công không kích hoạt xóa Cloudinary.
-
-## Kiểm duyệt, bổ sung và kích hoạt
-
-Trang Admin **Kiểm duyệt** mặc định hiển thị hai nhóm: chờ kiểm duyệt trước, đã từ chối sau;
-trong từng nhóm sắp ID bài giảm dần. Bộ lọc **Tất cả / Chờ kiểm duyệt / Đã từ chối** được giữ trong URL.
-Thẻ từ chối có lý do/ngày xử lý gần nhất; mở chi tiết để đọc đầy đủ và lịch sử, không duyệt lại trực tiếp bài đã từ chối.
-Chủ bài gửi lại thì chuyển về nhóm chờ và được kiểm duyệt lượt mới. Bài phê duyệt rời danh sách này;
-quyết định/snapshot/lịch sử vẫn được giữ. Phê duyệt chưa tự kích hoạt đấu giá: chủ sách còn đặt lịch/kích hoạt.
-
-| Thao tác | Điều kiện | Kết quả nguyên tử |
+| HTTP | Đường dẫn | Ý nghĩa / quyền |
 |---|---|---|
-| Duyệt | Admin, bài/phiên pending, version hiện tại, lý do và xác nhận bằng chứng quý hiếm | Bài `da_duyet`, phiên `da_qua_kiem_duyet`, lưu quyết định/lịch sử |
-| Từ chối | Admin, cặp pending, version hiện tại và lý do | Bài `tu_choi`, phiên `khong_dat_kiem_duyet`, lưu quyết định/lịch sử |
-| Gửi lại | Chủ bài, cặp bị từ chối và version hiện tại | Cập nhật hồ sơ sách riêng/nội dung/giá, gỡ hoặc thêm media, cặp về pending; giữ ID và lịch sử |
-| Kích hoạt | Chủ bài, cặp đã duyệt, version hiện tại, lịch tương lai hợp lệ | Cập nhật cùng phiên thành `da_kich_hoat`; không tạo phiên khác |
+| GET | `/auth/csrf` | Token CSRF gắn session, có giới hạn thử |
+| POST | `/auth/register` | CSRF, họ tên/email/mật khẩu; chỉ tạo nguoi_dung |
+| POST | `/auth/login` | CSRF + mật khẩu; đổi session và phiên hiện hành |
+| POST | `/auth/logout` | CSRF; hủy phiên được chọn, không xóa owner của phiên mới |
+| GET | `/auth/me` | Tài khoản/session hiện hành |
+| POST | `/auth/control` | Body `{}`, session + CSRF; endpoint tương thích chỉ kiểm tra, không claim |
+| GET | `/auth/control-status` | Kiểm tra phiên, không khôi phục phiên cũ |
+| GET | `/auth/admin-check` | Admin |
 
-Model lấy khóa rồi đối chiếu rowversion. SQL xuất BINARY(8), utility mã hóa hex 16 ký tự cho JSON;
-HTTP 409 yêu cầu client đọc lại dữ liệu. Không cấp version mặc định khi thiếu.
+## 2. Đăng sách và vòng đời phiên
 
-Admin ghi căn cứ quý hiếm và nguồn đối chiếu. Tình trạng vật lý tốt không thay điều kiện quý hiếm;
-thiếu bằng chứng phải được ghi rõ. Worker AI phân tích riêng sau COMMIT khi đã bật; khi tắt hoặc lỗi, Admin tiếp tục kiểm tra thủ công.
-Kết quả AI chỉ để tham khảo, không tự phê duyệt/từ chối. Hợp đồng và quy tắc tại [ai-analysis.md](ai-analysis.md).
+1. Tải từng tệp qua API → vé Redis trước upload → Cloudinary → xác minh metadata → vé ready.
+2. Gửi thông tin sách/bài/giá và vé. Claim vé nguyên tử theo owner/trạng thái/tuổi vé.
+3. Transaction tạo Sach, BaiDang, hồ sơ theo bài, phiên pending, media và lịch sử. Chưa có lịch phiên.
+4. COMMIT rồi bind/dọn vé. Retry cùng UUID trả bài đã tạo của đúng chủ; rollback chắc chắn mới release vé.
+5. Admin có thể yêu cầu AI riêng hoặc kiểm duyệt thủ công. Quyết định/lý do/snapshot được lưu cùng transaction.
+6. Bị từ chối: chủ sách bổ sung hồ sơ/media rồi gửi duyệt lại. Phê duyệt: chủ sách mới đặt lịch/kích hoạt.
+7. Phiên kết thúc do hết hạn hoặc đạt ngưỡng. Có người thắng mới tạo giao dịch/phòng chat.
 
-## Đăng lại
-
-1. Xác định sách vật lý và lấy khóa Sach ổn định qua các lần đăng.
-2. Đọc bài/phiên mới nhất của sách và kết quả dưới transaction.
-3. Chỉ chấp nhận khi phiên đã `da_ket_thuc`, kết quả `khong_co_nguoi_thang`, người thắng NULL.
-4. Tạo bài/phiên mới cùng `sach_id`, giá mới và trạng thái pending. Có thể dùng lại media.
-5. Giữ nguyên giá, lịch sử, kết quả và các quyết định của lần cũ.
-
-Không suy ra không có người thắng từ việc thiếu KetQuaDauGia. Phiên gần nhất chưa kết thúc
-hoặc đã có người thắng không được đăng lại, kể cả giao dịch chưa hoàn tất.
-
-## Hợp đồng HTTP hiện tại
-
-### Tài khoản
-
-| Phương thức | Endpoint | Điều kiện |
+| Thao tác | BaiDang.trang_thai | PhienDauGia.trang_thai |
 |---|---|---|
-| GET | `/api/auth/csrf` | Cấp CSRF token gắn với session |
-| POST | `/api/auth/register` | CSRF; họ tên, email, mật khẩu |
-| POST | `/api/auth/login` | CSRF; email, mật khẩu; đổi session/CSRF |
-| POST | `/api/auth/logout` | CSRF; hủy session được chọn |
-| GET | `/api/auth/me` | Tài khoản hợp lệ |
-| POST | `/api/auth/control` | Cookie/owner hợp lệ + CSRF, body rỗng; chỉ kiểm tra, không claim |
-| GET | `/api/auth/control-status` | Tài khoản hợp lệ và đúng chủ; không tự claim |
-| GET | `/api/auth/admin-check` | Admin hợp lệ |
+| Đăng/gửi duyệt lại | `cho_kiem_duyet` | `cho_kiem_duyet` |
+| Admin từ chối | `tu_choi` | `khong_dat_kiem_duyet` |
+| Admin phê duyệt | `da_duyet` | `da_qua_kiem_duyet` |
+| Chủ sách kích hoạt lịch | `da_duyet` | `da_kich_hoat` |
+| Kết thúc | `da_duyet` | `da_ket_thuc` |
 
-### Bài đăng và media
+Đây là các chuyển trạng thái có chức năng thực tế, không phải mọi enum còn trong DDL đều có nút thao tác.
+Không có API hủy giữa phiên, kết thúc thủ công hoặc xóa bài. Chỉ đăng lại cùng sach_id khi **phiên mới nhất**
+đã kết thúc, có KetQuaDauGia xác nhận `khong_co_nguoi_thang` và người thắng NULL; thiếu kết quả không đủ điều kiện.
 
-| Phương thức | Endpoint | Quyền |
+| HTTP | Đường dẫn | Quyền / chức năng |
 |---|---|---|
-| GET | `/api/posts/catalog`, `/api/posts/catalog/:id` | Công khai; projection không có giá ẩn hoặc dữ liệu nội bộ |
-| GET | `/api/posts/mine` | Người dùng, chỉ bài của mình |
-| GET | `/api/posts/pending?status=all` | Admin; `status=all` (mặc định), `pending` hoặc `rejected` |
-| GET | `/api/posts/:id` | Chủ bài hoặc Admin |
-| POST | `/api/posts` | Người dùng + CSRF |
-| POST | `/api/posts/:id/resubmit` | Chủ bài bị từ chối + CSRF |
-| POST | `/api/posts/:id/relist` | Chủ bài đủ điều kiện + CSRF |
-| POST | `/api/posts/:id/review` | Admin + CSRF |
-| POST | `/api/posts/:id/activate` | Chủ bài đã duyệt + CSRF |
-| GET | `/api/media/config` | Cấu hình công khai không chứa credentials |
-| POST | `/api/media/image`, `/api/media/video` | Người dùng + CSRF; body nhị phân, MIME tương ứng |
-| DELETE | `/api/media/:upload_id` | Chủ vé + CSRF; tệp chưa gắn bài |
+| GET | `/posts/catalog` | Công khai; danh mục hoặc tìm kiếm, chỉ đã duyệt và kích hoạt/kết thúc |
+| GET | `/posts/catalog/:id` | Chi tiết công khai, không giá ẩn hoặc AI riêng |
+| GET | `/posts/mine` | Người dùng, bài của mình |
+| GET | `/posts/pending` | Admin, chờ và từ chối theo bộ lọc/cursor |
+| GET | `/posts/:id` | Chủ bài hoặc Admin |
+| POST | `/posts` | Người dùng, tạo bài với UUID v4 |
+| POST | `/posts/:id/resubmit` | Chủ bài bị từ chối, row_version và dữ liệu bổ sung |
+| POST | `/posts/:id/relist` | Chủ sách đủ điều kiện đăng lại; tạo bài/phiên mới |
+| POST | `/posts/:id/review` | Admin, bài pending, version hiện tại, lý do; phê duyệt cần xác nhận bằng chứng |
+| POST | `/posts/:id/activate` | Chủ bài đã duyệt, lịch ISO có timezone và version |
+| POST | `/posts/:id/reviews/:reviewId/export` | Chủ bài + body `{}`; JSON snapshot để in/lưu PDF |
+| GET | `/media/config` | Giới hạn/định dạng công khai, không credentials |
+| POST | `/media/image`, `/media/video` | Người dùng; body nhị phân, Content-Type được hỗ trợ |
+| DELETE | `/media/:id` | Chủ vé; chỉ vé upload chưa gắn bài |
 
-Danh sách tối đa 30 bài, phân trang bằng `?before=<id>` theo `nextBefore`.
-Giá trong JSON là chuỗi nguyên dương tối đa 18 chữ số, không có dấu phân cách.
+### Dữ liệu gửi bài
 
-- Tạo bài: `ma_yeu_cau` UUID v4, `sach`, `bai_dang`, `phien`, `media: [{upload_id,tieu_de}]`.
-- Đăng lại: bỏ `sach`, thêm `reuse_media`; tạo UUID mới cho lần đăng mới.
-- Gửi lại: bỏ `sach`/`ma_yeu_cau`, gửi `row_version`; giữ media đã lưu và thêm tệp mới.
-- Duyệt: `quyet_dinh: phe_duyet|tu_choi`, `ly_do`, `xac_nhan_quy_hiem`, `row_version`.
-- Kích hoạt: lịch ISO có múi giờ và `row_version`; SQL kiểm tra tương lai bằng đồng hồ server.
+- Tạo: `ma_yeu_cau` UUID v4, `sach`, `bai_dang`, `phien`, `media:[{upload_id,tieu_de}]`.
+- Đăng lại: không gửi `sach`, có thể gửi `reuse_media`; dùng UUID mới cho lần đăng mới.
+- Gửi duyệt lại: gửi `row_version`, không dùng `ma_yeu_cau`; được gửi `sach` để sửa toàn bộ hồ sơ
+  cùng `remove_media:[{kind:"image"|"video",id}]`. Client cũ bỏ hai trường này thì giữ hồ sơ/media cũ.
+- `bai_dang`: tiêu đề và `mo_ta_tinh_trang` (tình trạng, yếu tố quý hiếm, bằng chứng).
+  Không bắt người dùng nhập thêm ô tình trạng riêng. Backend giữ tương thích `sach.tinh_trang_sach` cũ.
+- `phien`: ba chuỗi tiền nguyên dương tối đa 18 chữ số, cooldown nguyên 10–30 giây, mặc định 20.
+  Ngưỡng kết thúc sớm phải lớn hơn hoặc bằng giá khởi điểm; không gửi lịch trong bước đăng mới.
+- ISBN có thể NULL, nếu nhập tối đa 100 ký tự. Năm xuất bản nếu có là số nguyên 1–9999.
+  Thể loại mới thuộc danh mục; giá trị legacy ngoài danh mục chỉ được giữ khi không đổi.
+- Duyệt: `quyet_dinh:phe_duyet|tu_choi`, `ly_do`, `row_version`; phê duyệt cần `xac_nhan_quy_hiem:true`.
+- Kích hoạt: `thoi_gian_bat_dau`, `thoi_gian_ket_thuc` có timezone, `row_version`; giờ SQL kiểm tra lịch tương lai.
 
-Thiếu đăng nhập trả 401; thiếu quyền/CSRF sai trả 403; xung đột trả 409; quá giới hạn trả 429.
-Header chọn tab phải có 32 ký tự hex viết thường; header này không thay cookie hoặc CSRF.
+Hồ sơ sửa nằm ở BaiDang.ho_so_sach; Sach giữ bản vật lý. Gỡ media cũ chỉ tắt dang_su_dung của đúng bài;
+không destroy tệp lịch sử. Trước gửi lại, lưu snapshot của quyết định legacy hiện tại nếu còn thiếu.
+Chỉ sau COMMIT hồ sơ SQL mới thay đổi; đóng biểu mẫu giữ nháp cục bộ, không gửi các sửa đổi này.
+Xem [media/nháp](media-upload.md) và [snapshot](review-exports.md).
 
-## Probe hạ tầng
+### Phân trang và tìm kiếm
 
-Phiên tài khoản: chỉ login bằng mật khẩu mới đổi owner và thu hồi session cũ. HTTP/Socket chỉ kiểm tra phiên;
-GET me, control-status và POST control không khôi phục phiên cũ. Tab bị thu hồi tự về đăng nhập, F5 không đổi owner.
-Chi tiết tại [account-control.md](account-control.md).
-
-`React → API → Redis Streams → Worker → SQL SELECT → Redis result → React`.
-API trả 202 queued; worker chỉ xác nhận completed sau truy vấn kiểm tra thành công.
-Kết quả probe được lấy qua HTTP; kênh hạ tầng Socket.IO vẫn gửi `system:hello`.
-Namespace `/auctions` cập nhật nghiệp vụ theo [realtime.md](realtime.md).
-Endpoint development cần `DEV_PROBE_TOKEN`, không dùng khóa này thay tài khoản.
-
-## Đặt giá và kết thúc phiên
-
-API tiếp nhận yêu cầu hợp lệ về cấu trúc, đưa vào Streams và trả 202; đây chưa phải đặt giá thành công.
-Các endpoint đã triển khai:
-
-| Phương thức | Endpoint | Điều kiện |
-|---|---|---|
-| GET | `/api/auctions/:id` | Công khai, chỉ phiên đã công bố; không có ngưỡng giá ẩn |
-| GET | `/api/auctions/:id/history` | Lượt hợp lệ công khai, 50 lượt/trang; `before` lấy trang cũ hơn |
-| GET | `/api/auctions/:id/bid-status` | Đăng nhập; trạng thái chủ sách, thời điểm đặt lại của chính session và giờ SQL |
-| POST | `/api/auctions/:id/bids` | Người dùng + CSRF; body chỉ `ma_yeu_cau` UUID v4 và `muc_gia` chuỗi nguyên |
-| GET | `/api/auctions/:id/requests/:requestId` | Chỉ chủ yêu cầu; đọc SQL trước admission Redis |
-
-Trạng thái HTTP kết quả gồm `dang_cho_xu_ly`, `da_chap_nhan`, `bi_tu_choi`.
-YeuCauDatGia chỉ lưu hai quyết định cuối; hàng chờ ở Redis. Mã đã có quyết định trả 200;
-mã cùng người/phiên/giá chưa xử lý trả 202, không xếp lại. Dùng lại mã cho nội dung khác trả 409.
-
-Worker lấy quyền xử lý phiên, mở transaction SQL, kiểm tra mã yêu cầu rồi đọc lại quyền, lịch, trạng thái,
-giá và cooldown. Quyết định chấp nhận/từ chối được lưu cùng thay đổi nghiệp vụ trong SQL.
-Chỉ thông báo thành công sau COMMIT; sự kiện giao lại đọc quyết định đã lưu, không đánh giá lại hoặc tạo trùng.
-XACK/XDEL chỉ sau xử lý thành công; lỗi tạm giữ pending, XAUTOCLAIM nhận lại.
-Chi tiết retention, dead-letter và lease nằm tại [Xử lý đấu giá](auction-processing.md).
-
-| Quy tắc | Điều kiện |
+| Danh sách | Đầu vào / đầu ra |
 |---|---|
-| Trạng thái/thời gian | Phiên đã kích hoạt, đến giờ bắt đầu và chưa hết hạn tại thời điểm worker kiểm tra |
-| Lượt đầu | `gia_khoi_diem + k × buoc_gia`, `k >= 0` |
-| Lượt sau | `gia_hien_tai + k × buoc_gia`, `k >= 1` |
-| Cooldown | Cùng người/cùng phiên; mặc định 20 giây, cấu hình 10–30 giây |
-| Chủ sách | Không tự đặt giá vào phiên của mình |
-| Kết thúc | Chỉ hết hạn hoặc lượt hợp lệ đạt/vượt ngưỡng giá ẩn |
+| Mine/catalog kiểu cũ | `before=<id>`, tối đa 30; `nextBefore` hoặc NULL |
+| Tìm catalog | `q` tối đa 120 ký tự, `genre`, `group`, `phase=all|live|scheduled|ended`, `sort=newest|price|ending`, `page` từ 1; 30 mục, `nextPage` |
+| Pending Admin | `status=all|pending|rejected`; chờ trước/từ chối sau, mỗi nhóm ID giảm dần; 30 mục |
+| Cursor pending | `nextBefore` dạng `pending:123` hoặc `rejected:123`; gửi nguyên cursor URL-encode vào `before` cùng bộ lọc |
 
-Tác vụ hết hạn và worker đặt giá dùng cùng cơ chế bảo vệ phiên.
-Trong một transaction, chuyển phiên kết thúc, tạo một KetQuaDauGia và tạo GiaoDich chỉ nếu có người thắng.
-Hết hạn có lượt hợp lệ thì lượt cao nhất thắng dù chưa đạt ngưỡng. Không có kết thúc thủ công hoặc hủy giữa phiên.
+Không trộn pagination page và before. Bộ lọc/cursor sai trả 400. Danh sách thay đổi giữa hai lượt tải
+không là snapshot cố định; tải lại trang để xem hiện tại. Bài đã duyệt rời danh sách kiểm duyệt, lịch sử vẫn giữ.
 
-## Giao dịch và tương tác sau phiên
+## 3. AI theo yêu cầu Admin
 
-Giao dịch đã được tạo từ kết quả có người thắng, xác định người mua/bán và số tiền.
-Phòng trò chuyện được tạo cùng giao dịch; dữ liệu cũ thiếu phòng được tạo bổ sung sau khi kiểm tra quyền.
-Hai bên trao đổi văn bản, người nhận đánh dấu đã đọc. Hoàn tất cần đủ xác nhận độc lập bằng giờ SQL;
-chỉ người mua được đánh giá người bán một lần sau hoàn tất. Uy tín/nhận xét được đọc công khai ở chi tiết phiên.
-Khiếu nại kiểm tra quan hệ người gửi–giao dịch–cuộc trò chuyện, lưu bằng chứng ảnh và phân công một Admin.
-Chỉ Admin được phân công, hồ sơ đang xử lý, mới đọc chat liên quan; không gửi tin hoặc đánh dấu đọc thay hai bên.
-Không tự thay đổi người thắng hoặc trạng thái giao dịch chỉ vì có khiếu nại.
-Bình luận chỉ nhận khi phiên đã công bố và đang trong [bắt đầu, kết thúc) theo giờ SQL; sau đó giữ lịch sử đọc.
-Hợp đồng `/api/community`, quyền, phân trang, retry và nghiệm thu tại [after-sales.md](after-sales.md).
+| HTTP | Đường dẫn | Quyền / chức năng |
+|---|---|---|
+| GET | `/ai/:id` | Admin xem tiến độ/lịch sử; chủ bài chỉ nhận kết quả được công bố sau quyết định |
+| GET | `/ai/:id?analysis=:analysisId` | Admin chọn lịch sử đúng bài; người bán chỉ ID đã công bố hiện tại |
+| POST | `/ai/:id` | Admin + CSRF, body `{row_version}`; pending/version hiện tại; trả 202 |
 
+Không tự enqueue sau đăng/gửi lại, khi GET hoặc khi worker khởi động. Chỉ yêu cầu Admin tạo job manual;
+job auto tồn từ bản cũ được bỏ qua. Worker chuẩn bị ảnh/video, gọi Gemini, kiểm tra JSON, Backend tính hai điểm
+và lưu SQL. Không đổi trạng thái bài/phiên. Thiếu bằng chứng giữ NULL; lỗi provider khác thiếu bằng chứng.
+Nút đầu tiên là **Phân tích bằng AI**, đang chạy bị khóa, sau một lần chạy là **Phân tích lại bằng AI**.
+Chi tiết Files API/video dài, deadline, replay và quyền công bố: [ai-analysis.md](ai-analysis.md).
 
-### Phân trang danh sách kiểm duyệt Admin
+## 4. Đặt giá và kết thúc
 
-`GET /api/posts/pending` giữ đường dẫn cũ nhưng trả cả chờ và từ chối mặc định. Mỗi trang tối đa 30 bài.
-`nextBefore` là cursor chứa nhóm và ID cuối (`pending:123` hoặc `rejected:123`), hoặc NULL.
-Client gửi nguyên cursor đã URL-encode vào `before`, giữ cùng `status` khi xem thêm; không tự tính cursor theo ID đơn lẻ.
-Bộ lọc/cursor sai trả 400; người dùng thường/khách không có quyền xem. Cursor theo cặp nhóm/ID giúp chuyển nhóm
-đúng dù ID các bài từ chối lớn hơn ID đang chờ. Khi dữ liệu đổi giữa các lượt tải, tải lại trang để có danh sách hiện tại;
-đây không phải snapshot SQL cố định. Danh mục công khai/Bài của tôi giữ cursor và hợp đồng cũ.
-Lý do/ngày từ chối lấy từ KiemDuyet hiện có, không thêm schema hoặc sửa quyết định đã lưu.
+| HTTP | Đường dẫn | Quyền / dữ liệu |
+|---|---|---|
+| GET | `/auctions/:id` | Snapshot công khai, giờ SQL, lịch sử mới nhất/kết quả |
+| GET | `/auctions/:id/history` | Công khai, 50 lượt/trang, `before` lấy cũ hơn |
+| GET | `/auctions/:id/bid-status` | Đăng nhập; chủ sách, thời điểm đặt lại của chính tài khoản, giờ SQL |
+| POST | `/auctions/:id/bids` | Người dùng + CSRF; chỉ `{ma_yeu_cau,muc_gia}` |
+| GET | `/auctions/:id/requests/:requestId` | Chỉ chủ yêu cầu; SQL receipt trước Redis admission |
 
+Giá đi qua JSON là chuỗi VND nguyên, UUID v4 được chuẩn hóa chữ thường.
+HTTP 202/`dang_cho_xu_ly` chưa thành công; `da_chap_nhan`/`bi_tu_choi` là quyết định đã lưu SQL.
+Cùng mã/cùng người/phiên/giá đọc lại kết quả, không xếp lại; nội dung khác trả 409. Chỉ retry cùng mã khi
+chưa rõ phản hồi, không tạo UUID mới cho cùng ý định đang chờ.
 
-## Sửa hồ sơ và media khi gửi duyệt lại
+Worker khóa phiên, đọc receipt và kiểm tra lại quyền/lịch/giá/cooldown bằng giờ SQL dưới khóa.
+Lượt đầu khởi điểm + k×bước (k≥0), lượt sau giá hiện tại + k×bước (k≥1). Chủ sách/Admin không đặt giá.
+Hết hạn hoặc đạt ngưỡng mới kết thúc; hết hạn có lượt hợp lệ thì lượt cao nhất thắng dù chưa đạt ngưỡng.
+Một transaction ghi quyết định, lượt hợp lệ, giá/lịch sử và kết quả/giao dịch/chat nếu kết thúc có người thắng.
+Xem [auction-processing.md](auction-processing.md) và [realtime.md](realtime.md).
 
-`POST /api/posts/:id/resubmit` vẫn cần chủ bài, CSRF, cặp từ chối và row_version hiện tại. Body có thể
-thêm `sach` với cùng trường/giới hạn như đăng mới; không nhận sach_id/trạng thái hoặc URL tự chèn.
-Thêm `remove_media: [{kind:"image"|"video",id:<ID media>}]`; ID lấy từ media của GET chi tiết.
-Kiểm tra trùng/loại/ID, quyền và media còn đang dùng của đúng bài trong transaction. Client cũ không gửi
-sach/remove_media thì giữ hồ sơ/media hiện tại. Giới hạn video tính sau khi gỡ và cộng các vé mới.
-Thể loại mới phải trong danh mục; giá trị cũ ngoài danh mục được giữ nếu không đổi, không cho chèn tên mới.
+## 5. Giao dịch và tương tác
 
-Migration 007 thêm ho_so_sach JSON ở BaiDang và dang_su_dung ở HinhAnh/Video. Không thêm bảng.
-Sach giữ bản vật lý/khóa đăng lại; thông tin hiển thị lấy từ hồ sơ bài, fallback về Sach nếu bài cũ chưa có JSON.
-OPENJSON WITH giữ NULL rõ ràng (xóa ISBN) và mô tả dài; tìm kiếm, danh sách, chi tiết, giao dịch và AI dùng cùng hồ sơ.
-Đăng mới lưu hồ sơ; đăng lại sao chép hồ sơ của bài nguồn vào bài mới, vẫn giữ cùng sach_id.
-Sửa bài bị từ chối của lần đăng sau không đổi hồ sơ phiên trước.
+Các endpoint có prefix `/community`. Chi tiết quyền, đầu vào, giới hạn và phân trang nằm tại
+[after-sales.md](after-sales.md). Phòng riêng gắn đúng người thắng/chủ sách; hoàn tất cần hai xác nhận.
+Chỉ người mua đánh giá một lần sau hoàn tất. Khiếu nại chỉ mở chat đọc cho Admin được phân công khi đang xử lý;
+không đổi người thắng/giá hoặc tự hoàn tiền. Bình luận sau giờ phiên chỉ đọc.
 
-Trước chỉnh sửa, chụp quyết định hiện tại nếu bản cũ chưa có snapshot. Sau đó cập nhật hồ sơ, đánh dấu media gỡ
-không còn dùng, thêm media mới theo thứ tự sau cả các hàng đã gỡ, đổi trạng thái/version và ghi lịch sử cùng transaction.
-Lỗi/version/quyền/video vượt giới hạn thì rollback tất cả; acknowledgement chỉ sau COMMIT; AI chỉ xếp lịch khi Admin chủ động yêu cầu.
-Media lịch sử không bị DELETE/destroy Cloudinary và vẫn được isMediaReferenced bảo vệ khỏi cleanup.
-Bản bìa/gallery/AI chỉ lấy media dang_su_dung=1; hash/version làm kết quả AI vòng trước không thành kết quả mới.
-Nút × trên media cũ chỉ đổi draft: Hủy giữ nguyên, Giữ lại phục hồi draft (không vượt giới hạn video).
-Nút × trên tệp vừa upload vẫn hủy vé mới như trước. Quyết định cũ và PDF giữ sách/media lúc kiểm duyệt.
+## 6. Hộp thông báo
+
+| HTTP | Đường dẫn | Quyền / dữ liệu |
+|---|---|---|
+| GET | `/notifications?before=:id` | Hộp của session hiện tại, 30 mục/trang và số chưa đọc |
+| POST | `/notifications/:id/read` | Chủ thông báo + CSRF, body `{}`, giữ thời điểm đọc đầu |
+
+Đồng bộ từ các bản ghi nguồn SQL đã COMMIT khi đọc hộp; UNIQUE người nhận/nguồn chống trùng.
+Không phải trigger, outbox hoặc Socket push riêng. Xem [ui-integration.md](ui-integration.md).
+
+## 7. Hạ tầng và lỗi HTTP
+
+| HTTP | Đường dẫn | Điều kiện |
+|---|---|---|
+| GET | `/health/live` | API chạy; không chứng minh dịch vụ phụ thuộc healthy |
+| GET | `/health/ready` | SQL/schema, Redis, worker heartbeat cùng đạt |
+| POST | `/dev/probes` | development + `X-Dev-Token`; 202, chỉ enqueue probe đọc SQL |
+| GET | `/dev/probes/:id` | Cùng điều kiện, đọc kết quả probe |
+
+401: chưa có phiên hợp lệ; 403: sai vai trò/CSRF; 404: không tìm thấy hoặc không được thấy dữ liệu riêng;
+409: xung đột trạng thái/version/nội dung; 410: yêu cầu giá không thể tiếp tục, cần đối soát;
+413/415: dung lượng/định dạng; 429: giới hạn thử; 503: dịch vụ chưa sẵn sàng. Lỗi provider có mã riêng,
+không phản chiếu khóa, stack hoặc body thô. Các nghĩa cụ thể phụ thuộc endpoint, không suy kết quả nghiệp vụ từ HTTP 202.

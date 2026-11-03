@@ -8,7 +8,8 @@
 2. Sau khi model trả về từ COMMIT, processor publish `{ "auctionId": 7 }` lên kênh Redis `bookauction:auction:updates`.
 3. API dùng Redis subscriber riêng và phát `auction:changed` vào room phiên và room danh mục trên namespace `/auctions`.
 4. React nhận tín hiệu rồi lấy snapshot từ HTTP. Snapshot chứa giá, lịch, thời gian SQL, kết quả và 50 lượt hợp lệ mới nhất.
-5. Yêu cầu đặt giá của từng tài khoản vẫn lấy quyết định riêng qua API có cookie/CSRF và selector tab hiện hành.
+5. Yêu cầu đặt giá của từng tài khoản vẫn lấy quyết định riêng qua API có cookie và selector tab hiện hành.
+   POST gửi giá cần CSRF; GET đọc quyết định không yêu cầu CSRF.
 
 HTTP 202 chỉ là đang chờ. Không phát giá hoặc công bố người thắng trước khi SQL COMMIT.
 Kích hoạt phiên cũng phát tín hiệu sau COMMIT; lỗi thông báo không đổi kết quả kích hoạt thành thất bại giả.
@@ -57,6 +58,9 @@ Nút xem lượt cũ đọc trang kế tiếp; khi có lượt mới, lịch s�
 Số tiền giữ dạng chuỗi 18 chữ số. Giá gợi ý được cập nhật nếu chưa nhập; dữ liệu đang gõ được giữ khi giá nền đổi.
 
 ## Nghiệm thu
+
+Chuẩn bị dịch vụ/schema theo [setup-guide.md](setup-guide.md). Đừng gộp hộp thông báo SQL/polling
+với tín hiệu Socket phiên: hai chức năng có cơ chế và quyền khác nhau.
 
 Giữ SQL Server/Redis và `npm.cmd run dev:all` đang chạy, mở terminal khác:
 

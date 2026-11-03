@@ -6,7 +6,7 @@
 
 Đã triển khai API, Redis admission/Streams, processor có khóa phiên, transaction SQL,
 job hết hạn và giao diện gửi giá/theo dõi quyết định qua HTTP.
-Schema sau migration 003 có 20 bảng/152 cột. Không thay dependency hoặc cơ chế xác thực theo tab.
+Schema hiện tại sau migration 007 có **21 bảng/165 cột**; migration 003 đã bổ sung receipt quyết định giá và lý do kết thúc. Không thay dependency hoặc cơ chế xác thực theo tab.
 Socket.IO nghiệp vụ đã có theo [hợp đồng thời gian thực](realtime.md); AI đã có theo [hợp đồng phân tích](ai-analysis.md).
 Giao dịch, chat và xác nhận hoàn tất hai bên theo [hợp đồng sau đấu giá](after-sales.md).
 
@@ -15,6 +15,7 @@ Giao dịch, chat và xác nhận hoàn tất hai bên theo [hợp đồng sau �
 | Phương thức | Endpoint | Quyền và phản hồi |
 |---|---|---|
 | GET | `/api/auctions/:id` | Công khai với phiên đã duyệt và kích hoạt/kết thúc; snapshot và kết quả |
+| GET | `/api/auctions/:id/history` | Công khai; 50 lượt/trang, `before` lấy lượt cũ hơn |
 | GET | `/api/auctions/:id/bid-status` | Đã đăng nhập; chỉ trạng thái chủ sách và thời điểm đặt lại của chính tài khoản trong session |
 | POST | `/api/auctions/:id/bids` | Người dùng, cookie và CSRF; 202 đang chờ hoặc 200 quyết định đã có |
 | GET | `/api/auctions/:id/requests/:requestId` | Chủ yêu cầu; SQL trước Redis, người khác nhận 404 |
@@ -88,6 +89,9 @@ Thứ tự xử lý do quyền ghi SQL dưới khóa quyết định, không l�
 - Không nhận thêm lượt sau kết thúc; không có kết thúc thủ công hoặc hủy giữa phiên.
 
 ## Dữ liệu và migration
+
+Nâng cấp bằng `npm.cmd run db:migrate` sau khi dừng API/worker và SQL healthy; hướng dẫn đầy đủ
+tại [setup-guide.md](setup-guide.md). Không dùng số bảng/cột riêng của migration 003 làm readiness hiện tại.
 
 Migration 003 thêm YeuCauDatGia:
 

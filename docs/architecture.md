@@ -1,111 +1,98 @@
-<!-- Mục đích: Mô tả thành phần, kết nối, ranh giới trách nhiệm và phạm vi triển khai. -->
+<!-- Mục đích: Kiến trúc thực tế, ranh giới dữ liệu và trách nhiệm của từng tiến trình. -->
 
 # Kiến trúc hệ thống
 
-## Tổng quan
+## Thành phần
 
-Một repository chứa React Frontend và Express Backend, quản lý dependency bằng npm workspaces.
-Backend có hai tiến trình dùng chung mã nguồn: HTTP API và worker Redis Streams.
-SQL Server giữ trạng thái nghiệp vụ có thẩm quyền; Redis hỗ trợ session, hàng đợi và phối hợp xử lý.
+Một repository dùng npm workspaces, Node.js 24.x và JavaScript ES Modules. API, worker và web là ba
+­tiến trình phát triển; không phải ba microservice độc lập. Compose chạy SQL Server 2022 Developer/Redis 8.
 
-## Thành phần và kết nối
+| Thành phần | Trách nhiệm và kết nối |
+|---|---|
+| React/Vite | BookBid, biểu mẫu/nháp cục bộ, HTTP có cookie, Socket.IO công khai và namespace tài khoản |
+| Express API | Session/CSRF/quyền, validate HTTP, upload Cloudinary, admission đặt giá và yêu cầu AI |
+| SQL Server | Tài khoản, sách/hồ sơ bài, phiên/receipt giá, kết quả/giao dịch, kiểm duyệt/AI, tương tác và thông báo |
+| Redis | Session, quyền phiên, rate limit, vé media, Streams, lease, Pub/Sub, probe và heartbeat |
+| Worker | Ba consumer probe/đấu giá/AI với kết nối BLOCK riêng; job chốt hạn độc lập |
+| Cloudinary | Lưu ảnh/video gốc; Backend xác minh URL/public ID, SQL giữ tham chiếu |
+| Gemini | Quan sát theo JSON Schema; ảnh inline, video qua Files API; không quyết định duyệt |
 
-| Thành phần | Trách nhiệm | Kết nối |
+Frontend không đọc SQL/Redis hoặc nắm credentials provider. API có Redis subscriber để chuyển tín hiệu
+sau COMMIT tới các socket đang nối với chính API đó. Chưa có outbox hoặc Redis Socket.IO Adapter.
+
+## Phân lớp và luồng sự kiện
+
+HTTP: `Route → Middleware → Controller → Service → Model → SQL`.
+Routes khai báo quyền; controller chuẩn hóa đầu vào/projection; service điều phối; model truy vấn tham số hóa,
+transaction và khóa. Các policy/utility tách quy tắc giá, quyền, tiền, rowversion và trạng thái.
+
+| Luồng | Trình tự | Trạng thái bền vững |
 |---|---|---|
-| React | Tài khoản, bài đăng, đấu giá, giao dịch, chat, phản hồi và khiếu nại | HTTP/JSON, upload và tín hiệu Socket.IO |
-| Express API | Xác thực, phân quyền, đầu vào, nghiệp vụ HTTP và Socket.IO | SQL Server, Redis, Cloudinary |
-| SQL Server | Tài khoản, sách, bài, phiên, quyết định giá, kết quả, giao dịch và lịch sử | Thư viện `mssql`, truy vấn tham số hóa |
-| Redis | Session, vé media, admission đặt giá, khóa phiên, giới hạn thử, probe và heartbeat | Redis client; Lua khi cần thao tác nguyên tử |
-| Redis Streams | Stream probe, đấu giá và AI độc lập | Consumer group tại worker |
-| Worker | Đọc/xử lý probe, đấu giá và AI; chốt hạn và đối soát AI | Ba kết nối BLOCK riêng; transaction SQL nghiệp vụ |
-| Cloudinary | Lưu và phân phối ảnh/video | HTTPS REST từ Backend; SQL lưu URL/public_id |
-| Socket.IO | Room phiên/danh mục chỉ đọc, tín hiệu sau COMMIT và `system:hello` | Subscriber Redis riêng tại mỗi API; không phát dữ liệu riêng tư |
-| Gemini API | Quan sát sách/media theo hợp đồng JSON; không quyết định duyệt | HTTPS chỉ từ worker; Backend kiểm tra/tính điểm rồi lưu SQL |
+| Probe | HTTP development → stream probe → worker → SQL SELECT → Redis result | Không ghi nghiệp vụ |
+| Đặt giá | HTTP → admission/stream → consumer → lease phiên → transaction SQL → publish → ACK | YeuCauDatGia và các thay đổi hợp lệ trong SQL |
+| Hết hạn | Job đọc giờ SQL → stream đấu giá → cùng processor/khóa phiên | Kết quả, giao dịch/chat nếu có người thắng |
+| AI | Admin POST có CSRF/version → stream AI → worker chuẩn bị media/Gemini → kiểm tra/tính điểm → SQL | PhanTichAI và ChiTietPhanTichAI |
+| Hộp tin | GET hộp → đồng bộ nguồn đã COMMIT dưới khóa SQL → đọc ThongBao | Nội dung ngắn, nguồn UNIQUE và thời điểm đọc |
 
-Frontend không truy cập SQL hoặc Redis trực tiếp. Bí mật Cloudinary/Gemini chỉ có ở Backend.
-API, worker và React chạy riêng; SQL Server và Redis chạy trong Docker theo [README](../README.md).
+HTTP 202 là tiếp nhận, chưa phải nghiệp vụ thành công. SQL receipt và UNIQUE bảo vệ replay;
+không khẳng định transport xử lý/giao nhận đúng một lần.
 
-## Phân lớp Backend
+## Mô hình dữ liệu
 
-Luồng HTTP: `Route → Middleware → Controller → Service → Model → SQL Server`.
+[Manifest](../backend/schema-manifest.json) sau migration 007: **21 bảng/165 cột, 99 CHECK, 15 UNIQUE constraints**.
 
-- Route khai báo endpoint và middleware xác thực/CSRF/phân quyền.
-- Controller chuyển đầu vào/đầu ra HTTP, áp dụng projection công khai.
-- Service điều phối claim media, nghiệp vụ và kết quả commit/rollback.
-- Model thực hiện truy vấn tham số hóa, lấy khóa và giao dịch SQL.
-- Policy/utility chứa quy tắc trạng thái, chuẩn hóa phiên bản và các hàm dùng chung.
+| Nhóm | Bảng chính |
+|---|---|
+| Tài khoản và bản sách | NguoiDung, Sach, BaiDang, HinhAnh, Video |
+| Kiểm duyệt và AI | KiemDuyet, PhanTichAI, ChiTietPhanTichAI |
+| Đấu giá | PhienDauGia, YeuCauDatGia, LuotDatGia, LichSuDauGia, KetQuaDauGia |
+| Sau phiên | GiaoDich, CuocTroChuyen, TinNhan, DanhGia, BinhLuan |
+| Khiếu nại/hộp tin | KhieuNai, BangChungKhieuNai, ThongBao |
 
-Luồng probe: `Redis Streams → Consumer → Processor → SQL SELECT → Redis result`.
-Probe không ghi lượt giá, kết quả đấu giá hoặc giao dịch.
+Sach là bản vật lý/khóa ổn định để đăng lại. BaiDang.ho_so_sach giữ hồ sơ của lần đăng;
+chi tiết/tìm kiếm/giao dịch/AI dùng cùng phép gộp hồ sơ, fallback về Sach cho dữ liệu cũ.
+Gửi duyệt lại không ghi đè Sach/lịch sử phiên khác. HinhAnh/Video.dang_su_dung phân biệt tệp active
+với tệp đã gỡ khỏi hồ sơ mới, không DELETE hàng/file lịch sử.
+KiemDuyet.ket_qua_snapshot giữ sách/media/AI của đúng quyết định để xuất kết quả về sau.
 
-Luồng đấu giá: `HTTP → Redis Streams → Consumer → Redis lock → SQL transaction → ACK`.
-Job hết hạn đọc đồng hồ SQL và xếp sự kiện chốt vào cùng stream nghiệp vụ.
-YeuCauDatGia lưu quyết định cuối; LuotDatGia chỉ lưu lượt hợp lệ.
-Cùng transaction ghi quyết định, lượt/giá/lịch sử, kết quả, giao dịch và phòng chat nếu có người thắng khi phiên kết thúc.
-SQL có 21 bảng/165 cột sau migration 007 (hộp thông báo, bản kết quả kiểm duyệt và hồ sơ gửi duyệt lại); DDL nền được giữ để nâng cấp tại chỗ.
+FK bảo vệ tham chiếu, UNIQUE bảo vệ tối đa một kết quả/phiên, một giao dịch/kết quả, một phòng/giao dịch
+và một đánh giá/giao dịch. Chúng không tự tạo bản ghi bắt buộc; transaction nghiệp vụ thực hiện việc đó.
+Schema nền 001 được giữ; nâng cấp chạy 002–007, không reset database.
 
-## Xác thực theo tab
+## Xác thực và quyền
 
-Backend dùng một `express-session` middleware và RedisStore chung cho tiến trình.
-Frontend gửi mã tab ngẫu nhiên qua `X-Tab-ID`; Backend chỉ chọn cookie HttpOnly tương ứng,
-không lấy session từ cookie của tab khác hoặc cookie chung.
-Mã tab nằm trong sessionStorage và không chứa thông tin xác thực. Cookie chứa mã session được ký,
-CSRF token giữ trong bộ nhớ, vai trò và tài khoản luôn đọc lại từ SQL.
+Cookie HttpOnly riêng được chọn theo X-Tab-ID; selector nằm trong sessionStorage, không thay cookie/CSRF.
+Một tài khoản chỉ có một phiên đăng nhập hiện hành: login đúng mật khẩu đổi session/CSRF, Lua đổi owner,
+xóa session cũ và phát tín hiệu. F5/GET/control/Socket không claim phiên; tab cũ về đăng nhập.
+Khác tài khoản vẫn độc lập. Vai trò/tài khoản được đọc lại từ SQL; owner/session kiểm tra Redis.
+Cookie SameSite=Lax, Secure khi production; CSRF giữ ở bộ nhớ frontend.
 
-F5 giữ mã tab; một tài liệu mới xoay mã kể cả khi trình duyệt sao chép storage từ tab mở nó.
-Vì vậy tab mới cần đăng nhập, đăng xuất chỉ thu hồi phiên được chọn.
-Client terminal không gửi mã tab tiếp tục dùng hợp đồng cookie chung cho smoke và tích hợp HTTP.
-Mỗi tài khoản chỉ có một phiên đăng nhập trong Redis: login bằng mật khẩu đổi owner và xóa session cũ nguyên tử.
-HTTP riêng, kể cả me, kiểm tra session hiện tại; namespace /account ngắt phiên bị thu hồi qua Pub/Sub và heartbeat.
-Tab cũ tự về đăng nhập, F5 không claim hoặc hồi sinh phiên. Khác tài khoản vẫn độc lập; xem [account-control.md](account-control.md).
-Đây là cách phân tách thao tác theo tab, không phải ranh giới an toàn giữa các trang cùng origin.
+Namespace `/account` có xác thực và heartbeat để ngắt phiên bị thu hồi. `/auctions` chỉ công khai;
+không chứa cookie dùng làm quyền đấu giá, chat hoặc gia_toi_thieu. Quyền ghi nghiệp vụ luôn kiểm tra HTTP/worker/SQL.
+Chi tiết tại [account-control.md](account-control.md).
 
-## Nhất quán dữ liệu
+## Nhất quán và phục hồi
 
-- SQL Server là nguồn trạng thái quyết định quyền kích hoạt, lịch, giá và kết quả.
-- Tạo sách/bài/phiên/media/lịch sử trong cùng transaction SERIALIZABLE.
-- Duyệt và gửi lại cập nhật cặp trạng thái bài/phiên nguyên tử. Quyết định mới lưu kèm bản kết quả sách/media/AI trong cùng transaction; xuất lịch sử không lấy dữ liệu vòng mới. Xem [review-exports.md](review-exports.md).
-- Kiểm tra `row_version` sau khi lấy khóa; chuẩn hóa BINARY(8) thành hex 16 ký tự ở model.
-- UUID yêu cầu và UNIQUE bảo vệ retry; chỉ trả thành công sau COMMIT.
-- Giá DECIMAL(18,0) đi qua JSON dạng chuỗi, không chuyển thành JavaScript Number.
-- Giờ lưu UTC, SQL kiểm tra lịch kích hoạt theo `SYSUTCDATETIME()`.
+- SQL dùng transaction SERIALIZABLE và UPDLOCK/HOLDLOCK tại các thao tác cần tuần tự hóa.
+- Redis lease/token phối hợp; rowversion và UNIQUE tiếp tục bảo vệ khi lease mất/COMMIT kéo dài.
+- Rowversion được mã hóa từ BINARY(8) thành hex 16 ký tự, không chuyển qua Number.
+- Tiền DECIMAL(18,0) đi qua JSON dạng chuỗi; giờ nghiệp vụ lưu UTC và kiểm tra bằng giờ SQL.
+- Tệp được upload trước, ngoài transaction SQL; vé Redis claim nguyên tử xác nhận chủ sở hữu.
+  ACK Redis lỗi sau COMMIT không biến kết quả SQL thành rollback giả; claim chưa rõ giữ để đối soát.
+- Cleanup media phải kiểm tra tham chiếu SQL, kể cả hàng lịch sử/bằng chứng, trước khi destroy Cloudinary.
+- Giá/trạng thái phát tín hiệu sau COMMIT. Snapshot SQL sau join/reconnect và mỗi 5 giây bù sự kiện lỡ;
+  Socket/Pub/Sub không là nhật ký bền vững. Quyết định đặt giá của riêng người dùng đọc qua HTTP riêng.
+- Chat/bình luận/khiếu nại dùng HTTP/polling, không phát nội dung riêng vào room công khai.
 
-Tệp được upload ngoài transaction SQL. Vé Redis claim nguyên tử xác nhận chủ sở hữu trước khi gắn media.
-Sau COMMIT, acknowledgement Redis lỗi không làm kết quả SQL biến thành rollback giả.
-Cleanup chỉ destroy file bỏ dở sau khi SQL xác nhận không còn tham chiếu;
-claim chưa rõ commit được giữ để đối soát thủ công. Không có distributed transaction SQL–Cloudinary.
+## AI, video và nháp
 
-## Cập nhật thời gian thực và phục hồi
+Bài mới/đăng lại/gửi duyệt lại và các lần đọc không tạo job AI. Chỉ Admin yêu cầu; worker không có vòng quét
+pending để tự chạy. Job auto tồn từ bản cũ được bỏ qua; phân tích SQL đã lưu vẫn giữ lịch sử.
+Ảnh có ngân sách inline 12 MiB; video tải tuần tự, upload Files API, chờ ACTIVE rồi tham chiếu URI.
+Không cắt ở phút thứ 5; Gemini vẫn lấy mẫu và chịu quota/model/deadline. Thử xóa file Google khi xong,
+không lưu URI tạm vào SQL. Backend tính hai điểm độc lập, NULL khi thiếu chứng cứ; AI không đổi trạng thái bài/phiên.
 
-Worker đặt giá và tác vụ hết hạn dùng cùng khóa phiên và transaction/rowversion SQL.
-Sau COMMIT, processor publish tín hiệu ID phiên qua Redis Pub/Sub; API chuyển vào room công khai đã kiểm tra quyền xem.
-Publish lỗi giữ thông điệp pending; XAUTOCLAIM xử lý lại và đọc quyết định đã lưu trước khi phát lại/ACK.
-Không gửi ngưỡng, giá hoặc quyết định riêng trong tín hiệu Socket. Giao diện lấy snapshot SQL sau thông báo,
-sau khi đăng ký lại room và mỗi 5 giây để bù sự kiện lỡ. Snapshot chứa lịch sử mới nhất cùng giá/kết quả.
-Quyết định của người đặt vẫn được đọc qua HTTP có xác thực; namespace công khai không chứa session.
-Namespace /account dùng cookie xác thực riêng, không nhận lệnh đặt giá hoặc phát nội dung giao dịch.
-Không có outbox hoặc cam kết giao mọi thông báo; phục hồi trạng thái hiện tại bằng SQL. Xem [realtime.md](realtime.md) và ADR-009.
-
-## Phân tích sách
-
-Sau khi đăng/gửi duyệt lại COMMIT, API xếp job AI riêng. Worker gửi thông tin sách đã lọc và media đủ điều kiện,
-kiểm tra JSON, áp dụng bộ điểm cố định, rồi lưu PhanTichAI/ChiTietPhanTichAI nguyên tử.
-Tác vụ đối soát tìm bài pending chưa có lần phân tích của phiên bản hiện tại, bù lỗi enqueue.
-Không gọi Gemini trong SQL transaction; không sửa trạng thái bài/phiên khi lưu AI.
-Chi tiết quy tắc, phục hồi và giới hạn tại [ai-analysis.md](ai-analysis.md).
-
-## Giao dịch và tương tác sau phiên
-
-HTTP riêng kiểm tra chuỗi kết quả/người thắng/chủ bài trước khi cho hai bên đọc hoặc ghi giao dịch/chat.
-Các thao tác ghi khóa GiaoDich trong SERIALIZABLE; đủ hai xác nhận mới hoàn tất, UNIQUE giới hạn một phòng và một đánh giá.
-Khiếu nại kiểm tra cả giao dịch, người gửi và phòng; Admin được phân công chỉ đọc chat khi hồ sơ đang xử lý.
-Bình luận khóa dòng phiên rồi kiểm tra cửa sổ thời gian bằng SQL. Không phát chat/hồ sơ vào Socket công khai.
-Trang mới nhất tự đọc HTTP mỗi ba giây, lịch sử dùng cursor; không có receipt cho mọi POST hoặc cam kết giao đúng một lần.
-Bằng chứng ảnh dùng vé media hiện có; API hạn chế truy cập hồ sơ nhưng delivery Cloudinary chưa phải CDN riêng tư.
-Chi tiết tại [after-sales.md](after-sales.md); phần chờ nghiệm thu/thực nghiệm tại [tasks.md](tasks.md).
-
-
-Hồ sơ sách theo bài nằm ở BaiDang.ho_so_sach; Sach là bản vật lý/khóa ổn định và không bị gửi duyệt lại ghi đè.
-HinhAnh/Video giữ hàng lịch sử với dang_su_dung=0 sau khi gỡ; chỉ hàng active dùng cho gallery/bìa/AI.
-KiemDuyet.ket_qua_snapshot giữ hồ sơ từng quyết định. Gửi lại chụp snapshot legacy hiện tại trước cập nhật,
-đổi hồ sơ/media/trạng thái cùng transaction; đăng lại sao chép hồ sơ nguồn, không tạo bản sách vật lý khác.
+Nháp nằm trong localStorage theo tài khoản/chế độ/bài. Tác vụ upload sống ngoài component để tiếp tục qua
+điều hướng SPA; reload có thể ngắt lượt chưa xong. Vé chưa gửi bài hết hạn một giờ, không phải lưu nháp SQL.
+Xem [AI](ai-analysis.md), [media/nháp](media-upload.md), [đấu giá](auction-processing.md),
+[realtime](realtime.md), [sau phiên](after-sales.md) và [xuất kết quả](review-exports.md).

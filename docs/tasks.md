@@ -1,68 +1,57 @@
-<!-- Mục đích: Theo dõi chức năng, trạng thái kiểm chứng và công việc còn lại theo lĩnh vực nghiệp vụ. -->
+<!-- Mục đích: Phạm vi chức năng đã hoàn thành và checklist bàn giao, không thay bằng chứng kiểm thử. -->
 
-# Trạng thái phát triển
+# Trạng thái hoàn thành và bàn giao
 
-## Quy ước
+Rà soát theo nhánh `feat/Hai` ngày **03/11/2026**. Dự án đã hoàn thành triển khai phạm vi chức năng
+được chốt; nhóm đã xác nhận các mốc đến **Mốc 8**. Bảng này không xác nhận lại mọi dịch vụ thật hoặc
+mọi bản sửa mới nhất; bằng chứng cụ thể và giới hạn xem [VALIDATION.md](../VALIDATION.md).
 
-- **Đã triển khai:** có mã nguồn và tài liệu sử dụng.
-- **Đã kiểm tra tự động:** nêu rõ phụ thuộc thật/giả tại [VALIDATION.md](../VALIDATION.md).
-- **Chờ nghiệm thu:** cần chạy với dữ liệu và dịch vụ thật của nhóm.
-- **Chưa triển khai:** thiết kế hoặc công việc phát triển tiếp theo.
+## Phạm vi hiện có
 
-## Chức năng hiện tại
-
-| Nhóm | Phạm vi | Trạng thái |
-|---|---|---|
-| Hạ tầng | SQL, Redis, API, worker, Socket.IO và probe | Đã triển khai; nhóm xác nhận healthy/completed và smoke đạt |
-| Tài khoản | Đăng ký/đăng nhập/đăng xuất, Argon2id, CSRF, phân quyền | Đã triển khai; smoke tài khoản được nhóm xác nhận đạt |
-| Phiên tab | Khác tài khoản độc lập; login mới thu hồi session cũ, F5 không khôi phục | Đã kiểm tra hai API/Redis/Socket thật và trình duyệt; chờ máy nhóm |
-| Nhập tiền | Ô nhập số thuần; xem trước có dấu chấm, chuỗi nguyên tối đa 18 chữ số | Đã kiểm tra HTTP/Redis và trình duyệt; chờ nghiệm thu máy nhóm |
-| Thể loại | Danh mục chung, tìm không dấu, chỉ lưu lựa chọn; bổ sung nhóm sách cổ/tư liệu | Đã kiểm tra API và bàn phím/chuột trên desktop/mobile |
-| Đăng sách | Tạo sách/bài/phiên pending và media trong transaction | Đã triển khai; có smoke tích hợp |
-| Media | Cloudinary, vé Redis, ownership, cleanup | Đã triển khai; kiểm thử hợp đồng và Redis; media thật cần nghiệm thu |
-| Kiểm duyệt | Phê duyệt/từ chối có lý do, bổ sung và gửi lại | Đã triển khai; Admin phê duyệt đã được nhóm xác nhận hoạt động |
-| Kích hoạt | Chủ sách đặt lịch và cập nhật đúng phiên đã duyệt | Đã triển khai; chờ nghiệm thu SQL thật đầy đủ |
-| Đăng lại | Phiên cuối kết thúc không người thắng, giữ sách và lịch sử | Đã triển khai; có test policy và fixture trong smoke |
-| Danh mục | Chỉ bài đã duyệt/phiên kích hoạt, ẩn ngưỡng giá | Đã triển khai; có kiểm thử HTTP |
-| Đặt giá | API/Streams/worker/SQL, giá/lịch/cooldown, quyết định cuối và tiền 18 chữ số | Đã kiểm tra SQL/Redis thật và smoke tích hợp; chờ môi trường nhóm |
-| Khóa và phục hồi | Lease/token, rowversion, UNIQUE, pending/XAUTOCLAIM | Đã kiểm tra mất lease và crash sau COMMIT/trước ACK |
-| Kết thúc | Hết hạn/ngưỡng, một kết quả, giao dịch chỉ khi có người thắng | Đã kiểm tra SQL/Redis thật và smoke tích hợp |
-| Giao diện đấu giá | Gửi giá, chờ/chấp nhận/từ chối, retry cùng mã và kết quả | Đã kiểm tra nhiều tab, mất phản hồi mạng và desktop/mobile |
-| Thời gian thực | Worker → Pub/Sub → Socket, room công khai, lịch sử, đồng hồ SQL và lấy lại snapshot | Đã kiểm tra HTTP/Redis/Socket và hai browser độc lập; chờ smoke dịch vụ SQL thật của nhóm |
-| AI hỗ trợ kiểm duyệt | Gemini JSON, hai điểm độc lập, bằng chứng/NULL/cảnh báo, lịch sử và phân tích lại | Hải xác nhận smoke:ai PASS; đối chiếu sách có ảnh/video thật để test sau khi có dữ liệu |
-| Giao dịch | Đối chiếu chuỗi kết quả/người mua/bán/giá; đủ hai xác nhận mới hoàn tất | Đã triển khai; HTTP/trình duyệt đạt, chờ SQL thật và smoke:m8 |
-| Chat riêng | Một phòng/giao dịch, văn bản, chỉ người nhận đánh dấu đọc, phân trang | Đã kiểm tra quyền/CSRF và nhiều tab; SQL thật opt-in chưa chạy |
-| Uy tín và bình luận | Người mua đánh giá sau hoàn tất; bình luận trong giờ phiên, giữ lịch sử | Đã kiểm tra policy/HTTP/trình duyệt; chờ SQL thật ở biên giờ/đồng thời |
-| Khiếu nại | Ảnh có vé sở hữu, phân công Admin, chat chỉ đọc khi đang xử lý | Đã kiểm tra HTTP/Redis/trình duyệt với SQL và Cloudinary giả; chờ dịch vụ thật |
-
-## Công việc tiếp theo
-
-| Lĩnh vực | Công việc |
+| Nhóm | Chức năng đã có trong source |
 |---|---|
-| Hồ sơ | Cập nhật thông tin cá nhân theo phạm vi được thống nhất |
-| Nghiệm thu sau phiên | Chạy SQL opt-in, smoke:m8 và ảnh bằng chứng Cloudinary thật theo after-sales.md |
-| Thực nghiệm | Kiểm thử đồng thời, tải lớn, phục hồi tiến trình và tổng hợp báo cáo |
+| Hạ tầng | Docker SQL/Redis, API/worker/web, health/probe/heartbeat, dev:all |
+| Tài khoản | Đăng ký/đăng nhập/đăng xuất, Argon2id, session/CSRF/quyền; login mới thu hồi phiên cũ |
+| Bản sách | Bốn bước, thể loại có danh mục, ISBN tùy chọn, mô tả chung, tiền nguyên, nháp theo tài khoản |
+| Media | Nhiều định dạng, nhận diện nội dung, vé Redis/Cloudinary, gỡ media mới/cũ đúng vòng, recovery và cleanup |
+| Kiểm duyệt | Chờ và từ chối trong danh sách Admin, quyết định có lý do, bổ sung đủ hồ sơ, snapshot/PDF |
+| AI | Admin chủ động yêu cầu, JSON/kiểm tra bằng chứng/hai điểm/NULL, lịch sử, Files API cho video dài |
+| Phiên | Chủ sách kích hoạt lịch; một bản vật lý, đăng lại có điều kiện, giữ lịch sử |
+| Giá/kết thúc | Admission/Streams, khóa/transaction/receipt, bước giá/cooldown, ngưỡng hoặc hết hạn, kết quả duy nhất |
+| Thời gian thực | Tín hiệu sau COMMIT, snapshot/reconnect/polling, đồng hồ SQL, trạng thái yêu cầu riêng |
+| Sau phiên | Giao dịch/chat, hai xác nhận, người mua đánh giá, uy tín/bình luận công khai |
+| Khiếu nại | Hồ sơ/bằng chứng, tiếp nhận/phân công Admin, chat đọc đúng phạm vi, phản hồi xử lý |
+| BookBid | Responsive, sidebar Admin, gallery/kính lúp/đổi ảnh bàn phím, tìm kiếm SQL, hộp ThongBao riêng |
 
-Chưa có chức năng xóa bài đăng hoặc kết thúc phiên thủ công.
-Không triển khai thêm trạng thái nghiệp vụ, cổng thanh toán hay cơ chế xác thực khác khi chưa thống nhất.
+Không còn đặt mục “tích hợp AI”, “bổ sung frontend” hoặc “Mốc 8” là công việc chưa triển khai.
+Nghiệm thu bằng dữ liệu thật, đánh giá chất lượng AI và thử tải vẫn là các hoạt động kiểm chứng riêng.
 
-## Checklist nghiệm thu môi trường nhóm
+## Checklist bàn giao trên máy nhóm
 
-- [ ] Cập nhật mã, giữ cấu hình và volume hiện tại; khởi động lại API/worker/web.
-- [ ] SQL readiness 21 bảng/162 cột; cấu hình Cloudinary đầy đủ.
-- [ ] Hai tab cùng trình duyệt giữ Admin/người dùng riêng; F5, logout và mở tab mới đúng chính sách.
-- [ ] Cùng tài khoản ở hai cửa sổ: phiên mới hoạt động, tab cũ tự về đăng nhập; F5 không hồi sinh hoặc đăng xuất phiên mới.
-- [ ] Ba ô tiền không lặp số khi gõ/IME, focus/blur, dán/xóa; dòng Giá trị nhóm nghìn, API nhận chuỗi nguyên chính xác.
-- [ ] Đăng sách với ảnh và video thật; Admin từ chối, bổ sung, duyệt và chủ sách kích hoạt đúng phiên.
-- [ ] API danh mục/đấu giá không có `gia_toi_thieu`.
-- [ ] Gửi giá đúng bước/cooldown; theo dõi quyết định và hai kiểu kết thúc trên SQL Server 2022/Redis Compose của nhóm.
-- [ ] Hai trình duyệt tự đồng bộ giá/lịch sử/kết quả; mất mạng rồi nối lại tự lấy đúng trạng thái.
-- [ ] `check`, `test`, `build`, `smoke`, `smoke:auth`, `smoke:m4`, `smoke:m5`, `smoke:m6` đạt sau cập nhật.
-- [x] Hải xác nhận `smoke:ai` PASS; chỉ xác nhận tích hợp, chưa thay thế đánh giá chất lượng ảnh/video.
-- [ ] Đối chiếu hai điểm và bằng chứng bằng sách có ảnh/video thật khi Hải có dữ liệu; Admin quyết định.
-- [ ] Chạy `test:community` với SQL test riêng và `smoke:m8` trên API/worker/SQL/Redis thật.
-- [ ] Người mua/bán chat, xác nhận riêng, đánh giá một lần; người ngoài không xem được giao dịch/chat.
-- [ ] Khiếu nại ảnh thật, tranh tiếp nhận giữa hai Admin, quyền chat chỉ trong lúc xử lý; lịch sử sau kết thúc còn nguyên.
-- [ ] Lưu log/ảnh nghiệm thu phù hợp, đã loại thông tin nhạy cảm.
+Các ô trống là **chưa ghi nhận bằng chứng mới cho lượt bàn giao này**, không phủ nhận xác nhận mốc trước đó.
 
-Các xác nhận cũ không tự thay thế kiểm tra hồi quy cho bản cập nhật mới.
+- [ ] Đúng nhánh; giữ `.env`/volume, Node 24.x; đã cập nhật dependency theo lockfile và migration 002–007.
+- [ ] SQL readiness **21 bảng/165 cột**; Docker healthy, API/worker chạy; probe hoàn tất.
+- [ ] Khách không có avatar/hộp tin; hai tài khoản khác nhau dùng hai tab được.
+- [ ] Login cùng tài khoản nơi mới thu hồi tab cũ; F5 không hồi sinh phiên cũ hoặc làm mất phiên mới.
+- [ ] Nhập tiền không lặp/chèn số, giữ 18 chữ số; thể loại, ISBN và mô tả lưu đúng.
+- [ ] Nháp giữ trường/bước/media khi chuyển route; upload tiếp tục; reload và hết hạn vé báo đúng.
+- [ ] Đăng sách với ảnh/video thật, mở lại sau gửi để đối chiếu tệp đã gắn SQL.
+- [ ] Bài mới chưa chạy AI; Admin yêu cầu → tiến độ → kết quả/lỗi đúng; không tự chạy khi reload.
+- [ ] Video >5 phút được gửi Files API; đối chiếu manifest/timestamp với nội dung thật, không coi “đã gửi” là chất lượng thẩm định đạt.
+- [ ] Từ chối → bổ sung đủ hồ sơ/gỡ-thay media → gửi lại → phê duyệt; lịch sử/PDF cũ giữ đúng dữ liệu.
+- [ ] Chủ sách kích hoạt lịch; người mua không nhận `gia_toi_thieu` qua API/snapshot/thông báo.
+- [ ] Tranh giá/cooldown/retry cùng mã, hai kiểu kết thúc, kết quả và giao dịch không trùng.
+- [ ] Nhiều trình duyệt cùng snapshot; mất mạng/reconnect bắt kịp; hết giờ chờ xác nhận SQL rồi mới hiện người thắng.
+- [ ] Chat đúng hai bên, đánh dấu đọc đúng người nhận, hai xác nhận và đánh giá đúng người mua/một lần.
+- [ ] Khiếu nại có ảnh thật, hai Admin tranh tiếp nhận, quyền chat mất khi xử lý xong; không lộ hồ sơ cho bên còn lại.
+- [ ] Tìm kiếm không dấu/lọc/phân trang, thông báo riêng/đọc bền/không trùng, PDF và gallery trên desktop/mobile.
+- [ ] Lưu log/ảnh phiên bản và kết quả smoke/test opt-in đã che bí mật; không đánh dấu SKIP là PASS.
+
+Hướng dẫn lệnh và điều kiện chạy: [setup-guide.md](setup-guide.md), [VALIDATION.md](../VALIDATION.md).
+
+## Phần ngoài phạm vi
+
+Chưa có thanh toán/vận chuyển/hoàn tiền tự động, hồ sơ cá nhân mở rộng, theo dõi phiên/nhắc hết hạn,
+email/push hệ điều hành, CDN bằng chứng riêng tư, chữ ký số PDF, công cụ replay dead-letter hoặc benchmark production.
+Những phần này cần yêu cầu/thiết kế riêng; không được mô tả như chức năng đang hoạt động.

@@ -2,6 +2,13 @@
 
 # Kiểm chứng và nghiệm thu
 
+## Tự xếp hàng kiểm duyệt và phục hồi Gemini 503
+
+- `npm run check`, `npm test` và `npm run build` đều đạt. Bộ test có 207 PASS, 12 SKIP (dịch vụ thật), 219 bài.
+- HTTP fixture kiểm tra Admin chỉ yêu cầu phân tích lại sau khi có lượt phân tích cùng phiên bản; chủ bài không nhận chẩn đoán riêng của Gemini.
+- Kiểm thử mô phỏng 503 có `Retry-After`, model dự phòng, giữ media và giới hạn lượt. Kiểm thử xếp hàng sau COMMIT, không xếp trùng khi replay và giữ kết quả lưu bài khi Redis lỗi.
+- Không có migration mới. Chưa chạy `smoke:ai` với API key Gemini, SQL và Redis thật trong lần sửa này.
+
 ## Cập nhật BookBid và tự duyệt — 06/11/2026
 
 | Kiểm tra | Kết quả |

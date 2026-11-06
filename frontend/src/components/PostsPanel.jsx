@@ -1,5 +1,5 @@
 import StatusBadge from "./StatusBadge.jsx";
-/** Danh mục, bài của tôi, kiểm duyệt thủ công và luồng đặt giá/kết quả phiên. */
+/** Danh mục, bài của tôi, kiểm duyệt tự động và luồng đặt giá/kết quả phiên. */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BOOK_GENRE_GROUPS } from "../../../shared/bookGenres.js";
 import { bookReviewDescription } from "../../../shared/bookCondition.js";
@@ -29,7 +29,14 @@ function ReviewDecision({ review, postId, canExport }) {
         <small>{review.phan_tich_id ? "Kiểm duyệt tự động" : "Admin kiểm duyệt"} · {date(review.ngay_kiem_duyet)}</small>
       </div>
       <h3>{review.ket_qua === "Từ chối" ? "Lý do từ chối bài đăng" : "Căn cứ phê duyệt"}</h3>
-      <p className="preserve-lines">{review.phan_hoi_admin}</p>
+      {review.ket_qua === "Từ chối" ? (
+        <label>
+          Căn cứ và lý do kiểm duyệt
+          <textarea readOnly rows={6} value={review.phan_hoi_admin || ""} />
+        </label>
+      ) : (
+        <p className="preserve-lines">{review.phan_hoi_admin}</p>
+      )}
       {canExport && review.co_the_xuat && (
         <ReviewExportButton postId={postId} review={review} />
       )}
@@ -54,31 +61,19 @@ function Detail({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
-  async function act(event, action) {
+  async function activate(event) {
     event.preventDefault();
     setBusy(true);
     setError("");
     setMessage("");
     const data = Object.fromEntries(new FormData(event.currentTarget));
     try {
-      if (action === "review")
-        await postApi.review(post.bai_dang_id, {
-          quyet_dinh: event.nativeEvent.submitter.value,
-          ly_do: data.ly_do,
-          xac_nhan_quy_hiem: data.xac_nhan_quy_hiem === "on",
-          row_version: post.row_version,
-        });
-      else
-        await postApi.activate(post.bai_dang_id, {
-          thoi_gian_bat_dau: new Date(data.start).toISOString(),
-          thoi_gian_ket_thuc: new Date(data.end).toISOString(),
-          row_version: post.row_version,
-        });
-      setMessage(
-        action === "review"
-          ? "Đã lưu quyết định kiểm duyệt."
-          : "Đã đặt lịch và kích hoạt phiên.",
-      );
+      await postApi.activate(post.bai_dang_id, {
+        thoi_gian_bat_dau: new Date(data.start).toISOString(),
+        thoi_gian_ket_thuc: new Date(data.end).toISOString(),
+        row_version: post.row_version,
+      });
+      setMessage("Đã đặt lịch và kích hoạt phiên.");
       await onRefresh();
     } catch (failure) {
       setError(failure.message);
@@ -90,8 +85,7 @@ function Detail({
     post.trang_thai_phien,
   );
   const admin = user?.vai_tro === "admin",
-    decision = currentReview(post),
-    automatic = post.kiem_duyet_tu_dong;
+    decision = currentReview(post);
   const waiting = post.trang_thai_phien === "cho_kiem_duyet";
   const ai = (
     <AiPanel
@@ -168,7 +162,7 @@ function Detail({
               )}
             {mode === "mine" &&
               post.trang_thai_phien === "da_qua_kiem_duyet" && (
-                <form onSubmit={(event) => act(event, "activate")}>
+                <form onSubmit={activate}>
                   <fieldset disabled={busy}>
                     <h3>Đặt lịch phiên đã được duyệt</h3>
                     <label>
@@ -213,13 +207,11 @@ function Detail({
         <section className="panel live-review">
           {admin && ai}
           <h2>{waiting ? "Tiến độ kiểm duyệt" : "Kết quả kiểm duyệt"}</h2>
-          {waiting && (automatic || !admin) && (
+          {waiting && !admin && (
             <p className="notice" role="status">
-              {automatic
-                ? post.ai_san_sang
-                  ? "Hệ thống đang kiểm duyệt tự động. Kết quả và lý do sẽ xuất hiện tại đây."
-                  : "Kiểm duyệt tự động đang tạm chờ dịch vụ AI. Bài đăng đã được lưu."
-                : "Bài đăng đang chờ kiểm duyệt. Kết quả sẽ hiển thị sau khi có quyết định."}
+              {post.ai_san_sang
+                ? "Bài đăng đang chờ kiểm duyệt tự động. Quyết định và lý do sẽ xuất hiện tại đây."
+                : "Bài đăng đã được lưu và sẽ tiếp tục chờ dịch vụ AI."}
             </p>
           )}
           {decision && (
@@ -252,33 +244,6 @@ function Detail({
               <summary>{decision.phan_tich_id ? "Điểm và bằng chứng AI" : "Kết quả AI tham khảo"}</summary>
               {ai}
             </details>
-          )}
-          {mode === "pending" && waiting && !automatic && (
-            <form onSubmit={(event) => act(event, "review")}>
-              <fieldset disabled={busy}>
-                <label>
-                  Căn cứ và lý do kiểm duyệt
-                  <textarea name="ly_do" maxLength={8000} rows={5} required />
-                </label>
-                <label className="check-label">
-                  <input name="xac_nhan_quy_hiem" type="checkbox" />
-                  Tôi đã kiểm tra bằng chứng về yếu tố quý hiếm của đúng bản
-                  sách.
-                </label>
-                <p className="field-hint">
-                  AI chỉ hỗ trợ. Phê duyệt chưa kích hoạt phiên; chủ sách đặt
-                  lịch sau đó.
-                </p>
-                <div className="actions">
-                  <button name="decision" value="tu_choi" className="secondary">
-                    Từ chối có lý do
-                  </button>
-                  <button name="decision" value="phe_duyet" className="primary">
-                    Phê duyệt bài đăng
-                  </button>
-                </div>
-              </fieldset>
-            </form>
           )}
         </section>
       )}

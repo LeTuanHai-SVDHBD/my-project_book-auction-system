@@ -101,7 +101,7 @@ còn lại dừng theo `--kill-others`. Muốn chạy kiểm tra/smoke thì mở
 | Khách | Xem/tìm phiên công khai, ảnh/video, giá, lịch sử, kết quả, bình luận và uy tín |
 | Người dùng | Đăng sách, lưu nháp, bổ sung bài bị từ chối, kích hoạt/đăng lại đủ điều kiện; đặt giá sách của người khác |
 | Hai bên giao dịch | Chat riêng, xác nhận hoàn tất phần giao dịch của mình, khiếu nại; người mua đánh giá sau hoàn tất |
-| Admin | Theo dõi kiểm duyệt AI; duyệt thủ công khi tắt tự duyệt; xử lý khiếu nại |
+| Admin | Theo dõi kiểm duyệt AI, yêu cầu phân tích lại khi bài còn chờ; xử lý khiếu nại |
 
 Admin dùng sidebar riêng, không có chức năng đăng sách. Khách không thấy avatar tài khoản hoặc hộp thông báo.
 Đăng nhập cùng tài khoản ở nơi mới thu hồi phiên cũ; F5 không khôi phục phiên đã bị thu hồi.
@@ -112,10 +112,10 @@ Khác tài khoản vẫn có thể dùng đồng thời ở các tab. Xem [accou
 1. **Đăng sách:** điền bốn bước, gồm thông tin sách, ảnh/video, thông số đấu giá, kiểm tra và gửi.
    ISBN tùy chọn, tối đa 100 ký tự; thể loại chọn từ danh mục chung, gõ chỉ để lọc.
    Một ô **Tình trạng, yếu tố quý hiếm và bằng chứng** thay cho hai mô tả tình trạng trùng nhau.
-2. **Kiểm duyệt:** Khi bật tự duyệt, worker tự lấy hồ sơ chờ và đối chiếu hai điểm độc lập với hai ngưỡng.
+2. **Kiểm duyệt:** Bài được đưa vào hàng đợi AI sau khi lưu; worker đối chiếu hai điểm độc lập với hai ngưỡng.
    Đạt cả hai thì phê duyệt; điểm thấp hoặc thiếu bằng chứng sau khi phân tích thì từ chối kèm lý do.
-   Sự cố dịch vụ giữ bài chờ và thử lại theo lịch. Admin theo dõi kết quả, không cần thao tác duyệt.
-   Bật chế độ này theo [hướng dẫn cấu hình](docs/ai-analysis.md#kiểm-duyệt-tự-động).
+   Sự cố dịch vụ giữ bài chờ. Admin có thể yêu cầu AI phân tích lại, còn quyết định luôn do hệ thống lưu.
+   Bật Gemini và xem hai ngưỡng theo [hướng dẫn cấu hình](docs/ai-analysis.md#kiểm-duyệt-tự-động).
 3. **Bổ sung:** chủ bài bị từ chối sửa hồ sơ, đánh dấu gỡ media cũ, thêm media và gửi duyệt lại.
    Lưu hồ sơ theo bài, giữ media/quyết định/PDF của vòng trước. Bài đã duyệt rời danh sách kiểm duyệt.
 4. **Kích hoạt:** chủ sách đặt lịch tương lai cho đúng phiên đã duyệt. Phê duyệt chưa tự mở đấu giá.
@@ -189,6 +189,7 @@ Tất cả lệnh dưới chạy ở gốc repository; danh sách lấy từ [pa
 
 Smoke cần giữ `dev:all` ở terminal thứ nhất, chạy lệnh ở terminal thứ hai. Các smoke tạo/dọn fixture
 UUID riêng; FAIL hoặc pending chưa rõ có thể giữ fixture để đối soát. Không chạy song song các smoke.
+M4/M5/M6/M8 cần [môi trường fixture riêng](docs/ai-analysis.md#kiểm-tra-và-nghiệm-thu).
 Cách bật test SQL/Redis riêng và checklist nghiệm thu: [VALIDATION.md](VALIDATION.md).
 
 ## Tài liệu

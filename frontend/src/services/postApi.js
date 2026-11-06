@@ -6,7 +6,6 @@ export const postApi={
   list:(mode,before,status)=>{const params=new URLSearchParams();if(before)params.set('before',before);if(mode==='pending')params.set('status',status||'all');return apiRequest(`/posts/${mode}${params.size?'?'+params:''}`);},
   detail:(id,publicOnly=false)=>apiRequest(`/posts/${publicOnly?'catalog/':''}${id}`),
   save:(body,id,mode)=>apiPost(id?`/posts/${id}/${mode}`:'/posts',body),
-  review:(id,body)=>apiPost(`/posts/${id}/review`,body),
   exportReview:(id,reviewId)=>apiPost(`/posts/${id}/reviews/${reviewId}/export`),
   activate:(id,body)=>apiPost(`/posts/${id}/activate`,body),
   config:()=>apiRequest('/media/config'),

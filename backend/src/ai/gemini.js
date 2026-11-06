@@ -4,7 +4,7 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {createGeminiFiles} from './files.js';
 import {prepareAiMedia} from './media.js';
 import {boundedBytes} from './transport.js';
-import {aiRequestTimeout} from '../config/ai.js';
+import {AI_MAX_RETRY_WAIT_MS,aiRequestTimeout} from '../config/ai.js';
 export {boundedBytes} from './transport.js';
 import {CRITERIA} from './criteria.js';
 import {analysisInput} from './input.js';
@@ -46,17 +46,21 @@ export function createGemini({config,fetchImpl=fetch,onHttpError,wait=delay}) {
   Viết bằng chứng ngắn gọn theo từng tiêu chí, tránh lặp lại mô tả sách. Không có công cụ tìm web; không nói đã truy cập nguồn. sources chỉ được lấy từ sourceUrls có trong dữ liệu; nguồn chỉ là gợi ý cần Admin xác minh, không tự chế URL. Tách lời người bán khỏi quan sát. Viết bằng tiếng Việt.`;
       const prompt={book,criteria:CRITERIA.map(({id,group,guide})=>({id,group,guide})),sourceUrls,media:manifest.map(({id,kind,sent,full_file,sampling,duration_seconds})=>({id,kind,sent,full_file,sampling,duration_seconds}))};
       parts.unshift({type:'text',text:JSON.stringify(prompt)});
-      const payload=JSON.stringify({model:config.model,input:parts,system_instruction:instruction,store:false,
+      const payload={input:parts,system_instruction:instruction,store:false,
         response_format:{type:'text',mime_type:'application/json',schema:OUTPUT_SCHEMA},generation_config:{max_output_tokens:8192,
-          ...(config.thinkingLevel&&config.thinkingLevel!=='default'?{thinking_level:config.thinkingLevel}:{})}});
+          ...(config.thinkingLevel&&config.thinkingLevel!=='default'?{thinking_level:config.thinkingLevel}:{})}};
       const attempts=config.maxAttempts||2;
+      let model=config.model;
+      execution.model=model;
       for(let attempt=1;attempt<=attempts;attempt++) {
         signal.throwIfAborted();execution.attempts=attempt;
         await progress({phase:'provider',attempt,max_attempts:attempts,media_completed:manifest.length,media_total:manifest.length,provider_timeout_ms:execution.provider_timeout_ms});
         const requestSignal=AbortSignal.any([signal,AbortSignal.timeout(execution.provider_timeout_ms)]),requestStarted=Date.now();
+        let retryAfter=null;
         try {
-          const response=await fetchImpl('https://generativelanguage.googleapis.com/v1beta/interactions',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':config.key},signal:requestSignal,body:payload});
+          const response=await fetchImpl('https://generativelanguage.googleapis.com/v1beta/interactions',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':config.key},signal:requestSignal,body:JSON.stringify({model,...payload})});
           if(!response.ok){
+            retryAfter=response.headers.get('retry-after');
             let body=null;try{body=JSON.parse((await boundedBytes(response,65536,requestSignal)).toString('utf8'));}catch(error){if(requestSignal.aborted)throw error;}
             if(onHttpError)try{onHttpError({http_status:response.status,message:diagnosticMessage(body?.error?.message,config.key)});}catch{}
             throw geminiHttpFailure(response.status,body);
@@ -66,18 +70,24 @@ export function createGemini({config,fetchImpl=fetch,onHttpError,wait=delay}) {
           if(!Array.isArray(data.steps))throw fail('AI_INVALID_RESPONSE');
           const text=data.steps.filter(step=>step?.type==='model_output').flatMap(step=>Array.isArray(step.content)?step.content:[]).filter(x=>x?.type==='text'&&typeof x.text==='string').map(x=>x.text).join('');
           const observations=JSON.parse(text);execution.provider_ms+=Date.now()-requestStarted;
-          return {observations,mediaIds,sourceUrls,warnings,manifest,providerModel:data.model||config.model,execution:{...execution,total_ms:Date.now()-started}};
+          return {observations,mediaIds,sourceUrls,warnings,manifest,providerModel:data.model||model,execution:{...execution,total_ms:Date.now()-started}};
         }catch(error){
           execution.provider_ms+=Date.now()-requestStarted;
           const failure=classify(error,signal);
           if(attempt>=attempts||signal.aborted||!retryable(failure))throw failure;
-          await progress({phase:'retry',attempt,max_attempts:attempts,media_completed:manifest.length,media_total:manifest.length,provider_timeout_ms:execution.provider_timeout_ms});
-          await wait(config.retryDelayMs??750+Math.floor(Math.random()*500),undefined,{signal});
+          const waitMs=retryWait(retryAfter,failure,config.retryDelayMs);
+          // Do not retry earlier than the server requested if it exceeds this job's wait budget.
+          if(waitMs>AI_MAX_RETRY_WAIT_MS)throw failure;
+          const fallback=Boolean(failure.code==='AI_PROVIDER_UNAVAILABLE'&&config.fallbackModel&&model!==config.fallbackModel);
+          await progress({phase:'retry',attempt,max_attempts:attempts,retry_delay_ms:waitMs,fallback,media_completed:manifest.length,media_total:manifest.length,provider_timeout_ms:execution.provider_timeout_ms});
+          await wait(waitMs,undefined,{signal});
+          if(fallback)model=config.fallbackModel;
+          execution.model=model;
         }
       }
     }catch(error){
       const failure=classify(error,signal);
-      failure.aiContext={media:prepared?.manifest||[],warnings:prepared?.warnings||[],execution:{...execution,total_ms:Date.now()-started}};
+      failure.aiContext={model:execution.model,media:prepared?.manifest||[],warnings:prepared?.warnings||[],execution:{...execution,total_ms:Date.now()-started}};
       throw failure;
     }finally{await files.cleanup();}
   }};
@@ -90,6 +100,11 @@ function classify(error,signal) {
   if(error instanceof SyntaxError)return fail('AI_INVALID_RESPONSE');
   if(error instanceof TypeError)return geminiFailure('AI_NETWORK_ERROR',{transport_code:error.cause?.code});
   return fail('AI_PROVIDER_ERROR');
+}
+function retryWait(header,failure,override) {
+  const hint=header&&/^\d+$/.test(header)?Number(header)*1000:header?Date.parse(header)-Date.now():0;
+  const local=override??(failure.code==='AI_PROVIDER_UNAVAILABLE'?3000:1000)+Math.floor(Math.random()*1000);
+  return Math.max(local,Number.isNaN(hint)?0:hint);
 }
 function retryable(error) {
   if(['AI_TIMEOUT','AI_PROVIDER_UNAVAILABLE'].includes(error.code))return true;

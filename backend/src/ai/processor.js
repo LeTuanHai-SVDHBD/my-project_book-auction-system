@@ -33,9 +33,9 @@ export function createAiProcessor({posts,model,queue,provider,locks,config,signa
           result=scoreObservations(response.observations,{mediaIds:response.mediaIds,sourceUrls:response.sourceUrls});
           const warnings=[...result.canh_bao,...response.warnings];if(warnings.length)result.trang_thai='chua_day_du';
           metadata={...base,model:response.providerModel,media:response.manifest,execution:safeAiExecution(response.execution),warnings};
-        }catch(error){assertOwnership();result={diem_do_hiem:null,diem_tinh_trang:null,trang_thai:'that_bai',chi_tiet:[]};metadata={...base,error_code:error.code||'AI_INVALID_RESPONSE',provider_error:safeAiDiagnostics(error.aiDiagnostics),
+        }catch(error){assertOwnership();result={diem_do_hiem:null,diem_tinh_trang:null,trang_thai:'that_bai',chi_tiet:[]};metadata={...base,model:error.aiContext?.model||base.model,error_code:error.code||'AI_INVALID_RESPONSE',provider_error:safeAiDiagnostics(error.aiDiagnostics),
           media:(error.aiContext?.media||[]).filter(item=>row.media?.some(source=>source.url===item.url&&source.kind===item.kind)),execution:safeAiExecution(error.aiContext?.execution),
-          warnings:[aiFailureMessage(error.code),automatic?'Chưa có quyết định. Hệ thống sẽ thử lại theo lịch.':'Phân tích thất bại; Admin có thể thử lại hoặc kiểm duyệt thủ công.']};}
+          warnings:[aiFailureMessage(error.code)]};}
         assertOwnership();
         cached=await queue.update(job,{state:'running',result,metadata});
       }

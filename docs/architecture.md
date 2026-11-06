@@ -31,7 +31,7 @@ transaction và khóa. Các policy/utility tách quy tắc giá, quyền, tiền
 | Probe | HTTP development → stream probe → worker → SQL SELECT → Redis result | Không ghi nghiệp vụ |
 | Đặt giá | HTTP → admission/stream → consumer → lease phiên → transaction SQL → publish → ACK | YeuCauDatGia và các thay đổi hợp lệ trong SQL |
 | Hết hạn | Job đọc giờ SQL → stream đấu giá → cùng processor/khóa phiên | Kết quả, giao dịch/chat nếu có người thắng |
-| AI | Worker quét hồ sơ chờ (hoặc Admin yêu cầu ở chế độ thủ công) → stream AI → worker chuẩn bị media/Gemini → kiểm tra/tính điểm → SQL | PhanTichAI, ChiTietPhanTichAI; KiemDuyet khi tự duyệt |
+| AI | API xếp hàng sau khi lưu, worker quét hồ sơ chờ để phục hồi → stream AI → worker chuẩn bị media/Gemini → kiểm tra/tính điểm → SQL | PhanTichAI, ChiTietPhanTichAI; KiemDuyet khi tự duyệt |
 | Hộp tin | GET hộp → đồng bộ nguồn đã COMMIT dưới khóa SQL → đọc ThongBao | Nội dung ngắn, nguồn UNIQUE và thời điểm đọc |
 
 HTTP 202 là tiếp nhận, chưa phải nghiệp vụ thành công. SQL receipt và UNIQUE bảo vệ replay;
@@ -86,9 +86,8 @@ Chi tiết tại [account-control.md](account-control.md).
 
 ## AI, video và nháp
 
-Khi bật tự duyệt, worker quét SQL để xếp bài chờ theo phiên bản, kể cả sau restart. Các lần đọc không tạo job.
-Khi tắt tự duyệt, chỉ Admin yêu cầu phân tích. Worker không quét
-pending để tự chạy. Job auto tồn từ bản cũ được bỏ qua; phân tích SQL đã lưu vẫn giữ lịch sử.
+API xếp hàng sau khi lưu bài. Worker quét SQL để phục hồi bài chờ theo phiên bản, kể cả sau restart.
+Các lần đọc không tạo job. Yêu cầu phân tích lại của Admin dùng cùng hàng đợi và khóa chống trùng.
 Ảnh có ngân sách inline 12 MiB; video tải tuần tự, upload Files API, chờ ACTIVE rồi tham chiếu URI.
 Không cắt ở phút thứ 5; Gemini vẫn lấy mẫu và chịu quota/model/deadline. Thử xóa file Google khi xong,
 không lưu URI tạm vào SQL. Backend tính hai điểm độc lập, NULL khi thiếu chứng cứ. Ở chế độ tự duyệt, điểm và quyết định cập nhật cặp trạng thái bài/phiên trong một transaction.

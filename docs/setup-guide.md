@@ -74,7 +74,8 @@ Dùng cùng hostname `127.0.0.1` khi mở web/API để dễ kiểm tra cookie; 
 | `SQLSERVER_VOLUME_NAME`, `REDIS_VOLUME_NAME` | Chọn named volume; máy có dữ liệu dùng đúng tên đã inspect |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Ba giá trị Backend để upload media |
 | `AI_ENABLED`, `GEMINI_API_KEY`, `GEMINI_MODEL` | Bật Gemini; khóa chỉ ở Backend |
-| `AI_AUTO_MODERATION`, `AI_MIN_RARITY_SCORE`, `AI_MIN_CONDITION_SCORE` | Bật tự duyệt với hai ngưỡng 1–100; xem [cấu hình](ai-analysis.md#kiểm-duyệt-tự-động) |
+| `AI_MIN_RARITY_SCORE`, `AI_MIN_CONDITION_SCORE` | Hai ngưỡng tự duyệt 1–100 (mặc định 70 mỗi nhóm); xem [cấu hình](ai-analysis.md#kiểm-duyệt-tự-động) |
+| `GEMINI_FALLBACK_MODEL` | Tuỳ chọn: model Gemini tương thích dùng cho lượt thử lại khi model chính trả 503 |
 
 Các biến giới hạn/thời gian chờ media và AI nằm ở [media-upload.md](media-upload.md) và
 [ai-analysis.md](ai-analysis.md). Không đặt Cloudinary secret, Gemini key hoặc session secret trong `VITE_*`.
@@ -122,8 +123,8 @@ npm.cmd run dev:all
 Nếu schema lạ, dừng và đối chiếu; không xóa database/volume để ép lệnh chạy.
 Schema đích đối chiếu [manifest](../backend/schema-manifest.json): 21 bảng, 166 cột, 100 CHECK, 15 UNIQUE.
 Migration 007 giữ hồ sơ theo bài và media lịch sử. Migration 008 liên kết quyết định tự duyệt với đúng lần phân tích; giữ các quyết định Admin đã lưu.
-Ctrl+F5 để lấy frontend mới. Kết quả AI đã lưu không tự thay đổi; muốn phân tích bằng cách gửi video mới
-thì worker sẽ xử lý theo lịch nếu bật tự duyệt; nếu đang chạy thủ công, Admin yêu cầu phân tích lại.
+Ctrl+F5 để lấy frontend mới. Khi Gemini đã bật, bài mới và hồ sơ gửi lại tự được xếp hàng.
+Với bài vẫn chờ vì lỗi kỹ thuật, Admin có thể yêu cầu phân tích lại.
 
 Nếu đang dùng tên Docker project/volume cũ, đọc [docker-migration.md](docker-migration.md).
 Không chạy `docker compose down -v`, không FLUSHDB, không đổi tên volume theo ví dụ khi chưa inspect mount thực tế.

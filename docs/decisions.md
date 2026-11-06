@@ -365,3 +365,10 @@ Không copy chat/bằng chứng/giá ẩn vào thông báo. Xem [ui-integration.
 Theo yêu cầu ngày 06/11/2026, có thể bật tự duyệt với hai ngưỡng cấu hình bắt buộc. Backend dùng điểm đã tính và bằng chứng, không lấy quyết định từ văn bản Gemini. Cả hai điểm đạt thì phê duyệt; không đủ điểm hoặc thiếu bằng chứng thì ghi lý do để bổ sung. Lỗi kỹ thuật giữ chờ và thử lại có giãn cách.
 
 SQL lưu phân tích, quyết định, snapshot và cập nhật trạng thái nguyên tử; quyết định tự duyệt có `phan_tich_id`, không gán Admin giả. Worker phục hồi bài chờ từ SQL, kiểm tra lại phiên bản và dùng receipt chống ghi lặp. Admin chỉ theo dõi khi bật tự duyệt; chế độ thủ công vẫn dùng được cho môi trường thử. Phê duyệt không kích hoạt phiên. Xem [cấu hình](ai-analysis.md#kiểm-duyệt-tự-động).
+
+### Cập nhật: tự duyệt trong luồng sử dụng bình thường
+
+API xếp hàng sau khi lưu bài; worker quét SQL làm đường phục hồi. Cờ `AI_AUTO_MODERATION` cũ không còn
+quyết định luồng này. Hai ngưỡng mặc định 70/100, vẫn cho phép cấu hình riêng. Admin chỉ yêu cầu phân tích
+lại bài đang chờ đã có một lần phân tích cùng phiên bản. Lỗi HTTP 503 được thử lại có giãn cách và có thể
+dùng model Gemini dự phòng đã cấu hình; lỗi dịch vụ không sinh quyết định từ chối.

@@ -64,7 +64,7 @@ hai vòng từ chối/gửi lại/phê duyệt, xuất đồng thời, quyền v
 Khi API/worker/SQL/Redis/Cloudinary đã sẵn sàng trên máy nhóm, `npm.cmd run smoke:m4`
 kiểm tra thêm xuất quyết định từ chối, giữ nguyên sau gửi lại, phê duyệt có bản riêng và quyền/CSRF.
 Lệnh vẫn upload/dọn media thử và chỉ thao tác fixture UUID; xem README trước khi chạy.
-AI không tự chạy từ bài thử: chỉ Admin POST yêu cầu mới tạo job. Xuất PDF không gọi Gemini;
+Smoke M4 dùng môi trường fixture riêng; xem [cấu hình test](ai-analysis.md#kiểm-tra-và-nghiệm-thu). Xuất PDF không gọi Gemini;
 smoke:m4 không thay kiểm chứng AI/video thật.
 
 Nghiệm thu giao diện: mở cả hai kết quả phê duyệt/từ chối, lưu PDF nhiều trang, bấm một link ảnh/video,

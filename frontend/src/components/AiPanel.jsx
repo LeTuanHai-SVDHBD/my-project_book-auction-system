@@ -99,7 +99,8 @@ export default function AiPanel({ post, user }) {
   }
   const analysis = data?.analysis,
     pending = ["queued", "running"].includes(data?.job?.state),
-    hasAttempt = Boolean(data?.analysis || data?.history?.length),
+    waiting = post.trang_thai_phien === "cho_kiem_duyet",
+    canRetry = admin && waiting && data?.can_retry && !pending,
     hasScores = analysis && analysis.trang_thai !== "that_bai";
   if (!visible) return null;
   return (
@@ -109,17 +110,13 @@ export default function AiPanel({ post, user }) {
     >
       {admin && <h3>AI hỗ trợ kiểm duyệt</h3>}
       <p className="field-hint">
-        {post.kiem_duyet_tu_dong || currentReview(post)?.phan_tich_id
-          ? "Hệ thống đối chiếu hai điểm độc lập với mức đạt của từng nhóm."
-          : "Hai điểm phục vụ tham khảo. Admin đối chiếu bằng chứng trước khi quyết định."}
+        Hệ thống đối chiếu hai điểm độc lập với mức đạt của từng nhóm.
       </p>
-      {admin && data && !data.configured && (
-        <p className="notice">
-          {post.kiem_duyet_tu_dong ? "AI chưa sẵn sàng. Bài đăng sẽ tiếp tục chờ." : "Gemini chưa sẵn sàng. Kiểm duyệt thủ công vẫn hoạt động."}
-        </p>
+      {admin && waiting && data && !data.configured && (
+        <p className="notice">AI chưa sẵn sàng. Bài đăng sẽ tiếp tục chờ.</p>
       )}
-      {admin && post.kiem_duyet_tu_dong && !pending && !analysis && data?.configured && (
-        <p><StatusBadge state="queued" /> Hệ thống tự bắt đầu khi đến lượt.</p>
+      {admin && waiting && !pending && !canRetry && data?.configured && (
+        <p role="status"><StatusBadge state="queued" /> Hệ thống tự phân tích khi đến lượt.</p>
       )}
       {admin && pending && (
         <p className="notice" role="status">
@@ -128,21 +125,15 @@ export default function AiPanel({ post, user }) {
             " Kết quả bên dưới thuộc lần phân tích trước; yêu cầu mới chưa hoàn tất."}
         </p>
       )}
-      {admin && !post.kiem_duyet_tu_dong && post.trang_thai_phien === "cho_kiem_duyet" && (
-        <button
-          className="primary"
-          type="button"
-          disabled={!data?.configured || pending || busy}
-          onClick={request}
-        >
-          {busy
-            ? "Đang gửi…"
-            : pending
-              ? "Đang phân tích…"
-              : hasAttempt
-                ? "Phân tích lại bằng AI"
-                : "Phân tích bằng AI"}
-        </button>
+      {canRetry && (
+        <div>
+          <p className="notice" role="status">
+            Chưa có quyết định cho hồ sơ này. Bạn có thể yêu cầu AI phân tích lại.
+          </p>
+          <button className="primary" type="button" disabled={busy} onClick={request}>
+            {busy ? "Đang gửi…" : "Phân tích lại bằng AI"}
+          </button>
+        </div>
       )}
       {admin && data?.history?.length > 0 && (
         <label className="ai-history-select">
@@ -167,18 +158,14 @@ export default function AiPanel({ post, user }) {
           {admin ? "Đang tải trạng thái AI…" : "Đang tải kết quả AI…"}
         </p>
       )}
-      {!analysis && !pending && data && (!admin || !post.kiem_duyet_tu_dong) && (
-        <p role="status">
-          {admin
-            ? "Chưa phân tích. Nhấn Phân tích bằng AI để bắt đầu; Admin vẫn có thể kiểm duyệt thủ công."
-            : "Chưa có kết quả AI phù hợp cho lần kiểm duyệt này. Vui lòng xem quyết định và lý do ở trên."}
-        </p>
+      {!admin && !analysis && data && (
+        <p role="status">Chưa có kết quả AI phù hợp cho lần kiểm duyệt này.</p>
       )}
       {analysis &&
         (!admin && analysis.trang_thai === "that_bai" ? (
           <p className="notice">
             AI chưa phân tích thành công. Vui lòng xem quyết định và lý do kiểm
-            duyệt của Admin.
+            duyệt ở trên.
           </p>
         ) : (
           <>

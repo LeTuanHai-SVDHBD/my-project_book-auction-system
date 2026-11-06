@@ -31,6 +31,28 @@ test('32 ảnh tổng 8 MiB tải tối đa 4 luồng, giữ thứ tự/ID, cùn
   const sent=JSON.parse(bodies[0]);assert.equal(sent.store,false);assert.equal(sent.generation_config.thinking_level,'low');assert.equal(sent.input.filter(x=>x.type==='image').length,32);assert(!bodies[0].includes('never-send-price'));
   assert.equal(result.execution.attempts,2);assert.equal(result.execution.provider_timeout_ms,188000);assert(progress.some(x=>x.phase==='retry'));
 });
+test('503 waits for Retry-After and can switch to a configured model without downloading media again',async()=>{
+  const requests=[],waits=[];let downloads=0;
+  const config={...base,fallbackModel:'gemini-fixture-fallback'};
+  const p=createGemini({config,wait:async ms=>waits.push(ms),fetchImpl:async(url,options)=>{
+    if(String(url).includes('res.cloudinary.com')){downloads++;return new Response(png,{headers:{'content-type':'image/png'}});}
+    requests.push(JSON.parse(options.body));
+    if(requests.length===1)return Response.json({error:{status:'UNAVAILABLE'}},{status:503,headers:{'Retry-After':'8'}});
+    return Response.json({status:'completed',steps:[{type:'model_output',content:[{type:'text',text:'{"criteria":[],"warnings":[]}'}]}]});
+  }});
+  const result=await p.analyze({media:media(1)},AbortSignal.timeout(1000));
+  assert.deepEqual(waits,[8000]);assert.equal(downloads,1);
+  assert.deepEqual(requests.map(x=>x.model),[base.model,config.fallbackModel]);
+  assert.deepEqual(requests[1],{...requests[0],model:config.fallbackModel});
+  assert.equal(result.providerModel,config.fallbackModel);
+});
+test('503 with a long Retry-After ends this job without a premature request',async()=>{
+  let calls=0;
+  const p=createGemini({config:{...base,fallbackModel:'gemini-fixture-fallback'},wait:()=>assert.fail('Wait exceeds the job retry budget'),fetchImpl:async()=>{
+    calls++;return Response.json({error:{status:'UNAVAILABLE'}},{status:503,headers:{'Retry-After':'30'}});
+  }});
+  await assert.rejects(p.analyze({},AbortSignal.timeout(1000)),{code:'AI_PROVIDER_UNAVAILABLE'});assert.equal(calls,1);
+});
 test('hết ngân sách không tiếp tục tải các nhóm sau; vẫn ghi đủ media bị bỏ qua',async()=>{
   const bytes=Buffer.alloc(32);png.copy(bytes);let downloads=0;
   const provider=createGemini({config:{...base,mediaMaxBytes:32},fetchImpl:async url=>{

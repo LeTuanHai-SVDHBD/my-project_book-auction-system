@@ -3,7 +3,7 @@
 # Phân tích AI và bộ chấm điểm
 
 Gemini đọc hồ sơ và trả quan sát có cấu trúc. Backend tính hai điểm độc lập theo quy tắc cố định.
-Ở chế độ tự duyệt, Backend dùng hai ngưỡng cấu hình để lưu quyết định và lý do. Admin theo dõi kết quả.
+Backend dùng hai ngưỡng cấu hình để tự lưu quyết định và lý do. Admin theo dõi và có thể yêu cầu phân tích lại khi chưa có quyết định.
 Bộ quy tắc `book-review-2026-10-v1` được định nghĩa trong
 [criteria.js](../backend/src/ai/criteria.js) và [scoring.js](../backend/src/ai/scoring.js).
 Tài liệu đối chiếu source ngày 06/11/2026; không thay thế thử chất lượng thẩm định bằng sách thật.
@@ -26,6 +26,7 @@ Mở `.env` ở thư mục gốc trên máy phát triển:
 AI_ENABLED=true
 GEMINI_API_KEY=YOUR_PRIVATE_KEY
 GEMINI_MODEL=gemini-3.8-flash
+GEMINI_FALLBACK_MODEL=
 AI_PROVIDER_TIMEOUT_MS=60000
 AI_PROVIDER_MAX_TIMEOUT_MS=300000
 AI_PROVIDER_MAX_ATTEMPTS=2
@@ -46,21 +47,20 @@ Khởi động lại API và worker sau khi đổi cấu hình:
 npm.cmd run dev:all
 ```
 
-`AI_ENABLED` bật provider. Chế độ mặc định cũ vẫn hoạt động nếu `AI_AUTO_MODERATION=false`: Admin yêu cầu phân tích và quyết định thủ công.
+`AI_ENABLED` bật Gemini. Nếu chưa bật hoặc thiếu key, bài vẫn chờ kiểm duyệt. Giá trị `AI_AUTO_MODERATION` cũ không còn điều khiển luồng bài đăng.
 
 ## Kiểm duyệt tự động
 
-Dừng `dev:all`, chạy `npm.cmd run db:migrate` sau khi SQL Server sẵn sàng, rồi điền hai ngưỡng đã chọn vào `.env`.
-Ví dụ cấu hình nếu chọn 70/100 cho mỗi nhóm:
+Nếu chưa có migration 008, dừng `dev:all` và chạy `npm.cmd run db:migrate` sau khi SQL Server sẵn sàng.
+Bật Gemini và có thể ghi đè ngưỡng trong `.env`:
 
 ```dotenv
 AI_ENABLED=true
-AI_AUTO_MODERATION=true
 AI_MIN_RARITY_SCORE=70
 AI_MIN_CONDITION_SCORE=70
 ```
 
-Hai ngưỡng là số nguyên từ 1 đến 100, bắt buộc khi bật tự duyệt; không có ngưỡng mặc định ngầm.
+Hai ngưỡng là số nguyên từ 1 đến 100, mặc định 70/100 mỗi nhóm nếu bỏ trống. Giá trị đã cấu hình được giữ nguyên.
 Giữ Gemini key hiện có và chạy lại `npm.cmd run dev:all` để API và worker dùng cùng cấu hình.
 
 | Kết quả phân tích | Quyết định tự động |
@@ -70,15 +70,16 @@ Giữ Gemini key hiện có và chạy lại `npm.cmd run dev:all` để API và
 | Phân tích hoàn tất nhưng một nhóm thiếu bằng chứng | Từ chối để người bán bổ sung; nhóm thiếu vẫn giữ NULL |
 | Lỗi Gemini, tải/xử lý media tạm thời hoặc chưa có cấu hình | Bài tiếp tục chờ; không sinh quyết định từ lỗi kỹ thuật |
 
-Worker quét tối đa 12 bài chờ mỗi lượt 10 giây, gồm bài mới, gửi lại, đăng lại và bài đang chờ từ trước.
+Sau khi SQL lưu bài mới, gửi lại hoặc đăng lại, API xếp hàng AI mà không chờ kết quả phân tích.
+Worker quét tối đa 12 bài chờ mỗi lượt 10 giây để phục hồi khi Redis lỗi và xử lý bài chờ từ trước.
 Redis gom job theo bài/phiên bản; khi mất Redis, worker tìm lại bài còn chờ trong SQL.
 Lượt lỗi đã lưu được thử lại cách ít nhất 5 phút, tối đa 3 lần phân tích đã lưu cho mỗi phiên bản trong cửa sổ 24 giờ.
 Bài đã quyết định không tự chấm lại. Mỗi vòng gửi lại dùng phiên bản mới.
 
 Migration 008 cho phép `KiemDuyet.admin_id` NULL khi có `phan_tich_id`; quyết định cũ giữ Admin và dữ liệu lịch sử.
 Điểm/chi tiết, trạng thái bài và phiên, quyết định, snapshot PDF và lịch sử được ghi cùng COMMIT sau kiểm tra phiên bản.
-Người bán nhận thông báo từ quyết định đã lưu, xem lý do và có thể bổ sung hồ sơ. Trong chế độ tự duyệt,
-hai POST yêu cầu phân tích và duyệt tay của Admin trả 409 `AUTO_MODERATION_ENABLED`.
+Người bán nhận thông báo từ quyết định đã lưu, xem lý do và có thể bổ sung hồ sơ.
+Duyệt tay trả 409 `AUTO_MODERATION_ENABLED`; POST phân tích lại được phép khi đã có lần phân tích cho phiên bản đang chờ.
 Điểm là đánh giá theo bằng chứng đã cung cấp, không chứng thực ấn bản hay chữ ký.
 
 
@@ -208,12 +209,17 @@ Giới hạn bao gồm cả đọc response body, nên phản hồi có headers 
 
 Tối đa `AI_PROVIDER_MAX_ATTEMPTS` lượt cho mỗi lần worker xử lý (1–2, mặc định 2),
 chỉ thử lại khi timeout, HTTP 408/500/502/503/504 hoặc lỗi mạng tạm thời thuộc allowlist.
-Chờ ngẫu nhiên 750–1.249 ms trước lượt tiếp theo; dùng lại payload/media đã chuẩn bị.
+HTTP 503 chờ khoảng 3–4 giây; các lỗi tạm thời khác chờ khoảng 1–2 giây. Nếu có `Retry-After`,
+đợi ít nhất theo header trong ngân sách tối đa 15 giây. Nếu yêu cầu đợi lâu hơn, kết thúc lượt phân tích
+thay vì gửi lại quá sớm trong cùng tác vụ. Dùng lại media đã chuẩn bị.
+Sau 503 có thể dùng `GEMINI_FALLBACK_MODEL` cho lượt còn lại nếu đã cấu hình một model Gemini
+khác có quyền sử dụng và hỗ trợ cùng media, schema và tham số. Không thêm lượt gọi ngoài giới hạn.
 Không thử lại lỗi khóa/quyền/billing/model, HTTP 400/401/402/403/404/429, DNS `ENOTFOUND`, TLS,
 JSON sai hoặc phản hồi chưa hoàn tất. Lượt lỗi cũng có thể tốn quota/chi phí; không retry vô hạn.
 
 Deadline toàn job = giới hạn chuẩn bị ảnh + giới hạn chuẩn bị/video × giới hạn số video
-+ giới hạn mỗi lượt provider × số lượt + 10 giây dự phòng (mặc định 1555 giây, là trần cho ba video).
++ giới hạn mỗi lượt provider × số lượt + 15 giây cho mỗi khoảng đợi thử lại + 10 giây dự phòng
+(mặc định 1570 giây, là trần cho ba video).
 Số video đọc theo MEDIA_MAX_VIDEOS, tối đa 5; deadline job hoặc worker dừng sẽ hủy yêu cầu đang chạy.
 `AI_THINKING_LEVEL=low` giảm mức suy luận cho tác vụ trích xuất; có thể đặt `default` để bỏ tham số
 nếu model khác không hỗ trợ. Giữ `max_output_tokens=8192`, vì hạ giới hạn output có thể cắt cả phần suy luận
@@ -239,7 +245,8 @@ Mất lease hoặc worker dừng thì hủy provider, để stream pending cho p
 Kiểm tra quyền sở hữu lại trước khi cache và ngay trước COMMIT SQL.
 Con trỏ job theo bài và dữ liệu job có TTL 24 giờ, tránh hết con trỏ khi nhiều bài đang xếp hàng.
 SQL khóa bài/phiên, kiểm tra lại pending/version rồi lưu một PhanTichAI và các ChiTietPhanTichAI trong cùng transaction.
-Không sửa trạng thái bài/phiên. Nếu Admin đã duyệt/từ chối hoặc chủ sách gửi lại dữ liệu mới, bỏ kết quả đến muộn.
+Nếu đủ căn cứ, cùng transaction đó lưu quyết định và cập nhật bài/phiên. Nếu bài đã có quyết định
+hoặc chủ sách gửi lại dữ liệu mới, bỏ kết quả đến muộn.
 
 Dùng hai bảng đã có, không thêm cột. Một chi tiết nhóm `khac` chứa metadata có phiên bản:
 request UUID, hash đầu vào, source version, model, bộ quy tắc, media đã gửi/bỏ qua, cảnh báo/mã lỗi.
@@ -249,31 +256,28 @@ UI tách metadata khỏi chín tiêu chí. Mỗi lần phân tích là một b�
 Hash/version giúp đánh dấu kết quả thuộc dữ liệu cũ; dữ liệu lịch sử chưa có metadata vẫn xem được, có cảnh báo.
 
 Lỗi provider được lưu trạng thái `that_bai`, cả hai điểm NULL; thiếu dữ liệu là `chua_day_du`.
-Tự duyệt thử lại lỗi kỹ thuật theo lịch hữu hạn trong mỗi cửa sổ 24 giờ. Ở chế độ thủ công, Admin có thể yêu cầu phân tích lại.
+Worker thử lại lỗi kỹ thuật theo lịch hữu hạn trong mỗi cửa sổ 24 giờ. Admin có thể yêu cầu phân tích lại
+phiên bản hiện tại đang chờ; Redis gom trùng yêu cầu khi đã có job chạy.
 Lỗi SQL giữ stream pending, có thể reclaim sau ba phút; lease còn sống vẫn chặn xử lý trùng.
 Khi worker chết, chờ lease hết hạn và lượt reclaim tiếp theo để xử lý lại. Replay sau SQL COMMIT tìm receipt trước và không ghi/gọi lại.
 Cache kết quả giúp retry SQL không tốn thêm lượt Gemini khi cache còn tồn tại.
 Crash trước khi cache hoặc mất Redis có thể gọi provider lại; không cam kết gọi Gemini đúng một lần.
-Kết quả đã lưu SQL vẫn đọc được khi Redis mất dữ liệu. Chế độ tự duyệt sẽ xếp lại bài còn chờ; chế độ thủ công cần yêu cầu mới.
+Kết quả đã lưu SQL vẫn đọc được khi Redis mất dữ liệu. Worker sẽ xếp lại bài còn chờ.
 
 ## Quyền và giao diện
 
-| Trạng thái (chế độ thủ công) | Hiển thị |
+| Trạng thái | Hiển thị |
 |---|---|
-| Chưa có lần phân tích | “Chưa phân tích”, nút **Phân tích bằng AI**, chưa có hai ô điểm |
-| Yêu cầu đang queued/running | Thông báo tiến độ, nút **Đang phân tích…** bị khóa; nếu có kết quả trước thì ghi rõ đó là lần trước |
-| Đã phân tích, đủ hoặc thiếu bằng chứng | Hiện hai điểm độc lập; NULL mới hiển thị “Chưa đủ dữ liệu” và lý do; nút **Phân tích lại bằng AI** |
-| Lỗi provider/timeout | Hiện **Phân tích thất bại**, chẩn đoán và nút **Phân tích lại bằng AI**; không hiện hai ô NULL như thiếu bằng chứng |
+| Bài mới hoặc đang chạy | Hệ thống tự xếp hàng, Admin thấy tiến độ. |
+| Đã phân tích, còn chờ vì lỗi kỹ thuật | Có nút **Phân tích lại bằng AI** cho Admin khi không còn job đang chạy. |
+| Đã có quyết định | Hiện điểm và kết quả đã lưu. Nếu bị từ chối, ô chỉ đọc **Căn cứ và lý do kiểm duyệt** được điền từ kết quả của AI. |
 
-Ở chế độ tự duyệt, Admin xem tiến độ/lịch sử và kết quả, không có nút phân tích hoặc duyệt tay. Người bán chỉ nhận kết quả sau quyết định.
-
-- `GET /api/ai/:id?analysis=<id>`: chủ bài hoặc Admin; lần phân tích phải thuộc đúng bài.
-- `POST /api/ai/:id`: chỉ Admin khi tắt tự duyệt, đăng nhập + CSRF, body chỉ có `row_version` hiện tại; trả 202 khi xếp hàng.
-- Admin xem AI trong **Kiểm duyệt**, đọc lại mỗi ba giây, có tiến độ chuẩn bị ảnh/video, lượt chờ Gemini/thử lại, kết quả, chẩn đoán kỹ thuật, lịch sử và nút phân tích lại khi bài đang chờ duyệt. Nút yêu cầu phân tích chỉ có ở chế độ thủ công.
+- `GET /api/ai/:id?analysis=<id>`: chủ bài hoặc Admin; lần phân tích phải thuộc đúng bài. Admin nhận `can_retry` theo phiên bản bài hiện tại.
+- `POST /api/ai/:id`: Admin + CSRF gửi `row_version` của bài đang chờ và đã có lần phân tích hợp lệ cho phiên bản này; trả 202 khi xếp hàng.
+- Admin xem tiến độ, lịch sử, chẩn đoán và kết quả tại **Kiểm duyệt**; không có nút từ chối hoặc phê duyệt tay.
 - Chủ bài đang chờ duyệt chỉ thấy tiến độ và lịch sử quyết định trước đó (nếu có), không hiện/gọi panel AI. Sau phê duyệt hoặc từ chối, quyết định/lý do hiện trước, phần **Kết quả AI tham khảo** thu gọn bên dưới. Gửi duyệt lại sẽ ẩn AI cho tới quyết định mới. Người mua/khách không có API phân tích riêng.
 - Backend cũng lọc `ai` trong chi tiết riêng và `GET /api/ai/:id`: người bán không nhận job/lịch sử phân tích chưa công bố hoặc mã lỗi provider. Chỉ công bố kết quả có hash đầu vào hiện tại và đúng `phan_tich_id` của quyết định tự duyệt. Quyết định thủ công cũ đối chiếu theo thời gian. Không đủ metadata/mốc thời gian thì báo chưa có kết quả phù hợp, không gán kết quả cũ vào lần mới. Query `analysis` của người bán chỉ nhận ID đã công bố hiện tại; Admin vẫn xem lịch sử riêng.
 - Người bán thấy hai điểm, lý do NULL, tiêu chí, bằng chứng, nguồn và phép tính của kết quả phù hợp. Nếu phân tích thất bại, hiện **AI chưa phân tích thành công. Vui lòng xem quyết định và lý do kiểm duyệt của Admin.**, không hiện `AI_TIMEOUT` hoặc hướng dẫn cấu hình. Không đổi cách tính điểm hay dữ liệu phân tích đã lưu.
-- Khi tắt tự duyệt, phê duyệt thủ công vẫn cần xác nhận đã đối chiếu bằng chứng quý hiếm.
 
 Khi đang chạy lại, kết quả cũ có nhãn rõ là lần trước, không nhầm với tiến độ mới.
 Admin xem được số media đã gửi và thời gian chờ; người bán không nhận các chẩn đoán này.
@@ -321,7 +325,7 @@ Không kết luận key sai hoặc tự đổi model chỉ từ `AI_PROVIDER_ERR
 Sau khi sửa nguyên nhân/cấu hình, khởi động lại `dev:all`, chạy lại `smoke:ai` để nghiệm thu toàn luồng.
 Nhà cung cấp/model và schema/bộ điểm giữ nguyên; cấu hình thời gian, mức suy luận và điều phối media được cập nhật như trên.
 Sau pull chạy `npm.cmd run setup:ai` rồi khởi động lại API/worker để nhận cấu hình. Script giữ key và giá trị `.env` cũ.
-Bản ghi `AI_TIMEOUT` đã lưu vẫn thuộc lần trước. Bài còn chờ sẽ thử lại theo lịch tự duyệt; ở chế độ thủ công, dùng **Phân tích lại bằng AI**. Không tự thay kết quả cũ hoặc chạy lại AI cho bài đã có quyết định.
+Bản ghi `AI_TIMEOUT` đã lưu vẫn thuộc lần trước. Bài còn chờ sẽ thử lại theo lịch; Admin có thể dùng **Phân tích lại bằng AI**. Không tự thay kết quả cũ hoặc chạy lại AI cho bài đã có quyết định.
 
 ## Kiểm tra và nghiệm thu
 
@@ -352,7 +356,9 @@ phân tích rồi lưu từ chối vì thiếu bằng chứng; smoke đối chi�
 smoke yêu cầu phân tích rồi ghi quyết định bằng Admin như trước. Chỉ dọn dữ liệu fixture; job chưa rõ hoàn tất
 thì giữ để đối soát. Redis job hết TTL, không FLUSHDB.
 Smoke này không thay nghiệm thu chất lượng thẩm định ảnh/video thật hoặc xác thực nguồn.
-Các smoke M4/M5/M6/M8 tạo bài thử bằng duyệt tay; chạy trên môi trường test có `AI_AUTO_MODERATION=false`.
+Các smoke M4/M5/M6/M8 tạo kết quả kiểm duyệt fixture để kiểm tra nghiệp vụ khác. Chạy chúng với
+API/worker test riêng ở `development`, `DB_DATABASE=BookAuctionTest_*` và `AI_TEST_MANUAL_REVIEW=true`
+trên cả terminal chạy dịch vụ và terminal chạy smoke. Không đặt cờ này trong môi trường dùng dữ liệu thật.
 
 Nghiệm thu thủ công: dùng sách có bộ ảnh đủ/thiếu, mở bằng chứng từng tiêu chí, tự tính lại hai tổng;
 thử một hồ sơ đạt cả hai ngưỡng, một hồ sơ không đạt, lỗi quota và gửi duyệt lại. Không dùng điểm AI đơn lẻ để kết luận sách thật/hiếm.

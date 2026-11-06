@@ -13,8 +13,10 @@ export function aiProgressMessage(job) {
   if(p.phase==='video_processing')return `Gemini đang chuẩn bị ${mediaId}; video dài có thể cần vài phút…`;
   if (p.phase === "media")
     return `Đang chuẩn bị ảnh/video: ${number(p.media_completed)}/${number(p.media_total)} tệp…`;
-  if (p.phase === "retry")
-    return `Gemini gặp lỗi tạm thời. Đang chuẩn bị thử lượt ${Math.min(attempt + 1, max)}/${max}…`;
+  if (p.phase === "retry") {
+    const wait = Math.ceil(number(p.retry_delay_ms) / 1000);
+    return `Gemini gặp lỗi tạm thời. Đợi ${wait} giây trước lượt ${Math.min(attempt + 1, max)}/${max}${p.fallback ? " bằng mô hình dự phòng" : ""}…`;
+  }
   if (p.phase === "provider")
     return `Đang chờ Gemini trả kết quả (lượt ${attempt}/${max}, tối đa ${seconds} giây/lượt)…`;
   return "Đang phân tích sách…";

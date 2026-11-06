@@ -23,7 +23,7 @@ test('status ignores legacy automatic jobs while retaining prior SQL analysis/hi
  const row={row_version:'0000000000000001',trang_thai_phien:'cho_kiem_duyet',ai:analysis};
  let job={trigger:'auto',source_version:row.row_version,state:'queued',analysis_id:99};
  const service=createAiService({posts:{detail:async()=>row},model:{history:async()=>[{phan_tich_id:3}],get:()=>assert.fail('An old auto job cannot select a result')},config:{configured:true},queue:{status:async()=>job}});
- const previous=await service.status(7,{vai_tro:'admin'});assert.equal(previous.job,null);assert.equal(previous.analysis,analysis);assert.equal(previous.history[0].phan_tich_id,3);
+ const previous=await service.status(7,{vai_tro:'admin'});assert.equal(previous.job,null);assert.equal(previous.analysis.phan_tich_id,analysis.phan_tich_id);assert.equal(previous.analysis.thong_tin.error_code,analysis.thong_tin.error_code);assert.equal(previous.history[0].phan_tich_id,3);
  job={...job,trigger:'manual',analysis_id:null};const active=await service.status(7,{vai_tro:'admin'});assert.equal(active.job.state,'queued');
  job={...job,source_version:'0000000000000002'};assert.equal((await service.status(7,{vai_tro:'admin'})).job,null);
 });

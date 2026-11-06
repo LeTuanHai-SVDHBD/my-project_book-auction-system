@@ -24,17 +24,29 @@ test('NULL needs evidence, while provider/media outage stays pending',()=>{
   assert.equal(moderationDecision(partial,{media:[{sent:false,reason:'video_timeout'}]},thresholds),null);
   assert.equal(moderationDecision({...partial,trang_thai:'that_bai'}, {}, thresholds),null);
 });
-test('requires two explicit thresholds, with no default verdict policy',()=>{
-  assert.equal(parseAiConfig({}).autoModeration,null);
-  assert.throws(()=>parseAiConfig({AI_AUTO_MODERATION:'true'}),/AI_MIN_RARITY_SCORE/);
-  assert.throws(()=>parseAiConfig({AI_AUTO_MODERATION:'true',AI_MIN_RARITY_SCORE:'70',AI_MIN_CONDITION_SCORE:'101'}),/AI_MIN_CONDITION_SCORE/);
-  assert.deepEqual(parseAiConfig({AI_AUTO_MODERATION:'true',AI_MIN_RARITY_SCORE:'70',AI_MIN_CONDITION_SCORE:'75'}).autoModeration,thresholds);
+test('legacy false does not disable automatic moderation; only isolated smoke can exercise manual decisions',()=>{
+  assert.deepEqual(parseAiConfig({AI_AUTO_MODERATION:'false',AI_MIN_RARITY_SCORE:'',AI_MIN_CONDITION_SCORE:''}).autoModeration,{rarity:70,condition:70});
+  assert.throws(()=>parseAiConfig({AI_MIN_CONDITION_SCORE:'101'}),/AI_MIN_CONDITION_SCORE/);
+  assert.deepEqual(parseAiConfig({AI_MIN_RARITY_SCORE:'70',AI_MIN_CONDITION_SCORE:'75'}).autoModeration,thresholds);
+  assert.throws(()=>parseAiConfig({AI_TEST_MANUAL_REVIEW:'true',DB_DATABASE:'BookAuctionDB'}),/BookAuctionTest_/);
+  assert.throws(()=>parseAiConfig({AI_TEST_MANUAL_REVIEW:'true',NODE_ENV:'production',DB_DATABASE:'BookAuctionTest_Smoke'}),/development/);
+  assert.equal(parseAiConfig({AI_TEST_MANUAL_REVIEW:'true',DB_DATABASE:'BookAuctionTest_Smoke'}).autoModeration,null);
 });
-test('automatic mode rejects both Admin write endpoints at service boundary',async()=>{
-  const posts=createPostService({autoModeration:thresholds,model:{review:()=>assert.fail('manual review')}});
+test('submission enqueues after commit, never on replay, and keeps SQL success if Redis is down',async()=>{
+  let committed=false,found=null;const sent=[],logged=[];
+  const row={bai_dang_id:7,row_version:'0000000000000001',trang_thai_phien:'cho_kiem_duyet'};
+  const ai=createAiService({config:{configured:true,autoModeration:thresholds},posts:{detail:async id=>{assert(committed);return {...row,bai_dang_id:id};}},queue:{enqueue:async (source,trigger)=>{sent.push([source.bai_dang_id,trigger]);if(source.bai_dang_id===8)throw Error('Redis down');}}});
+  const posts=createPostService({autoModeration:thresholds,model:{findRequest:async()=>found,create:async()=>{committed=true;return {id:7};},resubmit:async()=>{committed=true;return {id:8};}},ledger:{claim:async()=>({items:[]}),bound:async()=>{}},enqueueReview:ai.enqueueSubmission,log:e=>logged.push(e.message)});
+  const input={requestId:randomUUID(),media:[]};
+  assert.deepEqual(await posts.create(1,input),{id:7});
+  found=7;assert.deepEqual(await posts.create(1,input),{id:7,replayed:true});
+  committed=false;assert.deepEqual(await posts.resubmit(1,8,input),{id:8});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(sent,[[7,'auto'],[8,'auto']]);assert.deepEqual(logged,['Redis down']);
+});
+test('automatic mode keeps the Admin decision endpoint blocked even if Gemini is disabled',async()=>{
+  const posts=createPostService({autoModeration:parseAiConfig({AI_ENABLED:'false'}).autoModeration,model:{review:()=>assert.fail('manual review')}});
   await assert.rejects(posts.review(2,1,{}),{code:'AUTO_MODERATION_ENABLED'});
-  const ai=createAiService({config:{autoModeration:thresholds},queue:{enqueue:()=>assert.fail('manual request')}});
-  await assert.rejects(ai.request(1,{vai_tro:'admin'},'fixture'),{code:'AUTO_MODERATION_ENABLED'});
 });
 test('scheduler deduplicates active versions and does not enqueue a changed round',async()=>{
   const rows=[1,2,3,4].map(bai_dang_id=>({bai_dang_id,row_version:'v1',trang_thai_phien:'cho_kiem_duyet'}));

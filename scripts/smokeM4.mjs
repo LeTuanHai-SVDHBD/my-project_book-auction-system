@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {config} from '../backend/src/config/env.js';
+import {parseAiConfig} from '../backend/src/config/ai.js';
 import {getPool,closeDatabase,sql} from '../backend/src/config/database.js';
 import {createPostModel} from '../backend/src/models/post.model.js';
 import {validatePost} from '../backend/src/services/postValidation.js';
@@ -28,6 +29,7 @@ const body=()=>({ma_yeu_cau:randomUUID(),sach:{ten_sach:`SMOKE M4 ${runId}`,tinh
 const provider=createCloudinary({config:parseMediaConfig(process.env)});
 try {
   assert.equal(config.mode,'development','Chỉ chạy smoke M4 trong NODE_ENV=development.');
+  assert.equal(parseAiConfig(process.env).autoModeration,null,'Chạy smoke này với API/worker test riêng: AI_TEST_MANUAL_REVIEW=true và DB_DATABASE=BookAuctionTest_*.');
   assert(parseMediaConfig(process.env).configured,'Cần điền Cloudinary trong .env trước.');
   const alice=new Client(),bob=new Client(),admin=new Client();
   check(await alice.call('/health/ready'),200);

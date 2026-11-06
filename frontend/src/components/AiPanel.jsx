@@ -85,6 +85,7 @@ export default function AiPanel({ post, user }) {
       const job = await apiPost(`/ai/${post.bai_dang_id}`, {
         row_version: post.row_version,
       });
+      ++sequence.current;
       setData((previous) => ({
         ...previous,
         job: { ...job, source_version: post.row_version },
@@ -92,7 +93,8 @@ export default function AiPanel({ post, user }) {
       setSelected("");
       await load("");
     } catch (failure) {
-      setError(failure.message);
+      if (failure.code === "AI_QUOTA_PAUSED") await load();
+      else setError(failure.message);
     } finally {
       setBusy(false);
     }
@@ -100,7 +102,8 @@ export default function AiPanel({ post, user }) {
   const analysis = data?.analysis,
     pending = ["queued", "running"].includes(data?.job?.state),
     waiting = post.trang_thai_phien === "cho_kiem_duyet",
-    canRetry = admin && waiting && data?.can_retry && !pending,
+    quotaPaused = admin && waiting && Boolean(data?.quota_resume_at),
+    canRetry = admin && waiting && data?.can_retry && !pending && !quotaPaused,
     hasScores = analysis && analysis.trang_thai !== "that_bai";
   if (!visible) return null;
   return (
@@ -115,10 +118,19 @@ export default function AiPanel({ post, user }) {
       {admin && waiting && data && !data.configured && (
         <p className="notice">AI chưa sẵn sàng. Bài đăng sẽ tiếp tục chờ.</p>
       )}
-      {admin && waiting && !pending && !canRetry && data?.configured && (
+      {quotaPaused && (
+        <p className="notice" role="status">
+          <StatusBadge state="quota_paused" /> Gemini đã trả HTTP 429. Bài vẫn chờ kiểm duyệt. {" "}
+          {data.quota_limited ? "Có thể yêu cầu phân tích lại từ " : "Hàng đợi sẽ tiếp tục từ "}
+          <time dateTime={new Date(data.quota_resume_at).toISOString()}>
+            {new Date(data.quota_resume_at).toLocaleString("vi-VN")}
+          </time>.
+        </p>
+      )}
+      {admin && waiting && !pending && !canRetry && !quotaPaused && data?.configured && (
         <p role="status"><StatusBadge state="queued" /> Hệ thống tự phân tích khi đến lượt.</p>
       )}
-      {admin && pending && (
+      {admin && pending && !quotaPaused && (
         <p className="notice" role="status">
           <StatusBadge state={data.job.state} /> {aiProgressMessage(data.job)}
           {analysis &&
@@ -128,7 +140,9 @@ export default function AiPanel({ post, user }) {
       {canRetry && (
         <div>
           <p className="notice" role="status">
-            Chưa có quyết định cho hồ sơ này. Bạn có thể yêu cầu AI phân tích lại.
+            {data.quota_limited
+              ? "Lần phân tích trước dừng vì hạn mức Gemini. Hãy kiểm tra hạn mức trước khi yêu cầu phân tích lại."
+              : "Chưa có quyết định cho hồ sơ này. Bạn có thể yêu cầu AI phân tích lại."}
           </p>
           <button className="primary" type="button" disabled={busy} onClick={request}>
             {busy ? "Đang gửi…" : "Phân tích lại bằng AI"}

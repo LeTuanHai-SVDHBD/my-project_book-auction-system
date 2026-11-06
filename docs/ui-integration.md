@@ -75,6 +75,7 @@ Bài từ chối có lý do/ngày gần nhất, mở để xem chi tiết; muố
 Bài đã phê duyệt rời danh sách này, quyết định/lịch sử vẫn giữ. Nút Về danh sách đưa về lưới thẻ.
 
 Bài mới tự phân tích sau khi lưu. Admin thấy tiến độ, kết quả hoặc lỗi; nút **Phân tích lại bằng AI** chỉ xuất hiện khi bài còn chờ, đã có lượt phân tích cùng phiên bản và không có job đang chạy.
+Khi Gemini trả 429, Admin thấy **Tạm dừng vì hạn mức** và giờ có thể thử lại. Trong thời gian chờ, giao diện ẩn nút thử lại và thông báo chuẩn bị media; bài vẫn ở danh sách chờ kiểm duyệt.
 Bài chờ ở màn hình chi tiết tự lấy lại kết quả mỗi 5 giây. AI tự ghi quyết định và điền ô chỉ đọc **Căn cứ và lý do kiểm duyệt** nếu từ chối. Chỉ kết quả phân tích không thất bại
 mới có hai ô điểm; NULL là thiếu bằng chứng, lỗi provider là thất bại/chẩn đoán riêng. Điểm `100.00` hiển thị `100/100`.
 Video có tiến độ lấy Cloudinary/chuyển Files/chờ ACTIVE; manifest giữ link gốc, cách gửi toàn tệp

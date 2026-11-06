@@ -5,6 +5,7 @@ import {randomUUID} from 'node:crypto';
 import {createClient} from 'redis';
 import {AI_QUEUE,createAiQueue} from '../src/ai/queue.js';
 import {ensureAiGroup,processAiMessage} from '../src/ai/consumer.js';
+import {createAiQuotaGate} from '../src/ai/quota.js';
 test('Redis AI: enqueue trùng chỉ một job, SQL lỗi giữ pending và reclaim an toàn', {skip:!process.env.AUTH_TEST_REDIS_URL,timeout:10000},async t=>{
   const client=createClient({url:process.env.AUTH_TEST_REDIS_URL,socket:{reconnectStrategy:false}});client.on('error',()=>{});await client.connect();const prefix=`bookauction:test:ai:${randomUUID()}:`,settings={...AI_QUEUE,prefix,stream:prefix+'events',group:prefix+'workers'};
   t.after(async()=>{try{const keys=await client.keys(prefix+'*');if(keys.length)await client.del(keys);}finally{client.destroy();}});
@@ -19,4 +20,15 @@ test('Redis AI: enqueue trùng chỉ một job, SQL lỗi giữ pending và recl
   const manual=await queue.enqueue(row);assert.notEqual(manual.requestId,auto.requestId);assert.equal(manual.trigger,'manual');
   assert.equal((await queue.enqueue(row)).requestId,manual.requestId);assert.equal((await queue.status(7)).trigger,'manual');
   const next=await queue.enqueue({...row,row_version:'0000000000000002'});assert.notEqual(next.requestId,jobs[0].requestId);
+  const stale=await queue.enqueue(row,'auto');
+  const retry=await queue.enqueue(row,'auto',19);
+  assert.notEqual(retry.requestId,stale.requestId);
+  assert.equal((await queue.enqueue(row,'auto',19)).requestId,retry.requestId);
+  assert.equal((await queue.enqueue(row,'auto')).requestId,retry.requestId);
+  const gate=createAiQuotaGate({getRedis:()=>client,apiKey:'fixture-gemini-key',prefix});
+  const otherGate=createAiQuotaGate({getRedis:()=>client,apiKey:'other-fixture-key',prefix});
+  const deadline=Date.now()+10000;
+  await Promise.all([gate.pauseUntil(deadline),gate.pauseUntil(deadline-5000)]);
+  assert.equal(await gate.until(),deadline);assert.equal(await otherGate.until(),0);
+
 });

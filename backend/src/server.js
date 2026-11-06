@@ -43,6 +43,7 @@ import {createCommunityRouter} from './routes/community.routes.js';
 import {parseAiConfig} from './config/ai.js';
 import {createAiModel} from './models/ai.model.js';
 import {createAiQueue} from './ai/queue.js';
+import {createAiQuotaGate} from './ai/quota.js';
 import {createAiService} from './services/ai.service.js';
 import {createAiRouter} from './routes/ai.routes.js';
 const authConfig = parseAuthConfig(process.env);
@@ -52,7 +53,7 @@ const sessionMiddleware = createSessionMiddleware(authConfig, new RedisStore({ c
 const mediaConfig = parseMediaConfig(process.env);
 const model = createPostModel({getPool,sql});
 const aiConfig=parseAiConfig(process.env);
-const aiService=createAiService({posts:model,model:createAiModel({getPool,sql}),queue:createAiQueue({getRedis:requireRedis}),config:aiConfig});
+const aiService=createAiService({posts:model,model:createAiModel({getPool,sql}),queue:createAiQueue({getRedis:requireRedis}),config:aiConfig,quota:createAiQuotaGate({getRedis:requireRedis,apiKey:aiConfig.key})});
 const aiRouter=createAiRouter({sessionMiddleware,users,service:aiService});
 const provider = createCloudinary({config:mediaConfig});
 const ledger = createMediaLedger({getRedis:requireRedis,provider,isReferenced:id=>model.isMediaReferenced(id),config:mediaConfig});

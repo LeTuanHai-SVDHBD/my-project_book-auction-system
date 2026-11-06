@@ -1,5 +1,6 @@
 /** Mã lỗi Gemini có hướng xử lý; chỉ giữ chẩn đoán thuộc allowlist, không lưu body/message từ provider. */
 import {HttpError} from '../middlewares/errorHandler.js';
+import {retryAfterMs} from './quota.js';
 const messages={
   AI_FILE_INVALID_RESPONSE:'Gemini Files API trả thông tin tệp không hợp lệ.',
   AI_FILE_PROCESSING_FAILED:'Gemini không xử lý được video. Kiểm tra định dạng/codec hoặc xuất lại video MP4.',
@@ -9,7 +10,7 @@ const messages={
   AI_BILLING_REQUIRED:'Gemini yêu cầu kiểm tra billing hoặc số dư của project. Không tự chạy lại liên tục.',
   AI_MODEL_NOT_FOUND:'Gemini không tìm thấy model/tài nguyên được yêu cầu. Kiểm tra GEMINI_MODEL và quyền truy cập của project.',
   AI_REQUEST_REJECTED:'Gemini từ chối đầu vào/cấu hình yêu cầu. Đối chiếu mã provider, tham số API và điều kiện project.',
-  AI_QUOTA_EXCEEDED:'Gemini đã chạm giới hạn lượt/token hoặc quota. Kiểm tra hạn mức project trước khi thử lại.',
+  AI_QUOTA_EXCEEDED:'Gemini đang giới hạn lượt gọi, token hoặc quota của project. Kiểm tra hạn mức trong Google AI Studio trước khi thử lại.',
   AI_PROVIDER_UNAVAILABLE:'Gemini tạm thời không phục vụ yêu cầu (HTTP 503). Có thể thử phân tích lại khi dịch vụ phục hồi.',
   AI_TIMEOUT:'Gemini chưa trả xong trong thời gian chờ sau các lượt thử của tác vụ. Xem số media/lượt gọi bên dưới. Có thể phân tích lại sau.',
   AI_JOB_TIMEOUT:'Tác vụ AI đã hết tổng thời gian xử lý. Chưa có kết quả hoàn tất; Admin có thể thử lại sau khi kiểm tra kết nối và dữ liệu media.',
@@ -36,7 +37,7 @@ export function safeAiExecution(value={}) {
     .filter(key=>Number.isSafeInteger(value?.[key])&&value[key]>=0&&value[key]<=86400000).map(key=>[key,value[key]]));
 }
 export function geminiFailure(code,details={}){const error=new HttpError(502,code,aiFailureMessage(code));error.aiDiagnostics=safeAiDiagnostics(details);return error;}
-export function geminiHttpFailure(status,body){
+export function geminiHttpFailure(status,body,retryAfter){
   const error=body?.error,normalize=value=>typeof value==='string'?value.toUpperCase():'';
   const candidates=[...(Array.isArray(error?.details)?error.details.map(x=>normalize(x?.reason)):[]),normalize(error?.code),normalize(error?.status)];
   const providerCode=candidates.find(x=>providerCodes.has(x));
@@ -44,7 +45,16 @@ export function geminiHttpFailure(status,body){
     :status===402||['PAYMENT_REQUIRED','BILLING_DISABLED'].includes(providerCode)?'AI_BILLING_REQUIRED'
     :status===403?'AI_ACCESS_DENIED':status===404?'AI_MODEL_NOT_FOUND':status===429?'AI_QUOTA_EXCEEDED'
     :[408,504].includes(status)?'AI_TIMEOUT':status===503?'AI_PROVIDER_UNAVAILABLE':status>=400&&status<500?'AI_REQUEST_REJECTED':'AI_PROVIDER_ERROR';
-  return geminiFailure(code,{http_status:status,provider_code:providerCode,field:error?.param});
+  const failure=geminiFailure(code,{http_status:status,provider_code:providerCode,field:error?.param});
+  if(code==='AI_QUOTA_EXCEEDED'){
+    const retryInfo=(Array.isArray(error?.details)?error.details:[]).filter(x=>x?.['@type']==='type.googleapis.com/google.rpc.RetryInfo');
+    const delayMs=retryInfo.reduce((max,x)=>{
+      const seconds=typeof x.retryDelay==='string'&&/^[0-9]+(?:\.[0-9]+)?s$/.test(x.retryDelay)?Number(x.retryDelay.slice(0,-1)):0;
+      return Math.max(max,Number.isFinite(seconds)?seconds*1000:0);
+    },0);
+    failure.aiRetryAfterMs=Math.max(delayMs,retryAfterMs(retryAfter));
+  }
+  return failure;
 }
 export function formatAiFailure(info={}){
   info=info||{};const diagnostics=safeAiDiagnostics(info.provider_error),parts=[info.error_code||'AI_PROVIDER_ERROR'];

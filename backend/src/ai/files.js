@@ -10,11 +10,8 @@ export function createGeminiFiles({ config, fetchImpl = fetch, wait = delay }) {
   const names = new Set(),
     headers = { "x-goog-api-key": config.key };
   async function json(response, signal) {
-    const body = JSON.parse(
-      (await boundedBytes(response, 65536, signal)).toString("utf8"),
-    );
-    if (!response.ok) throw geminiHttpFailure(response.status, body);
-    return body;
+    await check(response, signal);
+    return JSON.parse((await boundedBytes(response, 65536, signal)).toString("utf8"));
   }
   async function check(response, signal) {
     if (!response.ok) {
@@ -24,7 +21,7 @@ export function createGeminiFiles({ config, fetchImpl = fetch, wait = delay }) {
           (await boundedBytes(response, 65536, signal)).toString("utf8"),
         );
       } catch {}
-      throw geminiHttpFailure(response.status, body);
+      throw geminiHttpFailure(response.status, body, response.headers.get("retry-after"));
     }
   }
   return {

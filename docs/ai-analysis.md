@@ -73,7 +73,7 @@ Giữ Gemini key hiện có và chạy lại `npm.cmd run dev:all` để API và
 Sau khi SQL lưu bài mới, gửi lại hoặc đăng lại, API xếp hàng AI mà không chờ kết quả phân tích.
 Worker quét tối đa 12 bài chờ mỗi lượt 10 giây để phục hồi khi Redis lỗi và xử lý bài chờ từ trước.
 Redis gom job theo bài/phiên bản; khi mất Redis, worker tìm lại bài còn chờ trong SQL.
-Lượt lỗi đã lưu được thử lại cách ít nhất 5 phút, tối đa 3 lần phân tích đã lưu cho mỗi phiên bản trong cửa sổ 24 giờ.
+Lỗi kỹ thuật có thể thử lại cách ít nhất 5 phút, tối đa 3 lần phân tích đã lưu cho mỗi phiên bản trong cửa sổ 24 giờ. Lỗi 429 dùng quy tắc riêng bên dưới.
 Bài đã quyết định không tự chấm lại. Mỗi vòng gửi lại dùng phiên bản mới.
 
 Migration 008 cho phép `KiemDuyet.admin_id` NULL khi có `phan_tich_id`; quyết định cũ giữ Admin và dữ liệu lịch sử.
@@ -264,12 +264,20 @@ Cache kết quả giúp retry SQL không tốn thêm lượt Gemini khi cache c�
 Crash trước khi cache hoặc mất Redis có thể gọi provider lại; không cam kết gọi Gemini đúng một lần.
 Kết quả đã lưu SQL vẫn đọc được khi Redis mất dữ liệu. Worker sẽ xếp lại bài còn chờ.
 
+### Tạm dừng khi Gemini trả HTTP 429
+
+429 báo Gemini đang giới hạn yêu cầu. `TOO_MANY_REQUESTS` một mình không xác định giới hạn theo phút, token hay quota dài hơn. Worker dừng lượt hiện tại, không chuyển model để thử tiếp và không ghi quyết định duyệt/từ chối vì lỗi này. 429 từ Gemini Files API cũng dừng lượt trước khi gửi thêm video hoặc gọi phân tích.
+
+API và worker dùng một mốc tạm dừng trong Redis theo key Gemini, không lưu key thô. Nếu Gemini cung cấp `Retry-After` hoặc `RetryInfo`, lấy mốc dài hơn (tối thiểu 1 phút, tối đa 24 giờ); nếu không có, mặc định đợi 5 phút. Worker tạm dừng lấy việc AI; SQL vẫn nhận bài mới và lịch quét sẽ xếp lại sau khi hết thời gian chờ. Đấu giá và các luồng khác tiếp tục.
+
+Phiên bản bài có lần phân tích mới nhất lỗi 429 vẫn chờ kiểm duyệt và không được lịch nền tự chạy lại. Sau mốc tạm dừng, Admin kiểm tra hạn mức của project trong Google AI Studio rồi có thể bấm **Phân tích lại bằng AI**. Trong thời gian chờ, POST trả 429 `AI_QUOTA_PAUSED` và header `Retry-After`. Thời điểm này là mốc thử lại của ứng dụng; Gemini có thể vẫn chưa cấp lại quota. Không cần đăng lại bài hoặc đổi key chỉ để làm mới giao diện.
+
 ## Quyền và giao diện
 
 | Trạng thái | Hiển thị |
 |---|---|
 | Bài mới hoặc đang chạy | Hệ thống tự xếp hàng, Admin thấy tiến độ. |
-| Đã phân tích, còn chờ vì lỗi kỹ thuật | Có nút **Phân tích lại bằng AI** cho Admin khi không còn job đang chạy. |
+| Đã phân tích, còn chờ vì lỗi kỹ thuật | Có nút **Phân tích lại bằng AI** cho Admin khi không còn job đang chạy và đã qua thời gian tạm dừng nếu gặp 429. |
 | Đã có quyết định | Hiện điểm và kết quả đã lưu. Nếu bị từ chối, ô chỉ đọc **Căn cứ và lý do kiểm duyệt** được điền từ kết quả của AI. |
 
 - `GET /api/ai/:id?analysis=<id>`: chủ bài hoặc Admin; lần phân tích phải thuộc đúng bài. Admin nhận `can_retry` theo phiên bản bài hiện tại.

@@ -14,15 +14,15 @@ test('HTTP phân tích giữ quyền sở hữu/Admin, CSRF, version, key ở ba
   const authConfig=parseAuthConfig({SESSION_SECRET:'ai-http-fixture-only-'.repeat(4)}),sessionMiddleware=createSessionMiddleware(authConfig,new session.MemoryStore());
   const rows=[1,2,3].map(id=>({nguoi_dung_id:id,email:`a${id}@example.test`,ho_ten:'Fixture',vai_tro:id===3?'admin':'nguoi_dung'}));
   const users={findById:async id=>rows.find(x=>x.nguoi_dung_id===id),findByEmail:async email=>rows.find(x=>x.email===email)};
-  let enqueued=0,active=null;
+  let enqueued=0,active=null,quotaUntil=0,lastRetryOf;
   const post={row_version:'0000000000000001',trang_thai_bai:'cho_kiem_duyet',trang_thai_phien:'cho_kiem_duyet',ai:null};
   const posts={detail:async(id,options)=>{if(id!==7||!options.admin&&options.owner!==1)throw new HttpError(404,'POST_NOT_FOUND','Không tìm thấy.');return post;}};
-  const config={configured:true,autoModeration:{rarity:70,condition:70},key:'never-send-this-secret'},service=createAiService({posts,config,model:{history:async()=>[],get:async()=>null},queue:{status:async()=>active,enqueue:async(row,trigger)=>{assert.equal(trigger,'auto');enqueued++;return {requestId:'fixture',state:'queued'};}}});
+  const config={configured:true,autoModeration:{rarity:70,condition:70},key:'never-send-this-secret'},service=createAiService({posts,config,quota:{until:async()=>quotaUntil},model:{history:async()=>[],get:async()=>null},queue:{status:async()=>active,enqueue:async(row,trigger,retryOf)=>{assert.equal(trigger,'auto');lastRetryOf=retryOf;enqueued++;return {requestId:'fixture',state:'queued'};}}});
   const authRouter=createAuthRouter({authConfig,sessionMiddleware,users,passwords:{verify:async()=>true},limiter:{consume:async()=>0}}),aiRouter=createAiRouter({sessionMiddleware,users,service});
   const server=createServer(createApp({config:{mode:'development',origins:[],probeToken:'x'},deps:{},probes:{},authRouter,aiRouter}));await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(async()=>{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));});
   const base=`http://127.0.0.1:${server.address().port}/api`;
-  function client(){return {cookie:'',token:'',async call(path,method='GET',body,csrf=true){const response=await fetch(base+path,{method,headers:{cookie:this.cookie,...(body?{'Content-Type':'application/json'}:{}),...(csrf?{'x-csrf-token':this.token}:{})},body:body?JSON.stringify(body):undefined});for(const value of response.headers.getSetCookie())this.cookie=value.split(';')[0];const data=await response.json();if(data.csrfToken)this.token=data.csrfToken;return {status:response.status,data};},async login(id){await this.call('/auth/csrf');await this.call('/auth/login','POST',{email:`a${id}@example.test`,mat_khau:'fixture-password'});}};}
+  function client(){return {cookie:'',token:'',async call(path,method='GET',body,csrf=true){const response=await fetch(base+path,{method,headers:{cookie:this.cookie,...(body?{'Content-Type':'application/json'}:{}),...(csrf?{'x-csrf-token':this.token}:{})},body:body?JSON.stringify(body):undefined});for(const value of response.headers.getSetCookie())this.cookie=value.split(';')[0];const data=await response.json();if(data.csrfToken)this.token=data.csrfToken;return {status:response.status,data,retryAfter:response.headers.get('retry-after')};},async login(id){await this.call('/auth/csrf');await this.call('/auth/login','POST',{email:`a${id}@example.test`,mat_khau:'fixture-password'});}};}
   const guest=client(),owner=client(),other=client(),admin=client();await owner.login(1);await other.login(2);await admin.login(3);
   assert.equal((await guest.call('/ai/7')).status,401);assert.equal((await other.call('/ai/7')).status,404);
   const status=await owner.call('/ai/7');assert.equal(status.status,200);assert.equal(status.data.analysis,null);assert(!JSON.stringify(status).includes(config.key));
@@ -43,6 +43,19 @@ test('HTTP phân tích giữ quyền sở hữu/Admin, CSRF, version, key ở ba
   assert.equal((await admin.call('/ai/7','POST',{row_version:post.row_version})).status,202);assert.equal(enqueued,1);
   active={trigger:'auto',state:'running',source_version:post.row_version};
   assert.equal((await admin.call('/ai/7')).data.can_retry,false);active=null;
+  const previousInfo=post.ai.thong_tin,until=Date.now()+120000;
+  post.ai.thong_tin={...previousInfo,error_code:'AI_QUOTA_EXCEEDED',retry_not_before:until};
+  quotaUntil=until+60000;
+  let status429=await admin.call('/ai/7');assert.equal(status429.data.can_retry,false);assert.equal(status429.data.quota_resume_at,quotaUntil);
+  let paused=await admin.call('/ai/7','POST',{row_version:post.row_version});
+  assert.equal(paused.status,429);assert.equal(paused.data.error,'AI_QUOTA_PAUSED');assert(Number(paused.retryAfter)>0);assert.equal(enqueued,1);
+  quotaUntil=0;
+  status429=await admin.call('/ai/7');assert.equal(status429.data.quota_resume_at,until);assert.equal(status429.data.can_retry,false);
+  assert(!Object.hasOwn((await owner.call('/ai/7')).data,'quota_resume_at'));
+  post.ai.thong_tin.retry_not_before=Date.now()-1000;
+  status429=await admin.call('/ai/7');assert.equal(status429.data.quota_limited,true);assert.equal(status429.data.can_retry,true);
+  assert.equal((await admin.call('/ai/7','POST',{row_version:post.row_version})).status,202);assert.equal(lastRetryOf,10);assert.equal(enqueued,2);
+  post.ai.thong_tin=previousInfo;
   post.row_version='0000000000000002';
   assert.equal((await admin.call('/ai/7')).data.can_retry,false);
   assert.equal((await admin.call('/ai/7','POST',{row_version:post.row_version})).data.error,'AI_FIRST_ANALYSIS_AUTOMATIC');

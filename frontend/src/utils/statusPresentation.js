@@ -29,6 +29,7 @@ export const STATUS = Object.freeze({
   not_analyzed: entry('Chưa phân tích', 'slate', '—'),
   queued: entry('Đang chờ phân tích', 'amber', '◷'),
   running: entry('Đang phân tích', 'blue', '↻'),
+  quota_paused: entry('Tạm dừng vì hạn mức', 'orange', '◷'),
   thanh_cong: entry('Đã phân tích', 'green', '✓'),
   chua_day_du: entry('Phân tích chưa đầy đủ', 'orange', '!'),
   that_bai: entry('Phân tích thất bại', 'red', '×'),

@@ -32,6 +32,7 @@ không liệt kê từng tài nguyên font hoặc từng bài test.
 | `src/services/moderationList.js`, `catalogSearch.js` | Bộ lọc/cursor kiểm duyệt, tìm kiếm/allowlist sắp xếp |
 | `src/services/cloudinary.service.js`, `mediaLedger.service.js`, `mediaErrors.js` | Upload/recovery/metadata, lifecycle vé, cleanup bảo vệ SQL và lỗi provider an toàn |
 | `src/services/auction.service.js`, `bidPolicy.js` | Admission/đọc quyết định và quy tắc giá/giờ/cooldown |
+| `src/ai/quota.js` | Mốc tạm dừng Redis cho API và worker khi Gemini trả 429 |
 | `src/services/ai.service.js`, `aiPresentation.js` | Xếp hàng khi lưu bài, Admin yêu cầu phân tích lại, đọc status/history và công bố đúng vòng cho người bán |
 | `src/services/community.service.js`, `communityPolicy.js` | Khiếu nại/media và quyền/liên kết giao dịch/chat/đánh giá |
 | `src/services/reviewExport.js` | Snapshot và lọc dữ liệu xuất kết quả |

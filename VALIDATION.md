@@ -2,6 +2,13 @@
 
 # Kiểm chứng và nghiệm thu
 
+## Tạm dừng khi Gemini báo 429
+
+- `npm run check`, `npm test` và `npm run build` đều đạt. Bộ test có 211 PASS, 12 SKIP (dịch vụ thật), 223 bài.
+- Fixture xác nhận 429 dừng lượt phân tích, không gọi model dự phòng; 429 khi upload video dừng các lượt gửi tiếp theo. Worker giữ bài chờ và không chạy lượt tự động cũ của cùng phiên bản.
+- HTTP test kiểm tra chặn nút thử lại qua API trong thời gian tạm dừng, header `Retry-After`, cho phép Admin thử lại sau thời hạn và không lộ chẩn đoán riêng cho người bán.
+- Chưa chạy Gemini, Redis hoặc SQL thật trong lần sửa này; không có migration mới.
+
 ## Tự xếp hàng kiểm duyệt và phục hồi Gemini 503
 
 - `npm run check`, `npm test` và `npm run build` đều đạt. Bộ test có 207 PASS, 12 SKIP (dịch vụ thật), 219 bài.

@@ -10,6 +10,7 @@ import {CRITERIA} from './criteria.js';
 import {analysisInput} from './input.js';
 import {bookReviewDescription} from '../../../shared/bookCondition.js';
 import {geminiFailure,geminiHttpFailure} from './errors.js';
+import {retryAfterMs} from './quota.js';
 const fail=geminiFailure;
 export const OUTPUT_SCHEMA={type:'object',additionalProperties:false,required:['criteria','warnings'],properties:{
   warnings:{type:'array',items:{type:'string'},maxItems:20},criteria:{type:'array',maxItems:9,items:{type:'object',additionalProperties:false,
@@ -63,7 +64,7 @@ export function createGemini({config,fetchImpl=fetch,onHttpError,wait=delay}) {
             retryAfter=response.headers.get('retry-after');
             let body=null;try{body=JSON.parse((await boundedBytes(response,65536,requestSignal)).toString('utf8'));}catch(error){if(requestSignal.aborted)throw error;}
             if(onHttpError)try{onHttpError({http_status:response.status,message:diagnosticMessage(body?.error?.message,config.key)});}catch{}
-            throw geminiHttpFailure(response.status,body);
+            throw geminiHttpFailure(response.status,body,retryAfter);
           }
           const data=JSON.parse((await boundedBytes(response,1048576,requestSignal)).toString('utf8'));
           if(data.status!=='completed')throw fail('AI_INCOMPLETE_RESPONSE');
@@ -102,9 +103,8 @@ function classify(error,signal) {
   return fail('AI_PROVIDER_ERROR');
 }
 function retryWait(header,failure,override) {
-  const hint=header&&/^\d+$/.test(header)?Number(header)*1000:header?Date.parse(header)-Date.now():0;
   const local=override??(failure.code==='AI_PROVIDER_UNAVAILABLE'?3000:1000)+Math.floor(Math.random()*1000);
-  return Math.max(local,Number.isNaN(hint)?0:hint);
+  return Math.max(local,retryAfterMs(header));
 }
 function retryable(error) {
   if(['AI_TIMEOUT','AI_PROVIDER_UNAVAILABLE'].includes(error.code))return true;

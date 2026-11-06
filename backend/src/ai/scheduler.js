@@ -1,6 +1,7 @@
 /** Recover pending submissions from SQL after a restart or a Redis outage. */
 import {setTimeout as delay} from 'node:timers/promises';
-export async function enqueueAutoReviews({posts,model,queue,signal,log=()=>{}}) {
+export async function enqueueAutoReviews({posts,model,queue,signal,quota,log=()=>{}}) {
+  if(quota&&await quota.until()>Date.now())return;
   for (const candidate of await model.autoCandidates()) {
     if (signal.aborted) break;
     try {

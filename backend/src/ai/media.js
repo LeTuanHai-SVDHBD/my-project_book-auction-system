@@ -191,6 +191,7 @@ export async function prepareAiMedia({
         });
       }
     } catch (error) {
+      if (error.code === "AI_QUOTA_EXCEEDED") throw error;
       const reason =
         videoSignal.aborted ||
         ["TimeoutError", "AbortError"].includes(error.name) ||
@@ -199,7 +200,6 @@ export async function prepareAiMedia({
           : [
                 "AI_KEY_INVALID",
                 "AI_ACCESS_DENIED",
-                "AI_QUOTA_EXCEEDED",
                 "AI_BILLING_REQUIRED",
               ].includes(error.code)
             ? "video_access"

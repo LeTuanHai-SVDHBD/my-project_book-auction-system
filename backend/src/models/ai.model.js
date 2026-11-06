@@ -1,8 +1,8 @@
 /** Ghi mỗi lần phân tích cùng chi tiết trong SQL; khóa bài/phiên, bảo vệ replay và đầu vào đã thay đổi. */
 import {META_CRITERION} from '../ai/criteria.js';
-import {encodeRowVersion} from '../utils/rowVersion.js';
+import {encodeRowVersion,withRowVersion} from '../utils/rowVersion.js';
 const changed=()=>Object.assign(new Error('AI_INPUT_CHANGED'),{code:'AI_INPUT_CHANGED'});
-export function createAiModel({getPool,sql}) {
+export function createAiModel({getPool,sql,commitReview}) {
   const request=target=>target.request?target.request():new sql.Request(target);
   async function find(job,target) {
     const rows=await request(target||await getPool()).input('post',sql.Int,job.postId).input('request',sql.VarChar(36),job.requestId).input('meta',sql.NVarChar(200),META_CRITERION)
@@ -11,6 +11,21 @@ export function createAiModel({getPool,sql}) {
     return rows.recordset[0]||null;
   }
   return {find,
+    async autoCandidates() {
+      const rows=await request(await getPool()).input('meta',sql.NVarChar(200),META_CRITERION).query(`
+        SELECT TOP(12) b.bai_dang_id,CONVERT(BINARY(8),p.row_version) AS row_version
+        FROM dbo.BaiDang b JOIN dbo.PhienDauGia p ON p.bai_dang_id=b.bai_dang_id
+        OUTER APPLY (SELECT COUNT(*) AS attempts,MAX(a.ngay_phan_tich) AS last_at
+          FROM dbo.PhanTichAI a JOIN dbo.ChiTietPhanTichAI c ON c.phan_tich_id=a.phan_tich_id AND c.tieu_chi=@meta
+          CROSS APPLY (SELECT CASE WHEN ISJSON(c.bang_chung)=1 THEN c.bang_chung ELSE N'{}' END AS payload) j
+          WHERE a.bai_dang_id=b.bai_dang_id AND a.ngay_phan_tich>=DATEADD(day,-1,SYSUTCDATETIME())
+            AND JSON_VALUE(j.payload,'$.trigger')='auto'
+            AND JSON_VALUE(j.payload,'$.source_version')=CONVERT(VARCHAR(16),p.row_version,2)) recent
+        WHERE b.trang_thai='cho_kiem_duyet' AND p.trang_thai='cho_kiem_duyet'
+          AND recent.attempts<3 AND (recent.last_at IS NULL OR recent.last_at<=DATEADD(minute,-5,SYSUTCDATETIME()))
+        ORDER BY b.bai_dang_id`);
+      return rows.recordset.map(withRowVersion);
+    },
     async history(postId) {
       return (await request(await getPool()).input('post',sql.Int,postId).query('SELECT TOP(20) phan_tich_id,diem_do_hiem,diem_tinh_trang,trang_thai,ngay_phan_tich FROM dbo.PhanTichAI WHERE bai_dang_id=@post ORDER BY phan_tich_id DESC')).recordset;
     },
@@ -19,7 +34,7 @@ export function createAiModel({getPool,sql}) {
       if(row)row.chi_tiet=(await request(pool).input('id',sql.Int,analysisId).query('SELECT tieu_chi,diem,bang_chung,do_tin_cay,canh_bao,nhom_tieu_chi,trang_thai_danh_gia,trong_so,nguon_doi_chieu FROM dbo.ChiTietPhanTichAI WHERE phan_tich_id=@id ORDER BY chi_tiet_id')).recordset;
       return row||null;
     },
-    async save(job,result,metadata,beforeCommit=async()=>{}) {
+    async save(job,result,metadata,beforeCommit=async()=>{},verdict=null) {
       const tx=new sql.Transaction(await getPool());let started=false,committing=false;
       try{
         await tx.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);started=true;
@@ -38,6 +53,7 @@ export function createAiModel({getPool,sql}) {
           await query.query(`INSERT dbo.ChiTietPhanTichAI(phan_tich_id,tieu_chi,diem,bang_chung,do_tin_cay,canh_bao,nhom_tieu_chi,trang_thai_danh_gia,trong_so,nguon_doi_chieu)
             VALUES(@analysis,@tieu_chi,@diem,@bang_chung,@do_tin_cay,@canh_bao,@group,@state,@trong_so,@nguon_doi_chieu)`);
         }
+        if(verdict)await commitReview(tx,{job,analysisId:saved.phan_tich_id,verdict});
         await beforeCommit();committing=true;await tx.commit();return {...saved,trang_thai:result.trang_thai};
       }catch(error){if(started&&!committing)try{await tx.rollback();}catch{}throw error;}
     }

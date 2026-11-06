@@ -1,5 +1,6 @@
 /** Điều phối upload/SQL: chỉ nhận vé của chủ sách, không gọi Cloudinary trong transaction. */
-export function createPostService({ model, ledger, limits, notify=async()=>{}, log=()=>{} }) {
+import {HttpError} from '../middlewares/errorHandler.js';
+export function createPostService({ model, ledger, limits, autoModeration=false, notify=async()=>{}, log=()=>{} }) {
   async function attach(owner,input,operation) {
     const claim=await ledger.claim(owner,input.media);
     try {
@@ -20,7 +21,10 @@ export function createPostService({ model, ledger, limits, notify=async()=>{}, l
       return attach(owner,input,items=>model.create({owner,input,sourceId,code,items,limits}));
     },
     resubmit: (owner,postId,input)=>attach(owner,input,items=>model.resubmit({owner,postId,input,items,limits})),
-    review: (admin,postId,input)=>model.review({admin,postId,input}),
+    async review(admin,postId,input) {
+      if(autoModeration)throw new HttpError(409,'AUTO_MODERATION_ENABLED','Bài đăng được kiểm duyệt tự động.');
+      return model.review({admin,postId,input});
+    },
     async activate(owner,postId,input) {
       const result=await model.activate({owner,postId,input});
       try{if(result.auctionId)await notify(result.auctionId);}catch(error){log(error,{component:'activation-notify'});}

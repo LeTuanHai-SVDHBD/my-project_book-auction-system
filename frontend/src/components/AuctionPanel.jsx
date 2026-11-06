@@ -1,3 +1,4 @@
+import StatusBadge from "./StatusBadge.jsx";
 /** Gửi giá và theo dõi quyết định; khi chưa rõ kết quả chỉ retry cùng mã, không báo thành công từ 202. */
 import {useCallback,useEffect,useRef,useState} from 'react';
 import MoneyInput from './MoneyInput.jsx';
@@ -10,6 +11,7 @@ import BidHistory from './BidHistory.jsx';
 const money=value=>value===null?'Chưa có lượt hợp lệ':`${BigInt(value).toLocaleString('vi-VN')} đ`;
 const reasons={AUCTION_NOT_ACTIVE:'Phiên không còn nhận giá.',AUCTION_NOT_STARTED:'Phiên chưa đến giờ bắt đầu.',AUCTION_EXPIRED:'Phiên đã hết thời gian.',
   BID_TOO_LOW:'Mức giá chưa đủ cao so với giá hiện tại.',INVALID_BID_STEP:'Mức giá không đúng bước giá.',BIDDER_NOT_ALLOWED:'Tài khoản không còn quyền đặt giá.'};
+const phaseBadges={scheduled:'scheduled',open:'live',closing:'closing',closed:'ended'};
 const terminal=receipt=>['da_chap_nhan','bi_tu_choi'].includes(receipt?.trang_thai);
 function suggested(snapshot) {
   if(!snapshot)return '';
@@ -87,10 +89,10 @@ export default function AuctionPanel({auctionId,user,onSnapshot}) {
   }
   function submit(event){event.preventDefault();if(!canBid)return;const data=new FormData(event.currentTarget);void send({ma_yeu_cau:crypto.randomUUID(),muc_gia:data.get('muc_gia')});}
   return <section className="auction-panel" aria-label="Đặt giá và kết quả phiên"><h3>Phiên đấu giá và kết quả</h3>
-    <p className="field-hint" role="status">{realtime==='live'?'Đã kết nối cập nhật trực tiếp.':realtime==='syncing'?'Đang lấy trạng thái mới nhất…':'Đang kết nối lại. Hệ thống sẽ tự cập nhật dữ liệu.'}</p>
-    {snapshot&&<><dl className="post-info"><dt>Giá mới nhất</dt><dd>{money(snapshot.gia_hien_tai)}</dd><dt>Trạng thái phiên</dt><dd>{snapshot.trang_thai==='da_ket_thuc'?'Đã kết thúc':'Đã kích hoạt'}</dd></dl>
+    <p className="field-hint" role="status"><StatusBadge state={realtime==='live'?'connected':realtime==='syncing'?'syncing':'reconnecting'}/> {realtime==='live'?'Đã kết nối cập nhật trực tiếp.':realtime==='syncing'?'Đang lấy trạng thái mới nhất…':'Đang kết nối lại. Hệ thống sẽ tự cập nhật dữ liệu.'}</p>
+    {snapshot&&<><dl className="post-info"><dt>Giá mới nhất</dt><dd>{money(snapshot.gia_hien_tai)}</dd><dt>Trạng thái phiên</dt><dd><StatusBadge state={phaseBadges[time.phase]||'syncing'}/></dd></dl>
       <p className="auction-timer">{time.phase==='scheduled'?`Bắt đầu sau ${duration(time.seconds)}`:time.phase==='open'?`Còn ${duration(time.seconds)}`:time.phase==='closing'?'Đã hết giờ, đang chờ máy chủ xác nhận kết quả.':time.phase==='closed'?'Phiên đã kết thúc.':'Đang đồng bộ thời gian phiên…'}</p>
-      {snapshot.ket_qua&&<div className="notice" role="status"><strong>{snapshot.ket_qua.trang_thai==='co_nguoi_thang'?'Phiên có người thắng':'Phiên kết thúc không có người thắng'}</strong>
+      {snapshot.ket_qua&&<div className="notice" role="status"><StatusBadge state={snapshot.ket_qua.trang_thai}/>
         {snapshot.ket_qua.muc_gia_thang!==null&&<p>Giá thắng: {money(snapshot.ket_qua.muc_gia_thang)}{snapshot.ket_qua.nguoi_thang_dau_id===user?.nguoi_dung_id?' · Bạn là người thắng.':''}</p>}
         <p>{snapshot.ket_qua.ly_do_ket_thuc==='dat_gia_toi_thieu'?'Đã đạt điều kiện kết thúc sớm.':snapshot.ket_qua.ly_do_ket_thuc==='het_thoi_gian'?'Đã hết thời gian đấu giá.':'Kết quả lịch sử.'}</p></div>}
       {isBidder&&snapshot.trang_thai==='da_kich_hoat'&&<>
@@ -106,9 +108,9 @@ export default function AuctionPanel({auctionId,user,onSnapshot}) {
       {!isBidder&&snapshot.trang_thai==='da_kich_hoat'&&<p className="notice">{user?'Tài khoản Admin xem phiên và kết quả.':'Đăng nhập tài khoản người dùng để đặt giá.'}</p>}</>}
     {snapshot&&<BidHistory auctionId={auctionId} items={snapshot.lich_su} nextBefore={snapshot.lich_su_truoc}/>}
     {attempt&&!availability?.la_chu_sach&&receipt?.ly_do!=='SELLER_CANNOT_BID'&&<div aria-live="polite"><p>Mức giá đã gửi: <strong>{money(attempt.muc_gia)}</strong></p>
-      {receipt?.trang_thai==='da_chap_nhan'?<p className="account-success" role="status">Mức giá đã được chấp nhận.</p>:
-        receipt?.trang_thai==='bi_tu_choi'?(receipt.ly_do==='BID_COOLDOWN'?null:<p className="error" role="status">Mức giá bị từ chối: {reasons[receipt.ly_do]||receipt.ly_do}</p>):
-        <p role="status">{busy?'Đang gửi yêu cầu…':checking?'Đang kiểm tra kết quả…':'Đang chờ xác nhận kết quả.'}</p>}
+      {receipt?.trang_thai==='da_chap_nhan'?<p className="account-success" role="status"><StatusBadge state="da_chap_nhan"/></p>:
+        receipt?.trang_thai==='bi_tu_choi'?(receipt.ly_do==='BID_COOLDOWN'?null:<p className="error" role="status"><StatusBadge state="bi_tu_choi"/> · {reasons[receipt.ly_do]||receipt.ly_do}</p>):
+        <p role="status"><StatusBadge state="bid_pending"/> {busy?'Đang gửi yêu cầu…':checking?'Đang kiểm tra kết quả…':'Đang chờ xác nhận kết quả.'}</p>}
       {!terminal(receipt)&&!busy&&<button type="button" disabled={checking} onClick={()=>send(attempt)}>Thử lại cùng yêu cầu</button>}
       {terminal(receipt)&&canBid&&!busy&&<button type="button" onClick={()=>{setAttempt(null);setReceipt(null);latestReceipt.current=null;setError('');}}>Nhập mức giá tiếp theo</button>}
     </div>}

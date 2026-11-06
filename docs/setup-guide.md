@@ -30,7 +30,7 @@ npm.cmd run admin:create
 npm.cmd run dev:all
 ```
 
-`db:init` tạo database nếu cần, chạy schema nền 001 và migration 002–007. Nó không phải lệnh reset dữ liệu;
+`db:init` tạo database nếu cần, chạy schema nền 001 và migration 002–008. Nó không phải lệnh reset dữ liệu;
 schema có sẵn chỉ được nâng cấp nếu thuộc chữ ký đã biết. `admin:create` nhập tên/email/mật khẩu kín
 (12–128 ký tự) trong terminal, không tự nâng quyền tài khoản thường có email trùng.
 Người dùng thường đăng ký trên web; không có mật khẩu Admin mặc định trong source.
@@ -73,7 +73,8 @@ Dùng cùng hostname `127.0.0.1` khi mở web/API để dễ kiểm tra cookie; 
 | `LOG_LEVEL` | `info` |
 | `SQLSERVER_VOLUME_NAME`, `REDIS_VOLUME_NAME` | Chọn named volume; máy có dữ liệu dùng đúng tên đã inspect |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Ba giá trị Backend để upload media |
-| `AI_ENABLED`, `GEMINI_API_KEY`, `GEMINI_MODEL` | AI tắt mặc định; mẫu model `gemini-3.8-flash`, khóa chỉ ở Backend |
+| `AI_ENABLED`, `GEMINI_API_KEY`, `GEMINI_MODEL` | Bật Gemini; khóa chỉ ở Backend |
+| `AI_AUTO_MODERATION`, `AI_MIN_RARITY_SCORE`, `AI_MIN_CONDITION_SCORE` | Bật tự duyệt với hai ngưỡng 1–100; xem [cấu hình](ai-analysis.md#kiểm-duyệt-tự-động) |
 
 Các biến giới hạn/thời gian chờ media và AI nằm ở [media-upload.md](media-upload.md) và
 [ai-analysis.md](ai-analysis.md). Không đặt Cloudinary secret, Gemini key hoặc session secret trong `VITE_*`.
@@ -117,12 +118,12 @@ npm.cmd run db:migrate
 npm.cmd run dev:all
 ```
 
-`db:migrate` áp dụng 002–007, giữ dữ liệu và có thể chạy lại. Không tự chạy 001 lên database đang có dữ liệu.
+`db:migrate` áp dụng 002–008, giữ dữ liệu và có thể chạy lại. Không tự chạy 001 lên database đang có dữ liệu.
 Nếu schema lạ, dừng và đối chiếu; không xóa database/volume để ép lệnh chạy.
-Schema đích đối chiếu [manifest](../backend/schema-manifest.json): 21 bảng, 165 cột, 99 CHECK, 15 UNIQUE.
-Migration 007 giữ Sach làm bản vật lý, thêm hồ sơ riêng theo bài và cờ media active; không xóa lịch sử.
+Schema đích đối chiếu [manifest](../backend/schema-manifest.json): 21 bảng, 166 cột, 100 CHECK, 15 UNIQUE.
+Migration 007 giữ hồ sơ theo bài và media lịch sử. Migration 008 liên kết quyết định tự duyệt với đúng lần phân tích; giữ các quyết định Admin đã lưu.
 Ctrl+F5 để lấy frontend mới. Kết quả AI đã lưu không tự thay đổi; muốn phân tích bằng cách gửi video mới
-thì Admin phải nhấn **Phân tích lại bằng AI**.
+thì worker sẽ xử lý theo lịch nếu bật tự duyệt; nếu đang chạy thủ công, Admin yêu cầu phân tích lại.
 
 Nếu đang dùng tên Docker project/volume cũ, đọc [docker-migration.md](docker-migration.md).
 Không chạy `docker compose down -v`, không FLUSHDB, không đổi tên volume theo ví dụ khi chưa inspect mount thực tế.
@@ -154,7 +155,7 @@ Các smoke nghiệp vụ và điều kiện chạy được liệt kê tại [RE
 | Tab cũ bị đăng xuất | Đúng chính sách khi tài khoản vừa đăng nhập nơi khác; F5 không giành lại phiên |
 | Cloudinary có tệp nhưng web báo lỗi | Đối soát theo public ID, chưa có vé thì không gắn vào bài; không upload lặp liên tục |
 | `1.jpg` bị từ chối | Tên không bị cấm; kiểm tra nội dung thực/codec/tệp hỏng, xem lỗi theo tên tệp |
-| AI chưa có kết quả | Bài mới chờ Admin yêu cầu; kiểm tra AI_ENABLED/key rồi nhấn phân tích |
+| AI chưa có kết quả | Kiểm tra worker và `AI_ENABLED`/key; nếu tự duyệt, kiểm tra hai ngưỡng và trạng thái lần phân tích gần nhất |
 | AI HTTP 503 | Lỗi dịch vụ provider; xem chẩn đoán, thử lại hữu hạn; không tự kết luận khóa sai |
 | Video M4 chưa gửi AI | Xem manifest/lý do, dung lượng video, Files API/deadline/quota; không tăng ngân sách ảnh để chữa video |
 | Nháp không còn media | Vé chưa gửi hết hạn sau 1 giờ; nội dung nháp và file đã gắn SQL có vòng đời khác |

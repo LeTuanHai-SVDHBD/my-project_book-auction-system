@@ -30,15 +30,15 @@ Client terminal không có selector dùng cookie chung; xem [account-control.md]
 2. Gửi thông tin sách/bài/giá và vé. Claim vé nguyên tử theo owner/trạng thái/tuổi vé.
 3. Transaction tạo Sach, BaiDang, hồ sơ theo bài, phiên pending, media và lịch sử. Chưa có lịch phiên.
 4. COMMIT rồi bind/dọn vé. Retry cùng UUID trả bài đã tạo của đúng chủ; rollback chắc chắn mới release vé.
-5. Admin có thể yêu cầu AI riêng hoặc kiểm duyệt thủ công. Quyết định/lý do/snapshot được lưu cùng transaction.
+5. Khi bật tự duyệt, worker đọc bài chờ và dùng hai điểm để quyết định. Quyết định/lý do/snapshot được lưu cùng transaction. Khi tắt tự duyệt, Admin có thể duyệt thủ công.
 6. Bị từ chối: chủ sách bổ sung hồ sơ/media rồi gửi duyệt lại. Phê duyệt: chủ sách mới đặt lịch/kích hoạt.
 7. Phiên kết thúc do hết hạn hoặc đạt ngưỡng. Có người thắng mới tạo giao dịch/phòng chat.
 
 | Thao tác | BaiDang.trang_thai | PhienDauGia.trang_thai |
 |---|---|---|
 | Đăng/gửi duyệt lại | `cho_kiem_duyet` | `cho_kiem_duyet` |
-| Admin từ chối | `tu_choi` | `khong_dat_kiem_duyet` |
-| Admin phê duyệt | `da_duyet` | `da_qua_kiem_duyet` |
+| Từ chối | `tu_choi` | `khong_dat_kiem_duyet` |
+| Phê duyệt | `da_duyet` | `da_qua_kiem_duyet` |
 | Chủ sách kích hoạt lịch | `da_duyet` | `da_kich_hoat` |
 | Kết thúc | `da_duyet` | `da_ket_thuc` |
 
@@ -56,7 +56,7 @@ Không có API hủy giữa phiên, kết thúc thủ công hoặc xóa bài. Ch
 | POST | `/posts` | Người dùng, tạo bài với UUID v4 |
 | POST | `/posts/:id/resubmit` | Chủ bài bị từ chối, row_version và dữ liệu bổ sung |
 | POST | `/posts/:id/relist` | Chủ sách đủ điều kiện đăng lại; tạo bài/phiên mới |
-| POST | `/posts/:id/review` | Admin, bài pending, version hiện tại, lý do; phê duyệt cần xác nhận bằng chứng |
+| POST | `/posts/:id/review` | Admin khi tắt tự duyệt, bài pending, version hiện tại, lý do; phê duyệt cần xác nhận bằng chứng |
 | POST | `/posts/:id/activate` | Chủ bài đã duyệt, lịch ISO có timezone và version |
 | POST | `/posts/:id/reviews/:reviewId/export` | Chủ bài + body `{}`; JSON snapshot để in/lưu PDF |
 | GET | `/media/config` | Giới hạn/định dạng công khai, không credentials |
@@ -95,18 +95,18 @@ Xem [media/nháp](media-upload.md) và [snapshot](review-exports.md).
 Không trộn pagination page và before. Bộ lọc/cursor sai trả 400. Danh sách thay đổi giữa hai lượt tải
 không là snapshot cố định; tải lại trang để xem hiện tại. Bài đã duyệt rời danh sách kiểm duyệt, lịch sử vẫn giữ.
 
-## 3. AI theo yêu cầu Admin
+## 3. Phân tích và kiểm duyệt AI
 
 | HTTP | Đường dẫn | Quyền / chức năng |
 |---|---|---|
 | GET | `/ai/:id` | Admin xem tiến độ/lịch sử; chủ bài chỉ nhận kết quả được công bố sau quyết định |
 | GET | `/ai/:id?analysis=:analysisId` | Admin chọn lịch sử đúng bài; người bán chỉ ID đã công bố hiện tại |
-| POST | `/ai/:id` | Admin + CSRF, body `{row_version}`; pending/version hiện tại; trả 202 |
+| POST | `/ai/:id` | Admin khi tắt tự duyệt + CSRF, body `{row_version}`; pending/version hiện tại; trả 202 |
 
-Không tự enqueue sau đăng/gửi lại, khi GET hoặc khi worker khởi động. Chỉ yêu cầu Admin tạo job manual;
+Ở chế độ tự duyệt, worker lấy bài chờ từ SQL; GET chỉ đọc. Khi tắt tự duyệt, chỉ yêu cầu Admin tạo job manual;
 job auto tồn từ bản cũ được bỏ qua. Worker chuẩn bị ảnh/video, gọi Gemini, kiểm tra JSON, Backend tính hai điểm
 và lưu SQL. Không đổi trạng thái bài/phiên. Thiếu bằng chứng giữ NULL; lỗi provider khác thiếu bằng chứng.
-Nút đầu tiên là **Phân tích bằng AI**, đang chạy bị khóa, sau một lần chạy là **Phân tích lại bằng AI**.
+Ở chế độ thủ công, nút đầu tiên là **Phân tích bằng AI**, đang chạy bị khóa, sau một lần chạy là **Phân tích lại bằng AI**.
 Chi tiết Files API/video dài, deadline, replay và quyền công bố: [ai-analysis.md](ai-analysis.md).
 
 ## 4. Đặt giá và kết thúc

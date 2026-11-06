@@ -2,9 +2,9 @@
 
 ## Cấu hình và dữ liệu
 
-Cập nhật theo [setup-guide.md](setup-guide.md), giữ cấu hình/volume và chạy migration 002–007.
-005 thêm KiemDuyet.ket_qua_snapshot cùng check JSON, không thêm bảng. 007 cho sửa hồ sơ sách theo bài
-và gỡ media active mà giữ lịch sử; schema đích **21 bảng/165 cột**. Không chạy lại DDL nền để xóa dữ liệu.
+Cập nhật theo [setup-guide.md](setup-guide.md), giữ cấu hình/volume và chạy migration 002–008.
+005 thêm snapshot JSON; 008 gắn quyết định tự duyệt với `phan_tich_id`, không thêm bảng. 007 cho sửa hồ sơ sách theo bài
+và gỡ media active mà giữ lịch sử; schema đích **21 bảng/166 cột**. Không chạy lại DDL nền để xóa dữ liệu.
 
 ## Cách dùng
 
@@ -58,7 +58,7 @@ npm.cmd run build
 `reviewExport.test.js` dùng model SQL fixture và HTTP/session/CSRF thật; `rowVersion.test.js`
 kiểm tra rollback quyết định khi ghi snapshot lỗi. Đây không phải bằng chứng SQL Server thật.
 `reviewExportSql.test.js` chỉ chạy khi `REVIEW_TEST_SQL=true` và database riêng có tên `BookAuctionTest_*`.
-Chuẩn bị đủ schema test 007 trước theo [VALIDATION](../VALIDATION.md); bộ test kiểm tra migration chạy lại,
+Chuẩn bị đủ schema test 008 trước theo [VALIDATION](../VALIDATION.md); bộ test kiểm tra migration chạy lại,
 hai vòng từ chối/gửi lại/phê duyệt, xuất đồng thời, quyền và dữ liệu cũ.
 
 Khi API/worker/SQL/Redis/Cloudinary đã sẵn sàng trên máy nhóm, `npm.cmd run smoke:m4`
@@ -75,3 +75,5 @@ Migration 007 cho phép sửa hồ sơ sách và gỡ media khỏi bài gửi du
 snapshot của quyết định hiện tại nếu còn thiếu; snapshot đã có không bị ghi đè. Media gỡ chỉ đổi cờ dùng cho
 hồ sơ mới, vẫn có hàng SQL và URL Cloudinary cho bản xuất vòng cũ. Vòng cũ hơn đã mất provenance/snapshot
 không được dựng ngược bằng dữ liệu mới. Chức năng xuất vẫn dùng snapshot, không tự gọi lại AI.
+
+Quyết định tự duyệt ghi rõ nguồn AI, điểm/ngưỡng và căn cứ từ chối trong snapshot. Bản PDF đọc đúng lần đã lưu, kể cả sau khi người bán bổ sung và gửi lại.

@@ -161,8 +161,7 @@ export default function Home() {
           <Icon name="shield" size={42} />
           <h2>Thông tin có căn cứ</h2>
           <p>
-            AI hỗ trợ phân tích. Admin đối chiếu bằng chứng và đưa ra quyết định
-            kiểm duyệt.
+            Hồ sơ được kiểm duyệt trước khi người bán đặt lịch đấu giá.
           </p>
         </div>
       </section>

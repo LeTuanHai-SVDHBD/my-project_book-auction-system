@@ -2,8 +2,8 @@
 import { Router } from 'express';
 import { requireUser,requireRole,requireCsrf } from '../middlewares/auth.js';
 import { createPostController } from '../controllers/post.controller.js';
-export function createPostRouter({sessionMiddleware,users,model,service,limits}) {
-  const router=Router(); const c=createPostController({model,service,limits});
+export function createPostRouter({sessionMiddleware,users,model,service,limits,aiConfig}) {
+  const router=Router(); const c=createPostController({model,service,limits,aiConfig});
   router.get('/catalog',c.catalog); router.get('/catalog/:id',c.publicDetail);
   router.use((req,res,next)=>{res.set('Cache-Control','no-store');next();},sessionMiddleware,requireUser(users));
   router.get('/mine',requireRole('nguoi_dung'),c.mine);

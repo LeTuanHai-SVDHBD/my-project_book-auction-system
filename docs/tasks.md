@@ -15,7 +15,7 @@ mọi bản sửa mới nhất; bằng chứng cụ thể và giới hạn xem [
 | Bản sách | Bốn bước, thể loại có danh mục, ISBN tùy chọn, mô tả chung, tiền nguyên, nháp theo tài khoản |
 | Media | Nhiều định dạng, nhận diện nội dung, vé Redis/Cloudinary, gỡ media mới/cũ đúng vòng, recovery và cleanup |
 | Kiểm duyệt | Chờ và từ chối trong danh sách Admin, quyết định có lý do, bổ sung đủ hồ sơ, snapshot/PDF |
-| AI | Admin chủ động yêu cầu, JSON/kiểm tra bằng chứng/hai điểm/NULL, lịch sử, Files API cho video dài |
+| AI | Tự duyệt theo hai ngưỡng cấu hình, lý do từ chối, JSON/hai điểm/NULL, lịch sử, Files API cho video dài |
 | Phiên | Chủ sách kích hoạt lịch; một bản vật lý, đăng lại có điều kiện, giữ lịch sử |
 | Giá/kết thúc | Admission/Streams, khóa/transaction/receipt, bước giá/cooldown, ngưỡng hoặc hết hạn, kết quả duy nhất |
 | Thời gian thực | Tín hiệu sau COMMIT, snapshot/reconnect/polling, đồng hồ SQL, trạng thái yêu cầu riêng |
@@ -30,14 +30,14 @@ Nghiệm thu bằng dữ liệu thật, đánh giá chất lượng AI và thử
 
 Các ô trống là **chưa ghi nhận bằng chứng mới cho lượt bàn giao này**, không phủ nhận xác nhận mốc trước đó.
 
-- [ ] Đúng nhánh; giữ `.env`/volume, Node 24.x; đã cập nhật dependency theo lockfile và migration 002–007.
-- [ ] SQL readiness **21 bảng/165 cột**; Docker healthy, API/worker chạy; probe hoàn tất.
+- [ ] Đúng nhánh; giữ `.env`/volume, Node 24.x; đã cập nhật dependency theo lockfile và migration 002–008.
+- [ ] SQL readiness **21 bảng/166 cột**; Docker healthy, API/worker chạy; probe hoàn tất.
 - [ ] Khách không có avatar/hộp tin; hai tài khoản khác nhau dùng hai tab được.
 - [ ] Login cùng tài khoản nơi mới thu hồi tab cũ; F5 không hồi sinh phiên cũ hoặc làm mất phiên mới.
 - [ ] Nhập tiền không lặp/chèn số, giữ 18 chữ số; thể loại, ISBN và mô tả lưu đúng.
 - [ ] Nháp giữ trường/bước/media khi chuyển route; upload tiếp tục; reload và hết hạn vé báo đúng.
 - [ ] Đăng sách với ảnh/video thật, mở lại sau gửi để đối chiếu tệp đã gắn SQL.
-- [ ] Bài mới chưa chạy AI; Admin yêu cầu → tiến độ → kết quả/lỗi đúng; không tự chạy khi reload.
+- [ ] Bật tự duyệt trên môi trường test: bài mới/gửi lại → tự phân tích → duyệt hoặc từ chối có căn cứ; lỗi dịch vụ giữ chờ.
 - [ ] Video >5 phút được gửi Files API; đối chiếu manifest/timestamp với nội dung thật, không coi “đã gửi” là chất lượng thẩm định đạt.
 - [ ] Từ chối → bổ sung đủ hồ sơ/gỡ-thay media → gửi lại → phê duyệt; lịch sử/PDF cũ giữ đúng dữ liệu.
 - [ ] Chủ sách kích hoạt lịch; người mua không nhận `gia_toi_thieu` qua API/snapshot/thông báo.

@@ -10,7 +10,7 @@ Một repository dùng npm workspaces, Node.js 24.x và JavaScript ES Modules. A
 | Thành phần | Trách nhiệm và kết nối |
 |---|---|
 | React/Vite | BookBid, biểu mẫu/nháp cục bộ, HTTP có cookie, Socket.IO công khai và namespace tài khoản |
-| Express API | Session/CSRF/quyền, validate HTTP, upload Cloudinary, admission đặt giá và yêu cầu AI |
+| Express API | Session/CSRF/quyền, validate HTTP, upload Cloudinary, admission đặt giá và đọc kết quả AI |
 | SQL Server | Tài khoản, sách/hồ sơ bài, phiên/receipt giá, kết quả/giao dịch, kiểm duyệt/AI, tương tác và thông báo |
 | Redis | Session, quyền phiên, rate limit, vé media, Streams, lease, Pub/Sub, probe và heartbeat |
 | Worker | Ba consumer probe/đấu giá/AI với kết nối BLOCK riêng; job chốt hạn độc lập |
@@ -31,7 +31,7 @@ transaction và khóa. Các policy/utility tách quy tắc giá, quyền, tiền
 | Probe | HTTP development → stream probe → worker → SQL SELECT → Redis result | Không ghi nghiệp vụ |
 | Đặt giá | HTTP → admission/stream → consumer → lease phiên → transaction SQL → publish → ACK | YeuCauDatGia và các thay đổi hợp lệ trong SQL |
 | Hết hạn | Job đọc giờ SQL → stream đấu giá → cùng processor/khóa phiên | Kết quả, giao dịch/chat nếu có người thắng |
-| AI | Admin POST có CSRF/version → stream AI → worker chuẩn bị media/Gemini → kiểm tra/tính điểm → SQL | PhanTichAI và ChiTietPhanTichAI |
+| AI | Worker quét hồ sơ chờ (hoặc Admin yêu cầu ở chế độ thủ công) → stream AI → worker chuẩn bị media/Gemini → kiểm tra/tính điểm → SQL | PhanTichAI, ChiTietPhanTichAI; KiemDuyet khi tự duyệt |
 | Hộp tin | GET hộp → đồng bộ nguồn đã COMMIT dưới khóa SQL → đọc ThongBao | Nội dung ngắn, nguồn UNIQUE và thời điểm đọc |
 
 HTTP 202 là tiếp nhận, chưa phải nghiệp vụ thành công. SQL receipt và UNIQUE bảo vệ replay;
@@ -39,7 +39,7 @@ không khẳng định transport xử lý/giao nhận đúng một lần.
 
 ## Mô hình dữ liệu
 
-[Manifest](../backend/schema-manifest.json) sau migration 007: **21 bảng/165 cột, 99 CHECK, 15 UNIQUE constraints**.
+[Manifest](../backend/schema-manifest.json) sau migration 008: **21 bảng/166 cột, 100 CHECK, 15 UNIQUE constraints**.
 
 | Nhóm | Bảng chính |
 |---|---|
@@ -53,11 +53,11 @@ Sach là bản vật lý/khóa ổn định để đăng lại. BaiDang.ho_so_sa
 chi tiết/tìm kiếm/giao dịch/AI dùng cùng phép gộp hồ sơ, fallback về Sach cho dữ liệu cũ.
 Gửi duyệt lại không ghi đè Sach/lịch sử phiên khác. HinhAnh/Video.dang_su_dung phân biệt tệp active
 với tệp đã gỡ khỏi hồ sơ mới, không DELETE hàng/file lịch sử.
-KiemDuyet.ket_qua_snapshot giữ sách/media/AI của đúng quyết định để xuất kết quả về sau.
+KiemDuyet.ket_qua_snapshot giữ sách/media/AI của đúng quyết định; migration 008 thêm `phan_tich_id` cho quyết định tự duyệt.
 
 FK bảo vệ tham chiếu, UNIQUE bảo vệ tối đa một kết quả/phiên, một giao dịch/kết quả, một phòng/giao dịch
 và một đánh giá/giao dịch. Chúng không tự tạo bản ghi bắt buộc; transaction nghiệp vụ thực hiện việc đó.
-Schema nền 001 được giữ; nâng cấp chạy 002–007, không reset database.
+Schema nền 001 được giữ; nâng cấp chạy 002–008, không reset database.
 
 ## Xác thực và quyền
 
@@ -86,11 +86,12 @@ Chi tiết tại [account-control.md](account-control.md).
 
 ## AI, video và nháp
 
-Bài mới/đăng lại/gửi duyệt lại và các lần đọc không tạo job AI. Chỉ Admin yêu cầu; worker không có vòng quét
+Khi bật tự duyệt, worker quét SQL để xếp bài chờ theo phiên bản, kể cả sau restart. Các lần đọc không tạo job.
+Khi tắt tự duyệt, chỉ Admin yêu cầu phân tích. Worker không quét
 pending để tự chạy. Job auto tồn từ bản cũ được bỏ qua; phân tích SQL đã lưu vẫn giữ lịch sử.
 Ảnh có ngân sách inline 12 MiB; video tải tuần tự, upload Files API, chờ ACTIVE rồi tham chiếu URI.
 Không cắt ở phút thứ 5; Gemini vẫn lấy mẫu và chịu quota/model/deadline. Thử xóa file Google khi xong,
-không lưu URI tạm vào SQL. Backend tính hai điểm độc lập, NULL khi thiếu chứng cứ; AI không đổi trạng thái bài/phiên.
+không lưu URI tạm vào SQL. Backend tính hai điểm độc lập, NULL khi thiếu chứng cứ. Ở chế độ tự duyệt, điểm và quyết định cập nhật cặp trạng thái bài/phiên trong một transaction.
 
 Nháp nằm trong localStorage theo tài khoản/chế độ/bài. Tác vụ upload sống ngoài component để tiếp tục qua
 điều hướng SPA; reload có thể ngắt lượt chưa xong. Vé chưa gửi bài hết hạn một giờ, không phải lưu nháp SQL.

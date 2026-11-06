@@ -1,3 +1,4 @@
+import StatusBadge from "./StatusBadge.jsx";
 /**
  * Màn hình kiểm tra môi trường Mốc 2.
  * Hiển thị trạng thái dịch vụ và gửi probe kiểm tra hạ tầng.
@@ -9,7 +10,7 @@ const base=browserApiBase();
 function Status({ label, value, detail }) {
   const status = value === undefined ? 'waiting' : value ? 'ready' : 'down';
   return <article className={`service ${status}`}><div className="service-top"><span className="dot"/><span>{label}</span></div>
-    <strong>{value === undefined ? 'Đang kiểm tra' : value ? 'Sẵn sàng' : 'Chưa sẵn sàng'}</strong><p>{detail}</p></article>;
+    <StatusBadge state={status}/><p>{detail}</p></article>;
 }
 export default function InfrastructurePanel() {
   const [health, setHealth] = useState(null); const [networkError, setNetworkError] = useState('');
@@ -46,9 +47,8 @@ export default function InfrastructurePanel() {
     finally { if (mounted.current) setBusy(false); }
   }
   const db = health?.services?.sqlserver; const redis = health?.services?.redis; const worker = health?.services?.worker;
-  return <div className="page"><header><a className="brand" href="#"><span className="mark">B</span> BookAuction <span className="tag">NHÓM 15</span></a><span className="stage">KIỂM TRA HỆ THỐNG</span></header>
-    <main><div className="eyebrow">NỀN TẢNG CHO HỆ THỐNG ĐẤU GIÁ SÁCH</div><h1>Kết nối trước.<br/><em>Triển khai từng bước.</em></h1>
-      <p className="intro">Kiểm tra giao diện, API, cơ sở dữ liệu và tiến trình xử lý nền trong cùng một nơi.</p>
+  return <main className="posts-page infrastructure-page"><header className="posts-heading"><div><span className="eyebrow">Vận hành BookBid</span><h1>Trạng thái hệ thống</h1>
+      <p>Kiểm tra kết nối API, cơ sở dữ liệu và tiến trình xử lý nền.</p></div></header>
       <div className="summary"><span className={`dot ${health?.ok ? 'green' : 'amber'}`}/><b>{health?.ok ? 'Các thành phần đã sẵn sàng' : 'Đang chờ đủ các thành phần'}</b><button onClick={refresh}>Kiểm tra lại ↗</button></div>
       {networkError && <p className="alert" role="alert">{networkError}</p>}
       <section className="services" aria-label="Trạng thái hạ tầng">
@@ -64,8 +64,8 @@ export default function InfrastructurePanel() {
         <div className="probe-form"><label htmlFor="token">Khóa kiểm tra cục bộ</label><input id="token" type="password" value={token} onChange={e => setToken(e.target.value)} placeholder="DEV_PROBE_TOKEN trong .env" autoComplete="off"/>
           <button className="primary" disabled={busy || !token.trim()} onClick={probe}>{busy ? 'Đang kiểm tra…' : 'Gửi sự kiện kiểm tra →'}</button>
           {probeError && <p className="error" role="alert">{probeError}</p>}
-          {result && <div className={`result ${result.status === 'completed' ? 'done' : ''}`}><b>{result.status === 'completed' ? '✓ Worker đã đọc được SQL Server' : 'Yêu cầu đã xếp hàng'}</b><code>{result.requestId}</code>{result.consumer && <small>Worker: {result.consumer}</small>}</div>}
+          {result && <div className={`result ${result.status === 'completed' ? 'done' : ''}`}><StatusBadge state={result.status==='completed'?'ready':'waiting'}>{result.status==='completed'?'Worker đã đọc được SQL Server':'Yêu cầu đã xếp hàng'}</StatusBadge><code>{result.requestId}</code>{result.consumer && <small>Worker: {result.consumer}</small>}</div>}
         </div></section>
       <footer><span>React + Express + SQL Server + Redis</span><span>{health?.checkedAt ? `Cập nhật ${new Date(health.checkedAt).toLocaleTimeString('vi-VN')}` : 'Tự kiểm tra mỗi 5 giây'}</span></footer>
-    </main></div>;
+    </main>;
 }

@@ -61,7 +61,7 @@ function calculation(value, label) {
 function aiContent(ai) {
   if (!ai) return "<p>Chưa có kết quả AI phù hợp cho lần kiểm duyệt này.</p>";
   if (ai.trang_thai === "that_bai")
-    return "<p>AI chưa phân tích thành công. Vui lòng xem quyết định và lý do kiểm duyệt của Admin.</p>";
+    return "<p>AI chưa phân tích thành công. Vui lòng xem quyết định và lý do kiểm duyệt.</p>";
   return `<p>Phân tích #${text(ai.phan_tich_id)} · ${text(date(ai.ngay_phan_tich))}</p>
     <div class="scores"><div><span>Hỗ trợ đánh giá độ hiếm</span><strong>${score(ai.diem_do_hiem)}</strong><p>${escape(ai.tinh_diem?.do_hiem?.ly_do_null)}</p></div>
     <div><span>Tình trạng vật lý</span><strong>${score(ai.diem_tinh_trang)}</strong><p>${escape(ai.tinh_diem?.tinh_trang?.ly_do_null)}</p></div></div>
@@ -113,12 +113,12 @@ export function renderReviewDocument(report) {
     <body><div class="toolbar"><p>Chọn “Lưu dưới dạng PDF / Save as PDF” trong hộp thoại in. Đây là kết quả của một lần kiểm duyệt đã lưu.</p><button type="button" id="print-review">Lưu PDF / In</button></div>
     <main><header><div class="brand">BOOKBID</div><h1>Kết quả kiểm duyệt bài đăng</h1><p>Bài #${text(post.bai_dang_id)} · Lần kiểm duyệt #${text(review.kiem_duyet_id)}</p>
     <span class="status">${text(review.ket_qua)}</span><p class="muted">${text(date(review.ngay_kiem_duyet))}</p><p class="muted">Bản kết quả để lưu và đối chiếu trong hệ thống; chưa có chữ ký số.</p></header>
-    <section><h2>1. Quyết định của Admin</h2><p class="lines notice">${text(review.phan_hoi_admin)}</p></section>
+    <section><h2>1. ${review.phan_tich_id ? "Quyết định kiểm duyệt tự động" : "Quyết định của Admin"}</h2><p class="lines notice">${text(review.phan_hoi_admin)}</p></section>
     <section><h2>2. Thông tin bản sách</h2><h3>${text(book.ten_sach)}</h3><p class="lines">${text(post.tieu_de)}</p>
     <p class="muted">Mã bài: ${text(post.ma_san_pham)} · Một bản sách vật lý</p><dl>${facts.map(([label, value]) => `<dt>${label}</dt><dd>${text(value)}</dd>`).join("")}</dl>
     ${book.mo_ta ? `<h3>Giới thiệu</h3><p class="lines">${text(book.mo_ta)}</p>` : ""}
     <h3>Tình trạng, yếu tố quý hiếm và bằng chứng</h3><p class="lines">${text(book.tinh_trang_va_bang_chung)}</p></section>
-    <section><h2>3. Kết quả AI tham khảo</h2><p class="muted">AI chỉ hỗ trợ kiểm duyệt; quyết định phê duyệt hoặc từ chối do Admin thực hiện. Nguồn dẫn cần được kiểm tra, không mặc nhiên đã được AI xác thực.</p>${aiContent(ai)}</section>
+    <section><h2>3. Điểm và bằng chứng AI</h2><p class="muted">${review.phan_tich_id ? "Quyết định dựa trên mức đạt của hai nhóm tiêu chí." : "AI hỗ trợ phân tích; Admin đưa ra quyết định."} Nguồn dẫn chưa được xác thực độc lập.</p>${aiContent(ai)}</section>
     <section><h2>4. Ảnh và video của lần kiểm duyệt</h2><p class="muted">Media được xuất dưới dạng liên kết Cloudinary, không nhúng vào PDF. Liên kết mở được khi tệp còn tồn tại và được phép truy cập.</p>
     ${media?.length ? `<ol class="media-list">${media.map((item) => `<li><span class="media-label">${item.kind === "video" ? "Video" : "Ảnh"} ${String(++counts[item.kind]).padStart(2, "0")}${item.title ? ` · ${text(item.title)}` : ""}</span>${link(item.url, item.url, true)}</li>`).join("")}</ol>` : "<p>Không có ảnh/video được lưu cho lần kiểm duyệt này.</p>"}</section>
     </main></body></html>`;

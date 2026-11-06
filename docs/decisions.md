@@ -3,7 +3,7 @@
 # Quyết định kỹ thuật
 
 Rà soát theo source ngày 03/11/2026. Các ADR ghi lý do và giới hạn đã chọn, không tự chứng nhận mọi
-kiểm thử dịch vụ thật. Các số schema gắn migration cũ là mốc nâng cấp; schema đích hiện tại 21/165/99/15.
+kiểm thử dịch vụ thật. Các số schema gắn migration cũ là mốc nâng cấp; schema đích hiện tại 21/166/100/15.
 Chính sách mới về phiên đăng nhập, AI manual, Files API và nháp bên dưới thay thế các mô tả cũ tương ứng.
 Hướng dẫn chạy hiện tại tại [setup-guide.md](setup-guide.md), bằng chứng tại [VALIDATION](../VALIDATION.md).
 
@@ -223,7 +223,7 @@ Chi tiết: [Xử lý đấu giá](auction-processing.md).
 
 ## ADR-017 — AI quan sát, Backend tính điểm, Admin quyết định
 
-**Trạng thái:** đã triển khai; nhóm đã báo smoke:ai PASS ở lần trước. Đối chiếu chất lượng ảnh/video và Files API thật là nghiệm thu riêng.
+**Trạng thái:** lịch sử chế độ thủ công; xem ADR-030 cho chế độ tự duyệt. Nhóm đã báo smoke:ai PASS ở lần trước. Đối chiếu chất lượng ảnh/video và Files API thật là nghiệm thu riêng.
 
 Theo báo cáo tuần 7 và yêu cầu hiện tại, độ hiếm gồm bốn nhóm 25%; tình trạng gồm 20/25/30/15/10%.
 Giữ hai tổng độc lập; thiếu tiêu chí áp dụng giữ NULL, không áp dụng có căn cứ mới loại trọng số.
@@ -358,3 +358,10 @@ ThongBao (migration 004) là hộp riêng, đồng bộ khi đọc từ nguồn 
 UNIQUE người nhận/nguồn chống trùng; frontend polling 10 giây/focus/online. Không dùng trigger,
 không coi Socket/PubSub công khai là thông báo riêng, chưa có push/email/outbox.
 Không copy chat/bằng chứng/giá ẩn vào thông báo. Xem [ui-integration.md](ui-integration.md).
+
+
+## ADR-030 — Kiểm duyệt tự động theo hai điểm độc lập
+
+Theo yêu cầu ngày 06/11/2026, có thể bật tự duyệt với hai ngưỡng cấu hình bắt buộc. Backend dùng điểm đã tính và bằng chứng, không lấy quyết định từ văn bản Gemini. Cả hai điểm đạt thì phê duyệt; không đủ điểm hoặc thiếu bằng chứng thì ghi lý do để bổ sung. Lỗi kỹ thuật giữ chờ và thử lại có giãn cách.
+
+SQL lưu phân tích, quyết định, snapshot và cập nhật trạng thái nguyên tử; quyết định tự duyệt có `phan_tich_id`, không gán Admin giả. Worker phục hồi bài chờ từ SQL, kiểm tra lại phiên bản và dùng receipt chống ghi lặp. Admin chỉ theo dõi khi bật tự duyệt; chế độ thủ công vẫn dùng được cho môi trường thử. Phê duyệt không kích hoạt phiên. Xem [cấu hình](ai-analysis.md#kiểm-duyệt-tự-động).

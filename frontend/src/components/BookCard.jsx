@@ -1,3 +1,4 @@
+import StatusBadge from "./StatusBadge.jsx";
 /** Public card uses a real cover only; no fabricated appraisal images or quantity selector. */
 import { mediaDisplayUrl } from "../../../shared/mediaDelivery.js";
 import { Icon } from "./DesignUi.jsx";
@@ -6,19 +7,7 @@ export const money = (value) =>
     ? "Chưa có lượt giá"
     : `${BigInt(value).toLocaleString("vi-VN")} đ`;
 export default function BookCard({ post, mode = "catalog", query = "" }) {
-  const state = post.trang_thai_phien,
-    phase =
-      state === "da_ket_thuc"
-        ? "Đã kết thúc"
-        : state === "da_kich_hoat"
-          ? new Date(post.thoi_gian_bat_dau) > new Date()
-            ? "Sắp bắt đầu"
-            : "Đang đấu giá"
-          : state === "khong_dat_kiem_duyet"
-            ? "Bị từ chối"
-            : state === "da_qua_kiem_duyet"
-              ? "Đã duyệt · Chờ kích hoạt"
-              : "Chờ kiểm duyệt";
+  const state = post.trang_thai_phien;
   const href = `#/${mode}/${post.bai_dang_id}${query ? `?${query}` : ""}`;
   return (
     <article className="book-card">
@@ -28,7 +17,7 @@ export default function BookCard({ post, mode = "catalog", query = "" }) {
         aria-label={`Xem ${post.ten_sach}${mode === "pending" ? `, bài #${post.bai_dang_id}` : ""}`}
       >
         <span className="book-card-status">
-          <span className="badge badge-gold">{phase}</span>
+          <StatusBadge post={post} />
         </span>
         {post.anh_bia ? (
           <img

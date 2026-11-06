@@ -260,7 +260,7 @@ export default function BookBidShell({ user, route, children }) {
             <a href="#/account">Tài khoản</a>
           </div>
           <div className="footer-bottom">
-            <span>© {new Date().getFullYear()} BookBid · Nhóm 15</span>
+            <span>© {new Date().getFullYear()} BookBid</span>
             <button onClick={() => go("home")}>Về trang chủ</button>
           </div>
         </footer>

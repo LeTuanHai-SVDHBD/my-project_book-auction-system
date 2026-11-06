@@ -6,7 +6,7 @@
 đặt giá đến kết quả và giao dịch. Kiến trúc hướng sự kiện tách việc tiếp nhận yêu cầu HTTP
 khỏi xử lý đấu giá ở worker; **SQL Server là nguồn trạng thái có thẩm quyền**.
 
-Tài liệu được rà soát ngày **03/11/2026**, theo mã nguồn nhánh **`feat/Hai`**.
+Tài liệu được rà soát ngày **06/11/2026**, theo mã nguồn nhánh **`feat/Hai`**.
 Chức năng trong phạm vi các mốc 3–8 đã được triển khai. Mức kiểm chứng, báo cáo của nhóm
 và phần chưa chạy với dịch vụ thật được ghi riêng tại [VALIDATION.md](VALIDATION.md).
 Không coi việc hoàn thành mã nguồn là chứng nhận sẵn sàng vận hành production.
@@ -17,14 +17,14 @@ Không coi việc hoàn thành mã nguồn là chứng nhận sẵn sàng vận 
 |---|---|
 | Giao diện | React, Vite, JavaScript ES Modules; giao diện BookBid responsive |
 | API | Node.js **24.x**, Express; xác thực HTTP, upload và Socket.IO |
-| Worker | Redis Streams; xử lý giá, hết hạn và các yêu cầu AI của Admin |
-| CSDL | SQL Server 2022 Developer; migration 001–007 |
+| Worker | Redis Streams; xử lý giá, hết hạn và kiểm duyệt AI |
+| CSDL | SQL Server 2022 Developer; migration 001–008 |
 | Redis | Redis 8; session, hàng đợi, admission, khóa và Pub/Sub |
 | Ảnh/video | Cloudinary; vé upload Redis, metadata và tham chiếu SQL |
-| AI | Gemini Interactions + Files API; Backend tính điểm, Admin quyết định |
+| AI | Gemini Interactions + Files API; Backend tính hai điểm và hỗ trợ tự duyệt theo ngưỡng cấu hình |
 | Quản lý gói | npm workspaces, một `package-lock.json` ở thư mục gốc |
 
-Schema hiện tại: **21 bảng, 165 cột, 99 CHECK, 15 UNIQUE constraints**, theo
+Schema hiện tại: **21 bảng, 166 cột, 100 CHECK, 15 UNIQUE constraints**, theo
 [manifest](backend/schema-manifest.json). Số UNIQUE này không bao gồm việc đếm mọi chỉ mục duy nhất.
 Frontend không truy cập SQL/Redis trực tiếp. Chỉ SQL Server/Redis được Compose khởi động;
 API, worker và web chạy bằng Node trên máy phát triển.
@@ -81,7 +81,7 @@ npm.cmd run dev:all
 ```
 
 Ctrl+F5 sau khi cập nhật frontend. Các script `setup:*` chỉ thêm khóa thiếu, giữ giá trị đang có;
-`db:migrate` áp dụng 002–007 lên schema nền có sẵn. Không dùng `db:migrate` thay `db:init` trên database trống.
+`db:migrate` áp dụng 002–008 lên schema nền có sẵn. Không dùng `db:migrate` thay `db:init` trên database trống.
 Không xóa database/Redis/volume để chữa readiness. Nếu đổi Docker project hoặc máy có volume cũ,
 đọc [docker-migration.md](docs/docker-migration.md) trước khi khởi động.
 
@@ -101,7 +101,7 @@ còn lại dừng theo `--kill-others`. Muốn chạy kiểm tra/smoke thì mở
 | Khách | Xem/tìm phiên công khai, ảnh/video, giá, lịch sử, kết quả, bình luận và uy tín |
 | Người dùng | Đăng sách, lưu nháp, bổ sung bài bị từ chối, kích hoạt/đăng lại đủ điều kiện; đặt giá sách của người khác |
 | Hai bên giao dịch | Chat riêng, xác nhận hoàn tất phần giao dịch của mình, khiếu nại; người mua đánh giá sau hoàn tất |
-| Admin | Kiểm duyệt, chủ động phân tích AI, ghi quyết định/lý do; tiếp nhận và xử lý khiếu nại |
+| Admin | Theo dõi kiểm duyệt AI; duyệt thủ công khi tắt tự duyệt; xử lý khiếu nại |
 
 Admin dùng sidebar riêng, không có chức năng đăng sách. Khách không thấy avatar tài khoản hoặc hộp thông báo.
 Đăng nhập cùng tài khoản ở nơi mới thu hồi phiên cũ; F5 không khôi phục phiên đã bị thu hồi.
@@ -112,9 +112,10 @@ Khác tài khoản vẫn có thể dùng đồng thời ở các tab. Xem [accou
 1. **Đăng sách:** điền bốn bước, gồm thông tin sách, ảnh/video, thông số đấu giá, kiểm tra và gửi.
    ISBN tùy chọn, tối đa 100 ký tự; thể loại chọn từ danh mục chung, gõ chỉ để lọc.
    Một ô **Tình trạng, yếu tố quý hiếm và bằng chứng** thay cho hai mô tả tình trạng trùng nhau.
-2. **Kiểm duyệt:** Admin xem bài chờ hoặc bài đã từ chối. Bài mới hiện **Chưa phân tích**;
-   nhấn **Phân tích bằng AI** khi cần. AI không tự chạy khi đăng/gửi lại hoặc khi mở trang.
-   Admin phê duyệt/từ chối có lý do; phê duyệt cần xác nhận đã đối chiếu bằng chứng quý hiếm.
+2. **Kiểm duyệt:** Khi bật tự duyệt, worker tự lấy hồ sơ chờ và đối chiếu hai điểm độc lập với hai ngưỡng.
+   Đạt cả hai thì phê duyệt; điểm thấp hoặc thiếu bằng chứng sau khi phân tích thì từ chối kèm lý do.
+   Sự cố dịch vụ giữ bài chờ và thử lại theo lịch. Admin theo dõi kết quả, không cần thao tác duyệt.
+   Bật chế độ này theo [hướng dẫn cấu hình](docs/ai-analysis.md#kiểm-duyệt-tự-động).
 3. **Bổ sung:** chủ bài bị từ chối sửa hồ sơ, đánh dấu gỡ media cũ, thêm media và gửi duyệt lại.
    Lưu hồ sơ theo bài, giữ media/quyết định/PDF của vòng trước. Bài đã duyệt rời danh sách kiểm duyệt.
 4. **Kích hoạt:** chủ sách đặt lịch tương lai cho đúng phiên đã duyệt. Phê duyệt chưa tự mở đấu giá.
@@ -183,7 +184,7 @@ Tất cả lệnh dưới chạy ở gốc repository; danh sách lấy từ [pa
 | `npm.cmd run smoke:m4` | Bài đăng, Cloudinary thật, kiểm duyệt và xuất bản kết quả |
 | `npm.cmd run smoke:m5` | Quy tắc giá, tranh chấp và chốt phiên thật; không cần Cloudinary |
 | `npm.cmd run smoke:m6` | Thêm đồng bộ Socket và snapshot trên fixture đấu giá |
-| `npm.cmd run smoke:ai` | Admin yêu cầu Gemini qua worker, lưu SQL; fixture thiếu ảnh giữ NULL |
+| `npm.cmd run smoke:ai` | Gemini qua worker, lưu SQL; hồ sơ thử thiếu ảnh giữ NULL và kiểm tra chế độ đang bật |
 | `npm.cmd run smoke:m8` | Kết thúc và luồng sau phiên, tìm kiếm/thông báo; ảnh khiếu nại thật kiểm tra riêng |
 
 Smoke cần giữ `dev:all` ở terminal thứ nhất, chạy lệnh ở terminal thứ hai. Các smoke tạo/dọn fixture

@@ -6,7 +6,7 @@
 
 Đã triển khai API, Redis admission/Streams, processor có khóa phiên, transaction SQL,
 job hết hạn và giao diện gửi giá/theo dõi quyết định qua HTTP.
-Schema hiện tại sau migration 007 có **21 bảng/165 cột**; migration 003 đã bổ sung receipt quyết định giá và lý do kết thúc. Không thay dependency hoặc cơ chế xác thực theo tab.
+Schema hiện tại sau migration 008 có **21 bảng/166 cột**; migration 003 đã bổ sung receipt quyết định giá và lý do kết thúc. Không thay dependency hoặc cơ chế xác thực theo tab.
 Socket.IO nghiệp vụ đã có theo [hợp đồng thời gian thực](realtime.md); AI đã có theo [hợp đồng phân tích](ai-analysis.md).
 Giao dịch, chat và xác nhận hoàn tất hai bên theo [hợp đồng sau đấu giá](after-sales.md).
 

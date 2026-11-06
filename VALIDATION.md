@@ -2,6 +2,23 @@
 
 # Kiểm chứng và nghiệm thu
 
+## Cập nhật BookBid và tự duyệt — 06/11/2026
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `npm run check` | PASS, 159 tệp JavaScript phía máy chủ, script và dùng chung |
+| `npm test` | 204 PASS, 12 SKIP, 216 bài; không có bài thất bại |
+| `npm run build` | PASS, 97 modules |
+| Chromium và API dữ liệu mẫu | Kiểm tra trang khách, tài khoản, danh mục/chi tiết phiên, đăng sách/bài của tôi, giao dịch, khiếu nại, danh sách/chi tiết Admin, AI, thông báo và hạ tầng |
+| Kích thước giao diện | Đo khung 320/390/768/1440 px; các trang được đo không tràn ngang toàn trang |
+| Tương tác UI | Tìm kiếm rỗng/lỗi, Home/End gallery, trạng thái lượt giá mô phỏng, bốn bước gửi lại, gỡ ảnh cũ và khôi phục nháp, thông báo/Escape, menu Admin di động |
+| Quyết định tự duyệt | Test hai ngưỡng độc lập, biên bằng ngưỡng, NULL và lỗi kỹ thuật, chống replay/version cũ, chặn thao tác Admin khi bật tự duyệt. UI fixture xác nhận lý do và nguồn AI hiển thị đúng. |
+
+Schema đích sau [migration 008](backend/migrations/008_auto_moderation.sql): **21 bảng, 166 cột, 100 CHECK, 15 UNIQUE constraints**.
+Lượt này chưa chạy migration/SQL opt-in, Redis thật, Gemini thật hoặc smoke. Kiểm tra trên dịch vụ thật bằng `npm.cmd run db:migrate`, `npm.cmd run smoke:ai` và hồ sơ có ảnh/video sau khi cấu hình [hai ngưỡng](docs/ai-analysis.md#kiểm-duyệt-tự-động). Các bài test SQL mới kiểm tra cùng COMMIT, rollback và đúng snapshot khi có database test.
+
+## Lượt rà soát tài liệu trước đó
+
 Rà soát tài liệu ngày **03/11/2026** trên mã nguồn `feat/Hai`, commit
 [c546219](https://github.com/LeTuanHai-SVDHBD/my-project_book-auction-system/commit/c546219532bccdce858dde4863274087e6448446).
 Lượt này chỉ sửa Markdown, không sửa runtime, dependency, schema hoặc cấu hình riêng.
@@ -42,7 +59,7 @@ Snapshot/PDF, thuật toán giá, quyền tương tác và định dạng tiền
 Nhóm đã báo hoàn thành các mốc đến **Mốc 8**, có xác nhận smoke tài khoản, nghiệp vụ đấu giá/realtime
 và `smoke:ai` PASS ở các thời điểm trước. Xác nhận này ghi nhận tiến độ dự án, không tự chứng minh những
 thay đổi sau đó về nháp, hồ sơ, PDF, Cloudinary recovery hoặc Gemini Files API đều đã được smoke trên máy nhóm.
-Chất lượng hai điểm/bằng chứng cần đối chiếu bằng bản sách, ảnh và video thực tế; Admin vẫn quyết định.
+Chất lượng hai điểm/bằng chứng cần đối chiếu bằng bản sách, ảnh và video thực tế. Các lần xác nhận trước đây dùng chế độ Admin duyệt.
 
 Chưa có bằng chứng mới xác nhận: Google Files/Interactions với video thật của người dùng, mọi bộ SQL opt-in
 trên revision hiện tại, CDN bằng chứng riêng tư, tải lớn hoặc triển khai production HTTPS.
@@ -101,7 +118,7 @@ model/provider có thể vẫn là fixture. Chỉ gọi một bài “tích hợ
 
 Dùng database riêng có tên **BookAuctionTest_***, giữ thông tin kết nối SQL hợp lệ trong cấu hình.
 Khởi tạo/nâng schema test hiện tại trước; một số bài test tự áp dụng một phần migration lịch sử,
-không nên dựa vào chúng để thay bước chuẩn bị toàn bộ schema 007.
+không nên dựa vào chúng để thay bước chuẩn bị toàn bộ schema 008.
 Bật **một cờ SQL mỗi lần** để tránh các bộ test đồng thời sửa migration trên cùng database:
 
 ```powershell

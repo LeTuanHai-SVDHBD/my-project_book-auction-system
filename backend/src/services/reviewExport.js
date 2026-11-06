@@ -12,7 +12,7 @@ export function createReviewSnapshot(post) {
     post:pick(post,['bai_dang_id','ma_san_pham','tieu_de','mo_ta_tinh_trang']),
     book:{...pick(post,['sach_id','ten_sach','tac_gia','the_loai','nha_xuat_ban','nam_xuat_ban','isbn','mo_ta']),
       tinh_trang_va_bang_chung:bookReviewDescription(post)},
-    review:pick(review,['kiem_duyet_id','ket_qua','phan_hoi_admin','ngay_kiem_duyet']),
+    review:pick(review,['kiem_duyet_id','phan_tich_id','ket_qua','phan_hoi_admin','ngay_kiem_duyet']),
     media:(post.media||[]).map(item=>pick(item,['kind','url','title'])),
     ai:ownerAiResult(post.ai,post),
   };

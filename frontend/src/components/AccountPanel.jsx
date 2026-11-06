@@ -1,8 +1,7 @@
 /** Đăng ký, đăng nhập và thông tin tài khoản; không lưu xác thực vào storage. */
 import { useEffect, useState } from 'react';
 import { authApi } from '../services/authApi.js';
-export default function AccountPanel({ onUserChange }) {
-  const [user, setUser] = useState(null);
+export default function AccountPanel({ user, onUserChange: setUser }) {
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState('login');
   const [name, setName] = useState('');
@@ -12,7 +11,6 @@ export default function AccountPanel({ onUserChange }) {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [reload, setReload] = useState(0);
-  useEffect(() => { onUserChange?.(user); }, [user, onUserChange]);
   useEffect(() => {
     let canceled = false;
     setLoading(true); setError('');
@@ -20,8 +18,8 @@ export default function AccountPanel({ onUserChange }) {
       .catch(() => { if (!canceled) setError('Chưa tải được tài khoản. Kiểm tra API và Redis rồi thử lại.'); })
       .finally(() => { if (!canceled) setLoading(false); });
     return () => { canceled = true; };
-  }, [reload]);
-  useEffect(()=>{const signedOut=event=>{setUser(null);setMode('login');setPassword('');setError('');setBusy(false);setLoading(false);setMessage(event.detail?.message||'Bạn đã được đăng xuất.');};window.addEventListener('account:signed-out',signedOut);return()=>window.removeEventListener('account:signed-out',signedOut);},[]);
+  }, [reload, setUser]);
+  useEffect(()=>{const signedOut=event=>{setUser(null);setMode('login');setPassword('');setError('');setBusy(false);setLoading(false);setMessage(event.detail?.message||'Bạn đã được đăng xuất.');};window.addEventListener('account:signed-out',signedOut);return()=>window.removeEventListener('account:signed-out',signedOut);},[setUser]);
   async function submit(event) {
     event.preventDefault(); setBusy(true); setError(''); setMessage('');
     try {
@@ -46,7 +44,7 @@ export default function AccountPanel({ onUserChange }) {
     finally { setBusy(false); }
   }
   return <div className="account-page">
-    <section className="account-intro"><span className="eyebrow">BOOKAUCTION · NHÓM 15</span>
+    <section className="account-intro"><span className="eyebrow">BOOKBID</span>
       <h1>Mỗi cuốn sách,<br/><em>một hành trình mới.</em></h1>
       <p className="intro">Tạo tài khoản để chuẩn bị tham gia cộng đồng đấu giá sách.</p>
       <div className="account-note">Tài khoản của bạn dùng chung cho hoạt động mua và bán sách.</div>

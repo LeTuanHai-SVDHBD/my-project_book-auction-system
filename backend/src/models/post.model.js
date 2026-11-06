@@ -70,11 +70,11 @@ export function createPostModel({ getPool, sql }) {
   async function reviewData(target,postId) {
     const post=(await request(target).input('id',sql.Int,postId).query(`SELECT ${projection} ${joins} WHERE b.bai_dang_id=@id`)).recordset[0];
     post.media=(await media(target,postId)).map(({publicId,...item})=>item);
-    post.kiem_duyet=(await request(target).input('id',sql.Int,postId).query('SELECT kiem_duyet_id,ket_qua,phan_hoi_admin,ngay_kiem_duyet FROM dbo.KiemDuyet WHERE bai_dang_id=@id ORDER BY kiem_duyet_id DESC')).recordset;
+    post.kiem_duyet=(await request(target).input('id',sql.Int,postId).query('SELECT kiem_duyet_id,phan_tich_id,ket_qua,phan_hoi_admin,ngay_kiem_duyet FROM dbo.KiemDuyet WHERE bai_dang_id=@id ORDER BY kiem_duyet_id DESC')).recordset;
     const review=currentReview(post);
     if(review) {
-      post.ai=(await request(target).input('id',sql.Int,postId).input('decided',sql.DateTime2(3),review.ngay_kiem_duyet)
-        .query('SELECT TOP(1) phan_tich_id,diem_do_hiem,diem_tinh_trang,trang_thai,ngay_phan_tich FROM dbo.PhanTichAI WHERE bai_dang_id=@id AND ngay_phan_tich<=@decided ORDER BY phan_tich_id DESC')).recordset[0]||null;
+      post.ai=(await request(target).input('id',sql.Int,postId).input('decided',sql.DateTime2(3),review.ngay_kiem_duyet).input('analysis',sql.Int,review.phan_tich_id??null)
+        .query('SELECT TOP(1) phan_tich_id,diem_do_hiem,diem_tinh_trang,trang_thai,ngay_phan_tich FROM dbo.PhanTichAI WHERE bai_dang_id=@id AND ((@analysis IS NULL AND ngay_phan_tich<=@decided) OR phan_tich_id=@analysis) ORDER BY phan_tich_id DESC')).recordset[0]||null;
       if(post.ai)post.ai.chi_tiet=(await request(target).input('id',sql.Int,post.ai.phan_tich_id).query('SELECT tieu_chi,diem,bang_chung,do_tin_cay,canh_bao,nhom_tieu_chi,trang_thai_danh_gia,trong_so,nguon_doi_chieu FROM dbo.ChiTietPhanTichAI WHERE phan_tich_id=@id ORDER BY chi_tiet_id')).recordset;
       post.ai=analysisView(post.ai,post);
     }
@@ -86,6 +86,15 @@ export function createPostModel({ getPool, sql }) {
     await request(target).input('id',sql.Int,reviewId).input('post',sql.Int,postId).input('snapshot',sql.NVarChar(sql.MAX),JSON.stringify(snapshot))
       .query('UPDATE dbo.KiemDuyet SET ket_qua_snapshot=@snapshot WHERE kiem_duyet_id=@id AND bai_dang_id=@post AND ket_qua_snapshot IS NULL');
     return snapshot;
+  }
+  async function applyReview(tx,row,{postId,admin,analysisId,approve,reason}) {
+    await request(tx).input('id',sql.Int,postId).input('state',sql.VarChar(30),approve?'da_duyet':'tu_choi').query('UPDATE dbo.BaiDang SET trang_thai=@state WHERE bai_dang_id=@id');
+    await request(tx).input('id',sql.Int,row.phien_dau_gia_id).input('state',sql.VarChar(30),approve?'da_qua_kiem_duyet':'khong_dat_kiem_duyet').query('UPDATE dbo.PhienDauGia SET trang_thai=@state WHERE phien_dau_gia_id=@id');
+    const saved=await request(tx).input('id',sql.Int,postId).input('admin',sql.Int,admin).input('analysis',sql.Int,analysisId).input('result',sql.NVarChar(20),approve?'Phê duyệt':'Từ chối')
+      .input('reason',sql.NVarChar(sql.MAX),reason)
+      .query('INSERT dbo.KiemDuyet(bai_dang_id,admin_id,phan_tich_id,ket_qua,phan_hoi_admin) OUTPUT INSERTED.kiem_duyet_id VALUES(@id,@admin,@analysis,@result,@reason)');
+    await saveSnapshot(tx,postId,saved.recordset[0].kiem_duyet_id,await reviewData(tx,postId));
+    await history(tx,row.phien_dau_gia_id,admin,`${analysisId?'AI':'Admin'} ${approve?'phê duyệt':'từ chối'} bài đăng và phiên`);
   }
   return {
     findRequest,
@@ -141,10 +150,10 @@ export function createPostModel({ getPool, sql }) {
       if (!row || publicOnly && (row.trang_thai_bai!=='da_duyet'||!['da_kich_hoat','da_ket_thuc'].includes(row.trang_thai_phien)) || !publicOnly && !admin && row.nguoi_dung_id!==owner) notFound();
       row.media=(await media(pool,postId)).map(({publicId,...item})=>item);
       if (publicOnly) return row;
-      row.kiem_duyet=(await request(pool).input('id',sql.Int,postId).query('SELECT kiem_duyet_id,ket_qua,phan_hoi_admin,ngay_kiem_duyet,CAST(CASE WHEN ket_qua_snapshot IS NULL THEN 0 ELSE 1 END AS BIT) AS co_the_xuat FROM dbo.KiemDuyet WHERE bai_dang_id=@id ORDER BY kiem_duyet_id DESC')).recordset;
+      row.kiem_duyet=(await request(pool).input('id',sql.Int,postId).query('SELECT kiem_duyet_id,phan_tich_id,ket_qua,phan_hoi_admin,ngay_kiem_duyet,CAST(CASE WHEN ket_qua_snapshot IS NULL THEN 0 ELSE 1 END AS BIT) AS co_the_xuat FROM dbo.KiemDuyet WHERE bai_dang_id=@id ORDER BY kiem_duyet_id DESC')).recordset;
       const decision=currentReview(row);
       if(decision)decision.co_the_xuat=true; // Legacy current round can be captured safely under the export lock.
-      row.ai=(await request(pool).input('id',sql.Int,postId).query('SELECT TOP(1) phan_tich_id,diem_do_hiem,diem_tinh_trang,trang_thai,ngay_phan_tich FROM dbo.PhanTichAI WHERE bai_dang_id=@id ORDER BY phan_tich_id DESC')).recordset[0]||null;
+      row.ai=(await request(pool).input('id',sql.Int,postId).input('analysis',sql.Int,decision?.phan_tich_id??null).query('SELECT TOP(1) phan_tich_id,diem_do_hiem,diem_tinh_trang,trang_thai,ngay_phan_tich FROM dbo.PhanTichAI WHERE bai_dang_id=@id AND (@analysis IS NULL OR phan_tich_id=@analysis) ORDER BY phan_tich_id DESC')).recordset[0]||null;
       if (row.ai) row.ai.chi_tiet=(await request(pool).input('id',sql.Int,row.ai.phan_tich_id).query('SELECT tieu_chi,diem,bang_chung,do_tin_cay,canh_bao,nhom_tieu_chi,trang_thai_danh_gia,trong_so,nguon_doi_chieu FROM dbo.ChiTietPhanTichAI WHERE phan_tich_id=@id ORDER BY chi_tiet_id')).recordset;
       row.ai=analysisView(row.ai,row);
       if(!admin)row.ai=ownerAiResult(row.ai,row);
@@ -222,15 +231,15 @@ export function createPostModel({ getPool, sql }) {
         if (row.nguoi_dung_id===admin) throw new HttpError(403,'SELF_REVIEW','Không tự kiểm duyệt bài của mình.');
         assertStatePair(row,'cho_kiem_duyet','cho_kiem_duyet','Bài không còn chờ kiểm duyệt.');
         const approve=input.decision==='phe_duyet';
-        await request(tx).input('id',sql.Int,postId).input('state',sql.VarChar(30),approve?'da_duyet':'tu_choi').query('UPDATE dbo.BaiDang SET trang_thai=@state WHERE bai_dang_id=@id');
-        await request(tx).input('id',sql.Int,row.phien_dau_gia_id).input('state',sql.VarChar(30),approve?'da_qua_kiem_duyet':'khong_dat_kiem_duyet').query('UPDATE dbo.PhienDauGia SET trang_thai=@state WHERE phien_dau_gia_id=@id');
-        const saved=await request(tx).input('id',sql.Int,postId).input('admin',sql.Int,admin).input('result',sql.NVarChar(20),approve?'Phê duyệt':'Từ chối')
-          .input('reason',sql.NVarChar(sql.MAX),(approve?'Đã kiểm tra bằng chứng về yếu tố quý hiếm. ':'')+input.reason)
-          .query('INSERT dbo.KiemDuyet(bai_dang_id,admin_id,ket_qua,phan_hoi_admin) OUTPUT INSERTED.kiem_duyet_id VALUES(@id,@admin,@result,@reason)');
-        await saveSnapshot(tx,postId,saved.recordset[0].kiem_duyet_id,await reviewData(tx,postId));
-        await history(tx,row.phien_dau_gia_id,admin,approve?'Admin phê duyệt bài đăng và phiên':'Admin từ chối bài đăng và phiên');
+        await applyReview(tx,row,{postId,admin,analysisId:null,approve,reason:(approve?'Đã kiểm tra bằng chứng về yếu tố quý hiếm. ':'')+input.reason});
         return {id:postId};
       });
+    },
+    async recordAutoReview(tx,{job,analysisId,verdict}) {
+      const row=await locked(tx,job.postId,null,'admin');
+      assertVersion(row,job.sourceVersion);
+      assertStatePair(row,'cho_kiem_duyet','cho_kiem_duyet','Bài không còn chờ kiểm duyệt.');
+      await applyReview(tx,row,{postId:job.postId,admin:null,analysisId,approve:verdict.approve,reason:verdict.reason});
     },
     async exportReview(owner,postId,reviewId) {
       return transaction(async tx=>{

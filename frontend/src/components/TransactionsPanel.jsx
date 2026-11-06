@@ -1,3 +1,4 @@
+import StatusBadge from "./StatusBadge.jsx";
 /** Giao dịch của hai bên: truy vết kết quả, chat riêng, xác nhận độc lập, đánh giá và khiếu nại. */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { navigate } from "../services/navigation.js";
@@ -11,11 +12,6 @@ import {
 } from "./CommunityFeed.jsx";
 import { Dialog, Icon } from "./DesignUi.jsx";
 import ComplaintForm from "./ComplaintForm.jsx";
-const complaintStates = {
-  cho_xu_ly: "Chờ xử lý",
-  dang_xu_ly: "Đang xử lý",
-  da_xu_ly: "Đã xử lý",
-};
 function OwnComplaint({ id, onClose }) {
   const { data: row, error } = useCommunityPage(`/complaints/${id}`);
   return (
@@ -33,9 +29,7 @@ function OwnComplaint({ id, onClose }) {
       {row && (
         <>
           <div className="case-overview">
-            <span className={`case-state ${row.trang_thai}`}>
-              {complaintStates[row.trang_thai]}
-            </span>
+            <StatusBadge state={row.trang_thai} />
             <p>Gửi lúc {when(row.ngay_khieu_nai)}</p>
           </div>
           <section className="case-section">
@@ -161,9 +155,7 @@ function TradeDetail({ id, user, onClose }) {
   return (
     <article className="post-sheet live-trade-detail">
       <div className="sheet-heading">
-        <span className="status-pill">
-          {row.trang_thai === "hoan_tat" ? "Hoàn tất" : "Chờ hai bên xác nhận"}
-        </span>
+        <StatusBadge state={row.trang_thai} />
         <button onClick={onClose}>Về danh sách giao dịch</button>
       </div>
       <h2>{row.ten_sach}</h2>
@@ -302,9 +294,7 @@ function TradeDetail({ id, user, onClose }) {
                       <span className="case-number">
                         Hồ sơ #{item.khieu_nai_id}
                       </span>
-                      <span className={`case-state ${item.trang_thai}`}>
-                        {complaintStates[item.trang_thai]}
-                      </span>
+                      <StatusBadge state={item.trang_thai} />
                     </div>
                     <h4>{item.ly_do}</h4>
                     <p>Gửi lúc {when(item.ngay_khieu_nai)}</p>
@@ -385,7 +375,7 @@ export default function TransactionsPanel({ user, selectedId }) {
     <main className="posts-page">
       <header className="posts-heading">
         <div>
-          <span className="eyebrow">BOOKAUCTION · NHÓM 15</span>
+          <span className="eyebrow">BOOKBID</span>
           <h1>Giao dịch của tôi</h1>
           <p>
             Trao đổi với bên còn lại và theo dõi xác nhận, đánh giá, khiếu nại.
@@ -407,9 +397,7 @@ export default function TransactionsPanel({ user, selectedId }) {
           <div className="post-list">
             {feed.data?.items.map((row) => (
               <article className="post-card" key={row.giao_dich_id}>
-                <span className="status-pill">
-                  {row.trang_thai === "hoan_tat" ? "Hoàn tất" : "Chờ xác nhận"}
-                </span>
+                <StatusBadge state={row.trang_thai} />
                 <h2>{row.ten_sach}</h2>
                 <p>{row.ma_giao_dich}</p>
                 <p>

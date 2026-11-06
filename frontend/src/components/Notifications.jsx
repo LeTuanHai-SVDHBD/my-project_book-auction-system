@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiRequest, apiPost } from "../services/authApi.js";
 import { navigate } from "../services/navigation.js";
+import StatusBadge from "./StatusBadge.jsx";
 import { Dialog, Icon } from "./DesignUi.jsx";
 export function useNotifications(user) {
   const [data, setData] = useState(null),
@@ -208,15 +209,14 @@ export default function Notifications({ inbox, user, onClose }) {
                 <span className="inbox-entry-copy">
                   <span className="inbox-entry-title">
                     {item.tieu_de}
-                    {!item.ngay_doc && <i aria-label="Chưa đọc" />}
+
                   </span>
                   <span className="inbox-entry-body">{item.noi_dung}</span>
                   <span
                     className="inbox-entry-time"
                     title={new Date(item.ngay_tao).toLocaleString("vi-VN")}
                   >
-                    {timeAgo(item.ngay_tao)} ·{" "}
-                    {item.ngay_doc ? "Đã đọc" : "Chưa đọc"}
+                    {timeAgo(item.ngay_tao)} <StatusBadge state={item.ngay_doc ? "read" : "unread"} />
                   </span>
                 </span>
                 <Icon name="chevron" size={17} />

@@ -9,8 +9,8 @@ Không tích hợp cổng thanh toán, đối soát tài chính, vận chuyển,
 
 ## Cài đặt và phạm vi
 
-Cài/nâng cấp và các lệnh chạy tại [setup-guide.md](setup-guide.md). Schema hiện tại sau migration 007:
-**21 bảng/165 cột**, theo manifest. Các bảng giao dịch/chat/đánh giá/khiếu nại/bình luận có từ nền;
+Cài/nâng cấp và các lệnh chạy tại [setup-guide.md](setup-guide.md). Schema hiện tại sau migration 008:
+**21 bảng/166 cột**, theo manifest. Các bảng giao dịch/chat/đánh giá/khiếu nại/bình luận có từ nền;
 004 thêm thông báo, 005 snapshot kiểm duyệt, 006 mở ô ISBN, 007 hồ sơ theo bài/media active.
 Không thay cơ chế xác thực; thông tin sách lấy theo hồ sơ của đúng bài, giữ lịch sử phiên khác.
 

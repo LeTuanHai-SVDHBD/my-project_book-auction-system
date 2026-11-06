@@ -74,8 +74,8 @@ Mặc định chờ trước, từ chối sau; lọc Tất cả/Chờ/Đã từ 
 Bài từ chối có lý do/ngày gần nhất, mở để xem chi tiết; muốn duyệt lượt mới phải do chủ sách gửi lại.
 Bài đã phê duyệt rời danh sách này, quyết định/lịch sử vẫn giữ. Nút Về danh sách đưa về lưới thẻ.
 
-Bài mới **Chưa phân tích**, nút **Phân tích bằng AI**, chưa hiện điểm. Yêu cầu manual queued/running
-hiện tiến độ/khóa nút; đã chạy dùng **Phân tích lại bằng AI**. Chỉ kết quả phân tích không thất bại
+Khi bật tự duyệt, Admin thấy chờ, đang phân tích, kết quả hoặc lỗi; không hiện nút duyệt tay hay yêu cầu AI.
+Bài chờ ở màn hình chi tiết tự lấy lại kết quả mỗi 5 giây. Khi chạy thủ công, vẫn có nút **Phân tích bằng AI** và **Phân tích lại bằng AI**. Chỉ kết quả phân tích không thất bại
 mới có hai ô điểm; NULL là thiếu bằng chứng, lỗi provider là thất bại/chẩn đoán riêng. Điểm `100.00` hiển thị `100/100`.
 Video có tiến độ lấy Cloudinary/chuyển Files/chờ ACTIVE; manifest giữ link gốc, cách gửi toàn tệp
 (Gemini lấy mẫu), bytes/thời lượng nếu có. Không coi “đã gửi” là xác minh mọi frame/trang sách.
@@ -83,6 +83,20 @@ Video có tiến độ lấy Cloudinary/chuyển Files/chờ ACTIVE; manifest gi
 Người bán chờ duyệt không có panel AI nội bộ. Sau quyết định chỉ công bố kết quả đúng vòng;
 AI lỗi không lộ mã provider cho người bán. Nút PDF nằm trong kết quả/lịch sử có snapshot hợp lệ,
 không gọi lại AI; xem [ai-analysis.md](ai-analysis.md) và [review-exports.md](review-exports.md).
+
+## Màu trạng thái và bố cục
+
+| Nhóm | Nhãn và màu |
+|---|---|
+| Bài và phiên | Chờ duyệt vàng hổ phách; đã duyệt xanh lá; từ chối đỏ; sắp bắt đầu tím; đang đấu giá xanh dương; chờ chốt cam; kết thúc xám xanh |
+| Lượt giá | Chờ vàng hổ phách; chấp nhận xanh lá; từ chối đỏ |
+| Giao dịch | Chờ xác nhận xanh lam ngọc; hoàn tất xanh ngọc |
+| Khiếu nại | Chờ xử lý cam; đang xử lý chàm; đã xử lý xanh ngọc |
+| AI | Chưa phân tích xám; chờ vàng; đang phân tích xanh dương; xong xanh lá; thiếu dữ liệu cam; lỗi đỏ |
+
+Nhãn luôn có chữ và biểu tượng; không dùng màu làm tín hiệu duy nhất. Bài của tôi chuyển từ bảng sang thẻ
+ở màn hình hẹp. Chi tiết, nút tìm kiếm, bộ lọc, ngăn thông báo, hộp thoại, bảng điểm và media co theo chiều rộng.
+Giao diện dùng thương hiệu BookBid. Xem [kiểm chứng](../VALIDATION.md) để biết phạm vi QA thực tế.
 
 ## Gallery và đấu giá
 

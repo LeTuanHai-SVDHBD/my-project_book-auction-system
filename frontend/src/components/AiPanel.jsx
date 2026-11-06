@@ -1,13 +1,10 @@
+import { STATUS } from "../utils/statusPresentation.js";
+import StatusBadge from "./StatusBadge.jsx";
 /** Kết quả hỗ trợ Admin: hai điểm độc lập, NULL có lý do, bằng chứng theo tiêu chí và lịch sử lần phân tích. */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiRequest, apiPost } from "../services/authApi.js";
 import { currentReview } from "../../../shared/aiVisibility.js";
 import { aiProgressMessage } from "../utils/aiProgress.js";
-const states = {
-  thanh_cong: "Đã phân tích",
-  chua_day_du: "Chưa đầy đủ",
-  that_bai: "Phân tích thất bại",
-};
 const score = (value) =>
   value === null || value === undefined
     ? "Chưa đủ dữ liệu"
@@ -112,22 +109,26 @@ export default function AiPanel({ post, user }) {
     >
       {admin && <h3>AI hỗ trợ kiểm duyệt</h3>}
       <p className="field-hint">
-        Hai điểm phục vụ tham khảo. Admin đối chiếu bằng chứng và quyết định
-        điều kiện quý hiếm; tình trạng tốt không thay thế độ hiếm.
+        {post.kiem_duyet_tu_dong || currentReview(post)?.phan_tich_id
+          ? "Hệ thống đối chiếu hai điểm độc lập với mức đạt của từng nhóm."
+          : "Hai điểm phục vụ tham khảo. Admin đối chiếu bằng chứng trước khi quyết định."}
       </p>
       {admin && data && !data.configured && (
         <p className="notice">
-          Gemini chưa sẵn sàng. Kiểm duyệt thủ công vẫn hoạt động.
+          {post.kiem_duyet_tu_dong ? "AI chưa sẵn sàng. Bài đăng sẽ tiếp tục chờ." : "Gemini chưa sẵn sàng. Kiểm duyệt thủ công vẫn hoạt động."}
         </p>
+      )}
+      {admin && post.kiem_duyet_tu_dong && !pending && !analysis && data?.configured && (
+        <p><StatusBadge state="queued" /> Hệ thống tự bắt đầu khi đến lượt.</p>
       )}
       {admin && pending && (
         <p className="notice" role="status">
-          {aiProgressMessage(data.job)}
+          <StatusBadge state={data.job.state} /> {aiProgressMessage(data.job)}
           {analysis &&
             " Kết quả bên dưới thuộc lần phân tích trước; yêu cầu mới chưa hoàn tất."}
         </p>
       )}
-      {admin && post.trang_thai_phien === "cho_kiem_duyet" && (
+      {admin && !post.kiem_duyet_tu_dong && post.trang_thai_phien === "cho_kiem_duyet" && (
         <button
           className="primary"
           type="button"
@@ -154,7 +155,7 @@ export default function AiPanel({ post, user }) {
             <option value="">Mới nhất</option>
             {data.history.map((row) => (
               <option key={row.phan_tich_id} value={row.phan_tich_id}>
-                #{row.phan_tich_id} · {states[row.trang_thai]} ·{" "}
+                #{row.phan_tich_id} · {STATUS[row.trang_thai]?.label || STATUS.unknown.label} ·{" "}
                 {new Date(row.ngay_phan_tich).toLocaleString("vi-VN")}
               </option>
             ))}
@@ -166,11 +167,11 @@ export default function AiPanel({ post, user }) {
           {admin ? "Đang tải trạng thái AI…" : "Đang tải kết quả AI…"}
         </p>
       )}
-      {!analysis && !pending && data && (
+      {!analysis && !pending && data && (!admin || !post.kiem_duyet_tu_dong) && (
         <p role="status">
           {admin
             ? "Chưa phân tích. Nhấn Phân tích bằng AI để bắt đầu; Admin vẫn có thể kiểm duyệt thủ công."
-            : "Chưa có kết quả AI phù hợp cho lần kiểm duyệt này. Vui lòng xem quyết định và lý do của Admin ở trên."}
+            : "Chưa có kết quả AI phù hợp cho lần kiểm duyệt này. Vui lòng xem quyết định và lý do ở trên."}
         </p>
       )}
       {analysis &&
@@ -181,8 +182,8 @@ export default function AiPanel({ post, user }) {
           </p>
         ) : (
           <>
-            <p>
-              <strong>{states[analysis.trang_thai]}</strong> ·{" "}
+            <p className="ai-analysis-meta">
+              <StatusBadge state={analysis.trang_thai} /> {" "}
               {new Date(analysis.ngay_phan_tich).toLocaleString("vi-VN")}
             </p>
             {analysis.loi_thoi && (
@@ -196,12 +197,14 @@ export default function AiPanel({ post, user }) {
                 <div>
                   <h4>Hỗ trợ đánh giá độ hiếm</h4>
                   <strong>{score(analysis.diem_do_hiem)}</strong>
-                  <p>{analysis.tinh_diem?.do_hiem?.ly_do_null}</p>
+                  {analysis.thong_tin?.moderation && <p className="field-hint">Mức đạt: {analysis.thong_tin.moderation.thresholds.rarity}/100</p>}
+                  {analysis.tinh_diem?.do_hiem?.ly_do_null && <p>{analysis.tinh_diem.do_hiem.ly_do_null}</p>}
                 </div>
                 <div>
                   <h4>Tình trạng vật lý</h4>
                   <strong>{score(analysis.diem_tinh_trang)}</strong>
-                  <p>{analysis.tinh_diem?.tinh_trang?.ly_do_null}</p>
+                  {analysis.thong_tin?.moderation && <p className="field-hint">Mức đạt: {analysis.thong_tin.moderation.thresholds.condition}/100</p>}
+                  {analysis.tinh_diem?.tinh_trang?.ly_do_null && <p>{analysis.tinh_diem.tinh_trang.ly_do_null}</p>}
                 </div>
               </div>
             )}

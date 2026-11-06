@@ -342,7 +342,7 @@ export default function PostForm({
                         />
                         <small className="field-hint">
                           Nhập theo thông tin trên sách, có thể giữ dấu gạch nối
-                          và khoảng trắng. Tối đa {ISBN_MAX_LENGTH} ký tự; Admin
+                          và khoảng trắng. Tối đa {ISBN_MAX_LENGTH} ký tự; người kiểm duyệt
                           sẽ đối chiếu mã khi kiểm duyệt.
                         </small>
                       </label>
@@ -560,14 +560,14 @@ export default function PostForm({
             <p className="field-hint">
               Nhập số tiền VND nguyên; ô nhập chỉ chứa chữ số; dòng Giá trị bên
               dưới hiển thị dấu chấm phân cách hàng nghìn. Chỉ đặt lịch sau khi
-              được Admin phê duyệt.
+              bài đăng được duyệt.
             </p>
           </div>
           <div data-step="3" hidden={step !== 3}>
             <h3>Kiểm tra trước khi gửi</h3>
             <p>
               Bài đăng chỉ đại diện cho một bản sách vật lý. Chưa có lịch đấu
-              giá cho tới khi Admin phê duyệt và bạn kích hoạt.
+              giá cho tới khi bài được duyệt và bạn kích hoạt.
             </p>
             <dl className="post-info">
               <dt>Tên sách</dt>

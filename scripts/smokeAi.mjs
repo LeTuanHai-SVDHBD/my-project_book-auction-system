@@ -1,4 +1,4 @@
-/** Nghiệm thu AI thật: một bài không có ảnh, hai điểm NULL đúng nghĩa, Admin vẫn quyết định; dọn fixture riêng. */
+/** Nghiệm thu AI thật: một bài không có ảnh, hai điểm NULL đúng nghĩa, kiểm tra đúng chế độ kiểm duyệt; dọn fixture riêng. */
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {setTimeout as delay} from 'node:timers/promises';
@@ -9,29 +9,41 @@ import {createUserModel} from '../backend/src/models/user.model.js';
 import {passwords} from '../backend/src/services/password.service.js';
 import {formatAiFailure} from '../backend/src/ai/errors.js';
 const runId=randomUUID(),secret=randomBytes(24).toString('base64url'),base=`http://${config.host}:${config.port}/api`,accounts=[];
-let pool,postId,stage='cấu hình',finished=false,cleanupSafe=true;
+let auto=false,pool,postId,stage='cấu hình',finished=false,cleanupSafe=true;
 class Client{cookie='';token='';async call(path,method='GET',body){const response=await fetch(base+path,{method,headers:{cookie:this.cookie,'x-csrf-token':this.token,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(15000)});for(const value of response.headers.getSetCookie())if(value.startsWith('bookauction.sid='))this.cookie=value.split(';')[0];const data=await response.json();if(data.csrfToken)this.token=data.csrfToken;assert(response.ok,`${stage}: HTTP ${response.status} (${data.error||''})`);return data;}}
 try{
   assert.equal(config.mode,'development','Chỉ chạy smoke trong development.');assert(parseAiConfig(process.env).configured,'Cần AI_ENABLED=true và GEMINI_API_KEY trên máy; khởi động lại API/worker.');
   const seller=new Client(),admin=new Client();assert((await seller.call('/health/ready')).ok,'API/worker/SQL/Redis chưa sẵn sàng.');
   pool=await getPool();const users=createUserModel({getPool,sql}),hash=await passwords.hash(secret);
   for(const [label,role,client] of [['seller','nguoi_dung',seller],['admin','admin',admin]]){const user=await users.create({ho_ten:'AI smoke fixture',email:`ai-${label}-${runId}@example.test`,passwordHash:hash,role});accounts.push(user);await client.call('/auth/csrf');await client.call('/auth/login','POST',{email:user.email,mat_khau:secret});}
-  stage='đăng bài, chưa phân tích khi Admin chưa yêu cầu';
+  stage='đăng bài kiểm thử';
   const created=await seller.call('/posts','POST',{ma_yeu_cau:randomUUID(),sach:{ten_sach:`AI SMOKE ${runId}`,tinh_trang_sach:'Fixture không có ảnh, không được suy ra tình trạng tốt.'},bai_dang:{tieu_de:`AI SMOKE ${runId}`,mo_ta_tinh_trang:'Không có dữ liệu hình ảnh. Chỉ kiểm thử kết nối và NULL.'},phien:{gia_khoi_diem:'100000',gia_toi_thieu:'200000',buoc_gia:'1000',thoi_gian_cho_dat_lai:20},media:[]});postId=created.id;
-  const initialAi=await admin.call(`/ai/${postId}`);assert.equal(initialAi.analysis,null);assert.equal(initialAi.job,null);assert.deepEqual(initialAi.history,[]);
-  const initialPost=await admin.call(`/posts/${postId}`);
-  stage='Admin chủ động yêu cầu AI';cleanupSafe=false;
-  await admin.call(`/ai/${postId}`,'POST',{row_version:initialPost.row_version});
+  const initialPost=await admin.call(`/posts/${postId}`);auto=initialPost.kiem_duyet_tu_dong;
+  cleanupSafe=false;
+  if(!auto){
+    const initialAi=await admin.call(`/ai/${postId}`);assert.equal(initialAi.analysis,null);assert.equal(initialAi.job,null);assert.deepEqual(initialAi.history,[]);
+    stage='Admin chủ động yêu cầu AI';
+    await admin.call(`/ai/${postId}`,'POST',{row_version:initialPost.row_version});
+  }
   stage='chờ Gemini/worker lưu SQL';console.log('Đang kiểm tra Gemini thật; dữ liệu mẫu thiếu ảnh nên điểm phải giữ NULL.');
   let data;const deadline=Date.now()+parseAiConfig(process.env).jobTimeout+180000;
   while(Date.now()<deadline){data=await admin.call(`/ai/${postId}`);if(data.analysis&&(!data.job||data.job.state==='done')){cleanupSafe=true;break;}await delay(1000);}
   assert(data?.analysis,'Hết thời gian chờ kết quả AI.');assert.notEqual(data.analysis.trang_thai,'that_bai',`Gemini chưa hoàn tất: ${formatAiFailure(data.analysis.thong_tin)}`);
   assert.equal(data.analysis.diem_do_hiem,null);assert.equal(data.analysis.diem_tinh_trang,null);assert.equal(data.analysis.chi_tiet.length,9);
-  const waitingOwner=await seller.call(`/ai/${postId}`);assert.equal(waitingOwner.analysis,null);assert.equal(waitingOwner.job,null);assert.deepEqual(waitingOwner.history,[]);
-  assert.equal((await seller.call(`/posts/${postId}`)).ai,null);
-  const pendingPost=await admin.call(`/posts/${postId}`);assert.equal(pendingPost.trang_thai_phien,'cho_kiem_duyet');assert(!JSON.stringify(data).includes(process.env.GEMINI_API_KEY));
-  stage='Admin quyết định và công bố kết quả cho chủ bài';
-  await admin.call(`/posts/${postId}/review`,'POST',{quyet_dinh:'tu_choi',ly_do:'Fixture smoke thiếu ảnh: từ chối thử để kiểm tra công bố kết quả, không thẩm định sách thật.',row_version:pendingPost.row_version});
+  assert(!JSON.stringify(data).includes(process.env.GEMINI_API_KEY));
+  if(!auto){
+    const waitingOwner=await seller.call(`/ai/${postId}`);assert.equal(waitingOwner.analysis,null);assert.equal(waitingOwner.job,null);assert.deepEqual(waitingOwner.history,[]);
+    assert.equal((await seller.call(`/posts/${postId}`)).ai,null);
+    const pendingPost=await admin.call(`/posts/${postId}`);assert.equal(pendingPost.trang_thai_phien,'cho_kiem_duyet');
+    stage='Admin quyết định và công bố kết quả cho chủ bài';
+    await admin.call(`/posts/${postId}/review`,'POST',{quyet_dinh:'tu_choi',ly_do:'Fixture smoke thiếu ảnh: từ chối thử để kiểm tra công bố kết quả, không thẩm định sách thật.',row_version:pendingPost.row_version});
+  }else{
+    stage='AI tự từ chối vì hồ sơ thiếu bằng chứng';
+    const rejected=await seller.call(`/posts/${postId}`);
+    assert.equal(rejected.trang_thai_phien,'khong_dat_kiem_duyet');
+    assert.equal(rejected.kiem_duyet[0].phan_tich_id,data.analysis.phan_tich_id);
+    assert.match(rejected.kiem_duyet[0].phan_hoi_admin,/chưa đủ bằng chứng/);
+  }
   const owner=await seller.call(`/ai/${postId}`);assert.equal(owner.analysis?.phan_tich_id,data.analysis.phan_tich_id);
   assert.equal(owner.analysis.diem_do_hiem,null);assert.equal(owner.analysis.diem_tinh_trang,null);assert.equal(owner.job,null);assert.deepEqual(owner.history,[]);
   assert.equal((await seller.call(`/posts/${postId}`)).trang_thai_phien,'khong_dat_kiem_duyet');
@@ -43,4 +55,4 @@ finally{
   catch{console.error(`Chưa dọn xong fixture AI, bài #${postId}, run=${runId}.`);process.exitCode=1;}
   await closeDatabase();
 }
-if(finished&&!process.exitCode)console.log('PASS AI thật: bài mới chưa chạy; Admin yêu cầu Gemini JSON → Backend kiểm tra/tính điểm → SQL, thiếu ảnh giữ NULL; chủ bài chỉ thấy kết quả sau quyết định Admin.');
+if(finished&&!process.exitCode)console.log(auto?'PASS AI thật: worker tự phân tích, giữ NULL và từ chối vì thiếu bằng chứng; người bán thấy quyết định đã lưu.':'PASS AI thật: Admin yêu cầu phân tích; thiếu ảnh giữ NULL; người bán thấy kết quả sau quyết định Admin.');

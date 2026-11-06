@@ -2,6 +2,11 @@
 export function parseAiConfig(env) {
   if(env.AI_ENABLED!==undefined&&!['true','false',''].includes(env.AI_ENABLED))throw Error('AI_ENABLED chỉ nhận true hoặc false.');
   const integer=(name,fallback,min,max)=>{const n=Number(env[name]||fallback);if(!Number.isInteger(n)||n<min||n>max)throw Error(`${name} không hợp lệ.`);return n;};
+  if(env.AI_AUTO_MODERATION!==undefined&&!['true','false',''].includes(env.AI_AUTO_MODERATION))throw Error('AI_AUTO_MODERATION chỉ nhận true hoặc false.');
+  const autoModeration=env.AI_AUTO_MODERATION==='true'?{
+    rarity:integer('AI_MIN_RARITY_SCORE',NaN,1,100),
+    condition:integer('AI_MIN_CONDITION_SCORE',NaN,1,100),
+  }:null;
   const key=env.GEMINI_API_KEY||'',model=env.GEMINI_MODEL||'gemini-3.8-flash';
   if(!/^[a-z0-9][a-z0-9._-]{0,100}$/.test(model))throw Error('GEMINI_MODEL không hợp lệ.');
   const providerTimeout=integer('AI_PROVIDER_TIMEOUT_MS',60000,1000,300000);
@@ -13,7 +18,7 @@ export function parseAiConfig(env) {
   const videoMaxBytes=integer('AI_VIDEO_MAX_MB',100,1,100)*1048576;
   const maxAttempts=integer('AI_PROVIDER_MAX_ATTEMPTS',2,1,2),thinkingLevel=env.AI_THINKING_LEVEL||'low';
   if(!['low','medium','high','default'].includes(thinkingLevel))throw Error('AI_THINKING_LEVEL không hợp lệ.');
-  return {enabled:env.AI_ENABLED==='true',configured:env.AI_ENABLED==='true'&&key.length>10&&!key.includes('CHANGE_ME'),key,model,
+  return {autoModeration,enabled:env.AI_ENABLED==='true',configured:env.AI_ENABLED==='true'&&key.length>10&&!key.includes('CHANGE_ME'),key,model,
     cloudName:env.CLOUDINARY_CLOUD_NAME||'',providerTimeout,providerMaxTimeout,maxAttempts,thinkingLevel,mediaPrepareTimeout,videoPrepareTimeout,videoDownloadTimeout,videoMaxBytes,videoMaxCount,
     jobTimeout:mediaPrepareTimeout+videoPrepareTimeout*videoMaxCount+providerMaxTimeout*maxAttempts+10000,
     leaseRenewMs:15000,mediaConcurrency:4,mediaDownloadTimeout:15000,

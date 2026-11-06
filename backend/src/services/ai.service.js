@@ -5,6 +5,7 @@ import {ownerAiResult} from './aiPresentation.js';
 export function createAiService({posts,model,queue,config}) {
   return {
     async request(postId,user,sourceVersion){
+      if(config.autoModeration)throw new HttpError(409,'AUTO_MODERATION_ENABLED','Hệ thống sẽ tự phân tích và kiểm duyệt bài đăng.');
       if(!config.configured)throw new HttpError(503,'AI_NOT_CONFIGURED','Gemini chưa bật hoặc chưa cấu hình. Admin vẫn có thể kiểm duyệt thủ công.');
       const row=await posts.detail(postId,{owner:user.nguoi_dung_id,admin:user.vai_tro==='admin'});
       if(row.row_version!==sourceVersion||row.trang_thai_phien!=='cho_kiem_duyet')throw new HttpError(409,'AI_POST_CHANGED','Bài đã thay đổi hoặc không còn chờ duyệt. Hãy tải lại chi tiết.');
@@ -20,7 +21,7 @@ export function createAiService({posts,model,queue,config}) {
       let raw=analysisId?await model.get(postId,analysisId):row.ai;
       if(analysisId&&!raw)throw new HttpError(404,'AI_NOT_FOUND','Không tìm thấy lần phân tích của bài này.');
       let job=null;try{job=await queue.status(postId);}catch{/* SQL và kiểm duyệt thủ công vẫn dùng được khi Redis lỗi. */}
-      if(job?.trigger!=='manual')job=null;
+      if(job?.trigger!==(config.autoModeration?'auto':'manual'))job=null;
       if(!analysisId&&job?.source_version===row.row_version&&job.analysis_id&&raw?.phan_tich_id!==job.analysis_id)raw=await model.get(postId,job.analysis_id);
       return {configured:config.configured,job:job?.source_version===row.row_version?job:null,analysis:raw?.thong_tin?raw:analysisView(raw,row),history:await model.history(postId)};
     }

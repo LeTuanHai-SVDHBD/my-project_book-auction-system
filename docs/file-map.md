@@ -53,6 +53,7 @@ Các file `.gitkeep` chỉ giữ cấu trúc, không phải mô-đun chức năn
 |---|---|
 | `criteria.js`, `scoring.js` | Chín tiêu chí, bảng quy đổi, hai tổng độc lập và NULL |
 | `input.js` | Projection/hash đầu vào và đọc metadata/đánh dấu kết quả cũ |
+| `moderation.js`, `scheduler.js` | So hai ngưỡng, tạo lý do, xếp bài chờ theo phiên bản từ SQL |
 | `gemini.js` | Interactions REST/schema, prompt, retry hữu hạn, chống gửi giá/tài khoản |
 | `media.js` | Ảnh inline có ngân sách, video tuần tự riêng, manifest M1… |
 | `files.js` | Gemini Files resumable, kiểm tra host/name/URI, poll ACTIVE, cleanup |
@@ -72,10 +73,11 @@ Các file `.gitkeep` chỉ giữ cấu trúc, không phải mô-đun chức năn
 | `005_review_exports.sql` | Snapshot JSON theo quyết định KiemDuyet |
 | `006_isbn_input.sql` | ISBN NVARCHAR(100), không ép 10/13 ký tự |
 | `007_resubmission_profiles.sql` | BaiDang.ho_so_sach, HinhAnh/Video.dang_su_dung |
-| `backend/schema-manifest.json` | Chữ ký đích: 21 bảng, 165 cột, 99 CHECK, 15 UNIQUE |
+| `008_auto_moderation.sql` | Liên kết KiemDuyet–PhanTichAI, phân biệt nguồn Admin/AI |
+| `backend/schema-manifest.json` | Chữ ký đích: 21 bảng, 166 cột, 100 CHECK, 15 UNIQUE |
 | `backend/scripts/` | Init/migrate, danh sách migration dùng chung và CLI tạo Admin |
 
-Các dòng tên migration 002–007 ở bảng trên đều nằm trong `backend/migrations/`.
+Các dòng tên migration 002–008 ở bảng trên đều nằm trong `backend/migrations/`.
 
 ## Frontend
 

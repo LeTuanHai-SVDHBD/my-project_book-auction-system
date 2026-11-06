@@ -30,7 +30,7 @@ export default function App() {
   return (
     <BookBidShell user={user} route={route}>
       <div hidden={page !== "account"}>
-        <AccountPanel onUserChange={setUser} />
+        <AccountPanel user={user} onUserChange={setUser} />
       </div>
       {page === "home" && <Home />}
       {["catalog", "mine", "pending", "create"].includes(page) && (

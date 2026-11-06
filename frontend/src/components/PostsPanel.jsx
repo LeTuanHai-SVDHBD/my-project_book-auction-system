@@ -1,3 +1,4 @@
+import StatusBadge from "./StatusBadge.jsx";
 /** Danh mục, bài của tôi, kiểm duyệt thủ công và luồng đặt giá/kết quả phiên. */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BOOK_GENRE_GROUPS } from "../../../shared/bookGenres.js";
@@ -14,13 +15,6 @@ import CommentsPanel from "./CommentsPanel.jsx";
 import AiPanel from "./AiPanel.jsx";
 import ReviewExportButton from "./ReviewExportButton.jsx";
 import { useAuctionRealtime } from "../services/auctionRealtime.js";
-const states = {
-  cho_kiem_duyet: "Chờ kiểm duyệt",
-  khong_dat_kiem_duyet: "Bị từ chối",
-  da_qua_kiem_duyet: "Đã duyệt · chờ đặt lịch",
-  da_kich_hoat: "Đã kích hoạt",
-  da_ket_thuc: "Đã kết thúc",
-};
 const money = (value) =>
   value == null ? "Chưa có" : `${BigInt(value).toLocaleString("vi-VN")} đ`;
 const date = (value) =>
@@ -28,12 +22,13 @@ const date = (value) =>
 function ReviewDecision({ review, postId, canExport }) {
   return (
     <blockquote className="review-decision">
-      <strong>
-        {review.ket_qua === "Phê duyệt"
-          ? "Phê duyệt bài đăng"
-          : "Từ chối bài đăng"}
-      </strong>{" "}
-      · {date(review.ngay_kiem_duyet)}
+      <div className="review-decision-heading">
+        <StatusBadge state={review.ket_qua === "Phê duyệt" ? "approved" : "rejected"}>
+          {review.ket_qua === "Phê duyệt" ? "Đã phê duyệt" : "Bị từ chối"}
+        </StatusBadge>
+        <small>{review.phan_tich_id ? "Kiểm duyệt tự động" : "Admin kiểm duyệt"} · {date(review.ngay_kiem_duyet)}</small>
+      </div>
+      <h3>{review.ket_qua === "Từ chối" ? "Lý do từ chối bài đăng" : "Căn cứ phê duyệt"}</h3>
       <p className="preserve-lines">{review.phan_hoi_admin}</p>
       {canExport && review.co_the_xuat && (
         <ReviewExportButton postId={postId} review={review} />
@@ -95,7 +90,8 @@ function Detail({
     post.trang_thai_phien,
   );
   const admin = user?.vai_tro === "admin",
-    decision = currentReview(post);
+    decision = currentReview(post),
+    automatic = post.kiem_duyet_tu_dong;
   const waiting = post.trang_thai_phien === "cho_kiem_duyet";
   const ai = (
     <AiPanel
@@ -119,7 +115,7 @@ function Detail({
         </div>
         <div>
           <section className="panel live-auction-summary">
-            <span className="status-pill">{states[post.trang_thai_phien]}</span>
+            <StatusBadge post={post} />
             <h1>{post.ten_sach}</h1>
             <p>{post.tieu_de}</p>
             <p className="field-hint">
@@ -217,10 +213,13 @@ function Detail({
         <section className="panel live-review">
           {admin && ai}
           <h2>{waiting ? "Tiến độ kiểm duyệt" : "Kết quả kiểm duyệt"}</h2>
-          {!admin && waiting && (
+          {waiting && (automatic || !admin) && (
             <p className="notice" role="status">
-              Bài đăng đang chờ Admin kiểm duyệt. Kết quả sẽ hiển thị sau khi có
-              quyết định.
+              {automatic
+                ? post.ai_san_sang
+                  ? "Hệ thống đang kiểm duyệt tự động. Kết quả và lý do sẽ xuất hiện tại đây."
+                  : "Kiểm duyệt tự động đang tạm chờ dịch vụ AI. Bài đăng đã được lưu."
+                : "Bài đăng đang chờ kiểm duyệt. Kết quả sẽ hiển thị sau khi có quyết định."}
             </p>
           )}
           {decision && (
@@ -250,11 +249,11 @@ function Detail({
           )}
           {!admin && decision && (
             <details className="seller-ai-results">
-              <summary>Kết quả AI tham khảo</summary>
+              <summary>{decision.phan_tich_id ? "Điểm và bằng chứng AI" : "Kết quả AI tham khảo"}</summary>
               {ai}
             </details>
           )}
-          {mode === "pending" && post.trang_thai_phien === "cho_kiem_duyet" && (
+          {mode === "pending" && waiting && !automatic && (
             <form onSubmit={(event) => act(event, "review")}>
               <fieldset disabled={busy}>
                 <label>
@@ -316,7 +315,7 @@ export default function PostsPanel({
     [next, setNext] = useState(null),
     [post, setPost] = useState(null),
     [form, setForm] = useState(initialCreate ? "create" : null);
-  const [loading, setLoading] = useState(false),
+  const [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [q, setQ] = useState(filters.get("q") || "");
@@ -389,9 +388,9 @@ export default function PostsPanel({
     enabled: !form && mode === "catalog",
     onChange: () => load(),
   });
-  async function open(id) {
+  async function open(id, background = false) {
     const seq = ++detailSequence.current;
-    setLoading(true);
+    if (!background) setLoading(true);
     setError("");
     try {
       const value = await postApi.detail(id, mode === "catalog");
@@ -410,6 +409,17 @@ export default function PostsPanel({
       ++detailSequence.current;
     };
   }, [selectedId, mode, initialCreate]);
+  const watchDecision = Boolean(!form && post?.kiem_duyet_tu_dong && post.trang_thai_phien === "cho_kiem_duyet");
+  useEffect(() => {
+    if (!watchDecision || !selectedId) return;
+    let active = true, timer;
+    async function poll() {
+      await open(selectedId, true);
+      if (active) timer = setTimeout(poll, 5000);
+    }
+    timer = setTimeout(poll, 5000);
+    return () => { active = false; clearTimeout(timer); };
+  }, [watchDecision, selectedId, mode]);
   async function refresh() {
     if (post) await open(post.bai_dang_id);
     await load();
@@ -417,7 +427,7 @@ export default function PostsPanel({
   async function saved(id) {
     setForm(null);
     setMessage(
-      "Đã gửi kiểm duyệt. Sau khi Admin duyệt, bạn có thể đặt lịch cho phiên.",
+      "Đã gửi kiểm duyệt. Bạn có thể đặt lịch cho phiên khi bài được duyệt.",
     );
     navigate("mine", id);
     await load();
@@ -434,7 +444,7 @@ export default function PostsPanel({
     mode === "mine"
       ? "Bài đăng của tôi"
       : mode === "pending"
-        ? "Kiểm duyệt bằng thông tin, không bằng cảm tính"
+        ? "Kiểm duyệt bài đăng"
         : "Tìm một ấn bản thuộc về bạn";
   const detail = post && (
     <Detail
@@ -470,7 +480,7 @@ export default function PostsPanel({
             </h1>
             <p>
               {mode === "pending"
-                ? "Đối chiếu bản sách, bằng chứng và hai điểm hỗ trợ trước khi ghi quyết định."
+                ? "Theo dõi bài đang chờ, bằng chứng và căn cứ kiểm duyệt."
                 : mode === "mine"
                   ? "Theo dõi kiểm duyệt, bổ sung bằng chứng và đặt lịch đấu giá."
                   : "Theo dõi phiên đấu giá, đọc thông tin bản sách và lựa chọn bằng sự hiểu biết."}
@@ -681,8 +691,8 @@ export default function PostsPanel({
               )}
             </div>
           )}
-          {mode === "mine" ? (
-            <div className="panel table-scroll">
+          {mode === "mine" && items.length > 0 ? (
+            <div className="panel table-scroll my-posts-table">
               <table>
                 <thead>
                   <tr>
@@ -703,11 +713,9 @@ export default function PostsPanel({
                           </small>
                         </a>
                       </td>
-                      <td>{money(item.gia_khoi_diem)}</td>
-                      <td>
-                        <span className="status-pill">
-                          {states[item.trang_thai_phien]}
-                        </span>
+                      <td data-label="Giá khởi điểm">{money(item.gia_khoi_diem)}</td>
+                      <td data-label="Trạng thái">
+                        <StatusBadge post={item} />
                       </td>
                       <td>
                         <a

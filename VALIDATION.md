@@ -2,6 +2,12 @@
 
 # Kiểm chứng và nghiệm thu
 
+## Giữ trạng thái ổn định sau lần phân tích AI thất bại
+
+- `npm run check`, `npm test` và `npm run build` đều đạt: 212 PASS, 12 SKIP (dịch vụ thật), tổng 224 test.
+- Mô phỏng timeout xác nhận worker bỏ job tự động cũ, chỉ chạy lại theo yêu cầu gắn với kết quả mới nhất và vẫn tự chạy lần đầu cho vòng mới. HTTP fixture xác nhận job cũ không làm giao diện hiện lại tiến độ.
+- Không có migration mới; chưa chạy Gemini, Redis hoặc SQL thật trong lần sửa này.
+
 ## Tạm dừng khi Gemini báo 429
 
 - `npm run check`, `npm test` và `npm run build` đều đạt. Bộ test có 211 PASS, 12 SKIP (dịch vụ thật), 223 bài.

@@ -15,20 +15,13 @@ export function createAiModel({getPool,sql,commitReview}) {
       const rows=await request(await getPool()).input('meta',sql.NVarChar(200),META_CRITERION).query(`
         SELECT TOP(12) b.bai_dang_id,CONVERT(BINARY(8),p.row_version) AS row_version
         FROM dbo.BaiDang b JOIN dbo.PhienDauGia p ON p.bai_dang_id=b.bai_dang_id
-        OUTER APPLY (SELECT COUNT(*) AS attempts,MAX(a.ngay_phan_tich) AS last_at
-          FROM dbo.PhanTichAI a JOIN dbo.ChiTietPhanTichAI c ON c.phan_tich_id=a.phan_tich_id AND c.tieu_chi=@meta
-          CROSS APPLY (SELECT CASE WHEN ISJSON(c.bang_chung)=1 THEN c.bang_chung ELSE N'{}' END AS payload) j
-          WHERE a.bai_dang_id=b.bai_dang_id AND a.ngay_phan_tich>=DATEADD(day,-1,SYSUTCDATETIME())
-            AND JSON_VALUE(j.payload,'$.trigger')='auto'
-            AND JSON_VALUE(j.payload,'$.source_version')=CONVERT(VARCHAR(16),p.row_version,2)) recent
-        OUTER APPLY (SELECT TOP(1) JSON_VALUE(j.payload,'$.error_code') AS error_code
-          FROM dbo.PhanTichAI a JOIN dbo.ChiTietPhanTichAI c ON c.phan_tich_id=a.phan_tich_id AND c.tieu_chi=@meta
-          CROSS APPLY (SELECT CASE WHEN ISJSON(c.bang_chung)=1 THEN c.bang_chung ELSE N'{}' END AS payload) j
-          WHERE a.bai_dang_id=b.bai_dang_id AND JSON_VALUE(j.payload,'$.source_version')=CONVERT(VARCHAR(16),p.row_version,2)
-          ORDER BY a.phan_tich_id DESC) latest
         WHERE b.trang_thai='cho_kiem_duyet' AND p.trang_thai='cho_kiem_duyet'
-          AND ISNULL(latest.error_code,'')<>'AI_QUOTA_EXCEEDED'
-          AND recent.attempts<3 AND (recent.last_at IS NULL OR recent.last_at<=DATEADD(minute,-5,SYSUTCDATETIME()))
+          AND NOT EXISTS (
+            SELECT 1 FROM dbo.PhanTichAI a
+            JOIN dbo.ChiTietPhanTichAI c ON c.phan_tich_id=a.phan_tich_id AND c.tieu_chi=@meta
+            WHERE a.bai_dang_id=b.bai_dang_id
+              AND JSON_VALUE(CASE WHEN ISJSON(c.bang_chung)=1 THEN c.bang_chung ELSE N'{}' END,'$.source_version')
+                =CONVERT(VARCHAR(16),p.row_version,2))
         ORDER BY b.bai_dang_id`);
       return rows.recordset.map(withRowVersion);
     },

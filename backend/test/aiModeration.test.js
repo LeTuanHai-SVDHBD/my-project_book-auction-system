@@ -48,10 +48,29 @@ test('automatic mode keeps the Admin decision endpoint blocked even if Gemini is
   const posts=createPostService({autoModeration:parseAiConfig({AI_ENABLED:'false'}).autoModeration,model:{review:()=>assert.fail('manual review')}});
   await assert.rejects(posts.review(2,1,{}),{code:'AUTO_MODERATION_ENABLED'});
 });
-test('scheduler deduplicates active versions and does not enqueue a changed round',async()=>{
-  const rows=[1,2,3,4].map(bai_dang_id=>({bai_dang_id,row_version:'v1',trang_thai_phien:'cho_kiem_duyet'}));
-  const sent=[];await enqueueAutoReviews({signal:new AbortController().signal,model:{autoCandidates:async()=>rows},posts:{detail:async id=>({...rows[id-1],row_version:id===3?'v2':'v1',trang_thai_phien:id===4?'da_qua_kiem_duyet':'cho_kiem_duyet'})},queue:{status:async id=>id===2?{trigger:'auto',source_version:'v1',state:'running'}:null,enqueue:async (row,trigger)=>sent.push([row.bai_dang_id,trigger])}});
-  assert.deepEqual(sent,[[1,'auto']]);
+test('scheduler only recovers unanalysed rounds, even if a result is saved after the SQL scan',async()=>{
+  const rows=[1,2,3,4,5,6].map(bai_dang_id=>({bai_dang_id,row_version:'v1',trang_thai_phien:'cho_kiem_duyet'}));
+  const sent=[];await enqueueAutoReviews({signal:new AbortController().signal,model:{autoCandidates:async()=>rows},posts:{detail:async id=>({...rows[id-1],row_version:id===3?'v2':'v1',trang_thai_phien:id===4?'da_qua_kiem_duyet':'cho_kiem_duyet',
+    ai:id>=5?{phan_tich_id:id,thong_tin:{source_version:id===5?'v1':'previous'}}:null})},queue:{status:async id=>id===2?{trigger:'auto',source_version:'v1',state:'running'}:null,enqueue:async (row,trigger)=>sent.push([row.bai_dang_id,trigger])}});
+  assert.deepEqual(sent,[[1,'auto'],[6,'auto']]);
+});
+test('after a timeout only an explicit retry can make another Gemini request for this round',async()=>{
+  const row={bai_dang_id:1,row_version:'0000000000000001',trang_thai_phien:'cho_kiem_duyet'};
+  const job=(retryOf)=>({postId:1,sourceVersion:row.row_version,inputHash:inputHash(row),trigger:'auto',requestId:randomUUID(),...(retryOf?{retryOf}:{})});
+  let calls=0,writes=0,stage;
+  const run=createAiProcessor({posts:{detail:async()=>row},model:{find:async()=>null,save:async(j,result,info,check,verdict)=>{
+    await check();assert.equal(verdict,null);assert.equal(info.error_code,'AI_TIMEOUT');
+    return row.ai={...result,phan_tich_id:++writes,thong_tin:info};
+  }},queue:{get:async()=>null,update:async(j,p)=>{stage=p.state;return {...j,...p};}},
+  provider:{analyze:async()=>{calls++;throw Object.assign(Error('timeout'),{code:'AI_TIMEOUT'});}},
+  locks:{acquire:async()=>({renew:async()=>true,release:async()=>{}})},config:{configured:true,autoModeration:thresholds,jobTimeout:1000}});
+  await run(job());assert.equal(stage,'done');
+  await run(job());assert.equal(stage,'skipped');assert.equal(calls,1);
+  await run(job(1));assert.equal(stage,'done');assert.equal(calls,2);
+  await run(job(1));assert.equal(stage,'skipped');assert.equal(calls,2);
+  row.row_version='0000000000000002';
+  await run(job(2));assert.equal(stage,'skipped');
+  await run(job());assert.equal(stage,'done');assert.equal(calls,3);
 });
 test('auto processor sends one persisted verdict for the exact input; replay and stale job do not call Gemini',async()=>{
   const row={bai_dang_id:1,row_version:'0000000000000001',trang_thai_phien:'cho_kiem_duyet'};

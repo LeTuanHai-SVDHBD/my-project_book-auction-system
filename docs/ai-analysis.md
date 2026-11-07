@@ -71,9 +71,9 @@ Giữ Gemini key hiện có và chạy lại `npm.cmd run dev:all` để API và
 | Lỗi Gemini, tải/xử lý media tạm thời hoặc chưa có cấu hình | Bài tiếp tục chờ; không sinh quyết định từ lỗi kỹ thuật |
 
 Sau khi SQL lưu bài mới, gửi lại hoặc đăng lại, API xếp hàng AI mà không chờ kết quả phân tích.
-Worker quét tối đa 12 bài chờ mỗi lượt 10 giây để phục hồi khi Redis lỗi và xử lý bài chờ từ trước.
-Redis gom job theo bài/phiên bản; khi mất Redis, worker tìm lại bài còn chờ trong SQL.
-Lỗi kỹ thuật có thể thử lại cách ít nhất 5 phút, tối đa 3 lần phân tích đã lưu cho mỗi phiên bản trong cửa sổ 24 giờ. Lỗi 429 dùng quy tắc riêng bên dưới.
+Worker quét tối đa 12 bài chờ mỗi lượt 10 giây để khôi phục lần phân tích đầu tiên khi Redis lỗi hoặc bài chưa được xếp hàng.
+Sau khi SQL đã lưu một lần phân tích cho phiên bản hiện tại, worker không tự chạy lần phân tích mới, kể cả khi lần trước thất bại do timeout, 503 hoặc 429.
+Nếu bài còn chờ, Admin bấm **Phân tích lại bằng AI** để gửi yêu cầu cho đúng lần phân tích mới nhất. Các lượt gọi lại giới hạn bên trong cùng một lần phân tích và thời gian tạm dừng do lỗi 429 vẫn áp dụng.
 Bài đã quyết định không tự chấm lại. Mỗi vòng gửi lại dùng phiên bản mới.
 
 Migration 008 cho phép `KiemDuyet.admin_id` NULL khi có `phan_tich_id`; quyết định cũ giữ Admin và dữ liệu lịch sử.

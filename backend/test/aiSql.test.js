@@ -25,6 +25,7 @@ test('SQL AI: lưu chi tiết cùng điểm, replay không thêm dòng và versi
   const result=scoreObservations(observations,{mediaIds:['M1']});
   await assert.rejects(model.save(job,result,metadata,async()=>{throw Error('before COMMIT');}),/before COMMIT/);assert.equal((await model.history(postId)).length,0);
   const first=await model.save(job,result,metadata);assert.equal((await model.save(job,result,metadata)).phan_tich_id,first.phan_tich_id);assert.equal((await model.history(postId)).length,1);
+  assert(!(await model.autoCandidates()).some(candidate=>candidate.bai_dang_id===postId));
   const stored=await model.get(postId,first.phan_tich_id);assert.equal(stored.diem_do_hiem,100);assert.equal(stored.diem_tinh_trang,76.39);assert.equal(stored.chi_tiet.length,10);
   assert.equal((await posts.detail(postId,{admin:true})).ai.loi_thoi,false);
   await pool.request().input('post',sql.Int,postId).query('UPDATE dbo.PhienDauGia SET buoc_gia=2000 WHERE bai_dang_id=@post');

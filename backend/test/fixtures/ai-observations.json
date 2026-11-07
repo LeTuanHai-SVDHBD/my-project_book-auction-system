@@ -1,0 +1,140 @@
+{
+  "mediaIds": [
+    "M1"
+  ],
+  "observations": {
+    "criteria": [
+      {
+        "id": "limited_edition",
+        "status": "assessed",
+        "findings": [
+          "meets"
+        ],
+        "evidence": "Bằng chứng tổng hợp giả lập chỉ để kiểm tra phép tính, không phải kết quả giám định.",
+        "media_refs": [
+          "M1"
+        ],
+        "sources": [],
+        "confidence": 80,
+        "warning": null
+      },
+      {
+        "id": "special_edition",
+        "status": "assessed",
+        "findings": [
+          "meets"
+        ],
+        "evidence": "Bằng chứng tổng hợp giả lập chỉ để kiểm tra phép tính, không phải kết quả giám định.",
+        "media_refs": [
+          "M1"
+        ],
+        "sources": [],
+        "confidence": 80,
+        "warning": null
+      },
+      {
+        "id": "historical_context",
+        "status": "assessed",
+        "findings": [
+          "meets"
+        ],
+        "evidence": "Bằng chứng tổng hợp giả lập chỉ để kiểm tra phép tính, không phải kết quả giám định.",
+        "media_refs": [
+          "M1"
+        ],
+        "sources": [],
+        "confidence": 80,
+        "warning": null
+      },
+      {
+        "id": "provenance",
+        "status": "assessed",
+        "findings": [
+          "meets"
+        ],
+        "evidence": "Bằng chứng tổng hợp giả lập chỉ để kiểm tra phép tính, không phải kết quả giám định.",
+        "media_refs": [
+          "M1"
+        ],
+        "sources": [],
+        "confidence": 80,
+        "warning": null
+      },
+      {
+        "id": "cover",
+        "status": "assessed",
+        "findings": [
+          "light"
+        ],
+        "evidence": "Bằng chứng tổng hợp giả lập chỉ để kiểm tra phép tính, không phải kết quả giám định.",
+        "media_refs": [
+          "M1"
+        ],
+        "sources": [],
+        "confidence": 80,
+        "warning": null
+      },
+      {
+        "id": "spine",
+        "status": "assessed",
+        "findings": [
+          "moderate"
+        ],
+        "evidence": "Bằng chứng tổng hợp giả lập chỉ để kiểm tra phép tính, không phải kết quả giám định.",
+        "media_refs": [
+          "M1"
+        ],
+        "sources": [],
+        "confidence": 80,
+        "warning": null
+      },
+      {
+        "id": "pages",
+        "status": "assessed",
+        "findings": [
+          "intact"
+        ],
+        "evidence": "Bằng chứng tổng hợp giả lập chỉ để kiểm tra phép tính, không phải kết quả giám định.",
+        "media_refs": [
+          "M1"
+        ],
+        "sources": [],
+        "confidence": 80,
+        "warning": null
+      },
+      {
+        "id": "edges",
+        "status": "assessed",
+        "findings": [
+          "light"
+        ],
+        "evidence": "Bằng chứng tổng hợp giả lập chỉ để kiểm tra phép tính, không phải kết quả giám định.",
+        "media_refs": [
+          "M1"
+        ],
+        "sources": [],
+        "confidence": 80,
+        "warning": null
+      },
+      {
+        "id": "dust_jacket",
+        "status": "not_applicable",
+        "findings": [
+          "intact"
+        ],
+        "evidence": "Bằng chứng tổng hợp giả lập chỉ để kiểm tra phép tính, không phải kết quả giám định.",
+        "media_refs": [
+          "M1"
+        ],
+        "sources": [],
+        "confidence": 80,
+        "warning": null
+      }
+    ],
+    "warnings": []
+  },
+  "expected": {
+    "diem_do_hiem": 100,
+    "diem_tinh_trang": 76.39
+  }
+}

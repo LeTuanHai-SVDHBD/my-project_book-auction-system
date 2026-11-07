@@ -1,6 +1,4 @@
-/**
- * Tạo Express app, middleware, API trạng thái và API chẩn đoán dành cho development.
- */
+/** HTTP API chung: kiểm tra hạ tầng, mô-đun tài khoản và xử lý lỗi tập trung. */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -12,16 +10,16 @@ function sameToken(received, expected) {
   const a = Buffer.from(received || ''); const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
 }
-export function createApp({ config, deps, probes, log = () => {} }) {
+export function createApp({ config, deps, probes, authRouter, postRouter, mediaRouter, auctionRouter, aiRouter, communityRouter, notificationRouter, log = () => {} }) {
   const app = express();
   app.disable('x-powered-by'); app.use(helmet());
   app.use((req, res, next) => { req.requestId = randomUUID(); res.setHeader('X-Request-ID', req.requestId); next(); });
   app.use(cors({ origin(origin, done) {
     if (!origin || config.origins.includes(origin)) done(null, true);
     else done(new HttpError(403, 'ORIGIN_NOT_ALLOWED', 'Origin không được phép.'));
-  } }));
-  app.use(express.json({ limit: '8kb' }));
-  app.get('/api/health/live', (req, res) => res.json({ ok: true, service: 'my-project_book-auction-system-api', uptimeSeconds: Math.floor(process.uptime()) }));
+  }, credentials: true }));
+  app.use(express.json({ limit: '64kb' }));
+  app.get('/api/health/live', (req, res) => res.json({ ok: true, service: 'book-auction-api', milestone: 8, uptimeSeconds: Math.floor(process.uptime()) }));
   app.get('/api/health/ready', async (req, res) => {
     const report = await readiness(deps); res.status(report.ok ? 200 : 503).json(report);
   });
@@ -40,6 +38,13 @@ export function createApp({ config, deps, probes, log = () => {} }) {
     res.json(result);
   });
   app.use('/api/dev', diagnostic);
+  if (authRouter) app.use('/api/auth', authRouter);
+  if (postRouter) app.use('/api/posts', postRouter);
+  if (mediaRouter) app.use('/api/media', mediaRouter);
+  if (auctionRouter) app.use('/api/auctions', auctionRouter);
+  if (aiRouter) app.use('/api/ai', aiRouter);
+  if (notificationRouter) app.use('/api/notifications',notificationRouter);
+  if (communityRouter) app.use('/api/community',communityRouter);
   app.use((req, res, next) => next(new HttpError(404, 'NOT_FOUND', 'Không tìm thấy API.')));
   app.use(errorHandler(log));
   return app;

@@ -15,7 +15,7 @@
 | `uml/exports/` | SVG/PNG đưa vào báo cáo | `sequence-ket-thuc-phien.svg` |
 | `evidence/` | Bằng chứng kiểm thử được chọn | `smoke-test-2026-10-22.txt` |
 
-Hiện mới có cấu trúc và hướng dẫn; nhóm tự thêm DOCX, PPTX và mã UML đang dùng. Các tên trên là ví dụ, không phải tài liệu đã tạo.
+Theo source được rà soát ngày 03/11/2026, các thư mục trên mới có `.gitkeep` và hướng dẫn; nhóm tự thêm DOCX, PPTX và mã UML đang dùng. Các tên trên là ví dụ, không phải tài liệu đã tạo.
 
 ## 2. Thêm tài liệu hiện có
 
@@ -25,7 +25,9 @@ Hiện mới có cấu trúc và hướng dẫn; nhóm tự thêm DOCX, PPTX và
 4. Thêm bằng chứng vào `evidence/` sau khi loại mật khẩu, token và dữ liệu cá nhân không cần thiết.
 5. Kiểm tra `git status` và chỉ commit tài liệu cần chia sẻ.
 
-`docs/` tiếp tục chứa kiến trúc, quyết định kỹ thuật và hướng dẫn vận hành.
+`docs/` tiếp tục chứa kiến trúc, quyết định kỹ thuật và hướng dẫn vận hành. Đối chiếu chức năng với
+[README](../README.md), [luồng/API](../docs/flows.md) và [bằng chứng kiểm chứng](../VALIDATION.md)
+trước khi đưa vào báo cáo; không mô tả tính năng mock hoặc kết quả fixture như dịch vụ thật đã đạt.
 
 ## 3. Tên file và phiên bản
 

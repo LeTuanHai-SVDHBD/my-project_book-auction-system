@@ -1,54 +1,57 @@
-<!-- Mục đích: Theo dõi tiến độ triển khai, nguồn xác nhận và công việc tiếp theo. -->
+<!-- Mục đích: Phạm vi chức năng đã hoàn thành và checklist bàn giao, không thay bằng chứng kiểm thử. -->
 
-# Tiến độ triển khai hệ thống
+# Trạng thái hoàn thành và bàn giao
 
-## 1. Hiện trạng
+Rà soát theo nhánh `feat/Hai` ngày **03/11/2026**. Dự án đã hoàn thành triển khai phạm vi chức năng
+được chốt; nhóm đã xác nhận các mốc đến **Mốc 8**. Bảng này không xác nhận lại mọi dịch vụ thật hoặc
+mọi bản sửa mới nhất; bằng chứng cụ thể và giới hạn xem [VALIDATION.md](../VALIDATION.md).
 
-Ngày 22/10/2026, chủ dự án xác nhận đã thiết lập thành công toàn bộ môi trường hạ tầng.
-Repository đã được đưa lên GitHub tại nhánh `feat/Hai`.
+## Phạm vi hiện có
 
-Xác nhận trên máy của nhóm và kiểm tra trong môi trường rà soát là hai nguồn riêng.
-Các kết quả chạy cục bộ được ghi tại [VALIDATION](../VALIDATION.md).
+| Nhóm | Chức năng đã có trong source |
+|---|---|
+| Hạ tầng | Docker SQL/Redis, API/worker/web, health/probe/heartbeat, dev:all |
+| Tài khoản | Đăng ký/đăng nhập/đăng xuất, Argon2id, session/CSRF/quyền; login mới thu hồi phiên cũ |
+| Bản sách | Bốn bước, thể loại có danh mục, ISBN tùy chọn, mô tả chung, tiền nguyên, nháp theo tài khoản |
+| Media | Nhiều định dạng, nhận diện nội dung, vé Redis/Cloudinary, gỡ media mới/cũ đúng vòng, recovery và cleanup |
+| Kiểm duyệt | Chờ và từ chối trong danh sách Admin, quyết định có lý do, bổ sung đủ hồ sơ, snapshot/PDF |
+| AI | Tự duyệt theo hai ngưỡng cấu hình, lý do từ chối, JSON/hai điểm/NULL, lịch sử, Files API cho video dài |
+| Phiên | Chủ sách kích hoạt lịch; một bản vật lý, đăng lại có điều kiện, giữ lịch sử |
+| Giá/kết thúc | Admission/Streams, khóa/transaction/receipt, bước giá/cooldown, ngưỡng hoặc hết hạn, kết quả duy nhất |
+| Thời gian thực | Tín hiệu sau COMMIT, snapshot/reconnect/polling, đồng hồ SQL, trạng thái yêu cầu riêng |
+| Sau phiên | Giao dịch/chat, hai xác nhận, người mua đánh giá, uy tín/bình luận công khai |
+| Khiếu nại | Hồ sơ/bằng chứng, tiếp nhận/phân công Admin, chat đọc đúng phạm vi, phản hồi xử lý |
+| BookBid | Responsive, sidebar Admin, gallery/kính lúp/đổi ảnh bàn phím, tìm kiếm SQL, hộp ThongBao riêng |
 
-## 2. Tiến độ
+Không còn đặt mục “tích hợp AI”, “bổ sung frontend” hoặc “Mốc 8” là công việc chưa triển khai.
+Nghiệm thu bằng dữ liệu thật, đánh giá chất lượng AI và thử tải vẫn là các hoạt động kiểm chứng riêng.
 
-| Nhóm việc | Trạng thái | Căn cứ |
-|---|---|---|
-| npm workspaces, cấu hình và cấu trúc Backend/Frontend | Đã có | Mã nguồn trong repository |
-| SQL Server và Redis trên Docker | Đã thiết lập | Chủ dự án xác nhận |
-| Khởi tạo database và schema | Đã thiết lập | Chủ dự án xác nhận; DDL gồm 19 bảng/142 trường |
-| API, worker, React và kết nối hạ tầng | Đã thiết lập | Chủ dự án xác nhận |
-| Kiểm thử tự động và build | Đã có công cụ | `check`, `test`, `build`; xem VALIDATION |
-| Tài liệu AGENTS và docs | Đã có | Các file đã được đưa vào repository |
-| Chuẩn hóa tên dự án, Docker và README | Đã chuẩn bị | Bản thay đổi cần được nhóm áp dụng |
-| Chú thích đầu file và phạm vi `.gitignore` | Đã chuẩn bị | Bản thay đổi cần được nhóm áp dụng |
-| Cấu trúc lưu báo cáo, slide và UML | Đã tạo thư mục | Chưa thêm tài liệu học thuật của nhóm |
-| Chạy lại sau khi chuyển tên Docker | Cần thực hiện | Làm theo `docker-migration.md`, sau đó chạy smoke |
-| Bằng chứng nghiệm thu | Cần bổ sung | Chưa có ảnh hoặc log nghiệm thu trong repository |
+## Checklist bàn giao trên máy nhóm
 
-## 3. Checklist sau khi áp dụng bản chuẩn hóa
+Các ô trống là **chưa ghi nhận bằng chứng mới cho lượt bàn giao này**, không phủ nhận xác nhận mốc trước đó.
 
-- [ ] Giữ nguyên `.env` và xác nhận đúng volume dữ liệu đang sử dụng.
-- [ ] Dừng Docker project cũ trước khi chạy project tên mới.
-- [ ] `npm.cmd ci` thành công với lockfile hiện tại.
-- [ ] SQL Server và Redis healthy.
-- [ ] API, worker và React chạy lại thành công.
-- [ ] Giao diện đủ năm trạng thái sẵn sàng.
-- [ ] Probe chuyển từ `queued` sang `completed`.
-- [ ] `npm.cmd run smoke` PASS sau chuyển đổi.
-- [ ] Đưa báo cáo DOCX, slide PPTX và mã UML vào `academic/`.
-- [ ] Lưu bằng chứng đã loại thông tin nhạy cảm trong `academic/evidence/`.
+- [ ] Đúng nhánh; giữ `.env`/volume, Node 24.x; đã cập nhật dependency theo lockfile và migration 002–008.
+- [ ] SQL readiness **21 bảng/166 cột**; Docker healthy, API/worker chạy; probe hoàn tất.
+- [ ] Khách không có avatar/hộp tin; hai tài khoản khác nhau dùng hai tab được.
+- [ ] Login cùng tài khoản nơi mới thu hồi tab cũ; F5 không hồi sinh phiên cũ hoặc làm mất phiên mới.
+- [ ] Nhập tiền không lặp/chèn số, giữ 18 chữ số; thể loại, ISBN và mô tả lưu đúng.
+- [ ] Nháp giữ trường/bước/media khi chuyển route; upload tiếp tục; reload và hết hạn vé báo đúng.
+- [ ] Đăng sách với ảnh/video thật, mở lại sau gửi để đối chiếu tệp đã gắn SQL.
+- [ ] Bật tự duyệt trên môi trường test: bài mới/gửi lại → tự phân tích → duyệt hoặc từ chối có căn cứ; lỗi dịch vụ giữ chờ.
+- [ ] Video >5 phút được gửi Files API; đối chiếu manifest/timestamp với nội dung thật, không coi “đã gửi” là chất lượng thẩm định đạt.
+- [ ] Từ chối → bổ sung đủ hồ sơ/gỡ-thay media → gửi lại → phê duyệt; lịch sử/PDF cũ giữ đúng dữ liệu.
+- [ ] Chủ sách kích hoạt lịch; người mua không nhận `gia_toi_thieu` qua API/snapshot/thông báo.
+- [ ] Tranh giá/cooldown/retry cùng mã, hai kiểu kết thúc, kết quả và giao dịch không trùng.
+- [ ] Nhiều trình duyệt cùng snapshot; mất mạng/reconnect bắt kịp; hết giờ chờ xác nhận SQL rồi mới hiện người thắng.
+- [ ] Chat đúng hai bên, đánh dấu đọc đúng người nhận, hai xác nhận và đánh giá đúng người mua/một lần.
+- [ ] Khiếu nại có ảnh thật, hai Admin tranh tiếp nhận, quyền chat mất khi xử lý xong; không lộ hồ sơ cho bên còn lại.
+- [ ] Tìm kiếm không dấu/lọc/phân trang, thông báo riêng/đọc bền/không trùng, PDF và gallery trên desktop/mobile.
+- [ ] Lưu log/ảnh phiên bản và kết quả smoke/test opt-in đã che bí mật; không đánh dấu SKIP là PASS.
 
-## 4. Công việc nghiệp vụ tiếp theo
+Hướng dẫn lệnh và điều kiện chạy: [setup-guide.md](setup-guide.md), [VALIDATION.md](../VALIDATION.md).
 
-- [ ] Thống nhất cơ chế đăng nhập và quản lý phiên.
-- [ ] Thống nhất kênh thông báo từ worker sang API và cách phục hồi sau COMMIT.
-- [ ] Đăng ký, đăng nhập và phân quyền.
-- [ ] Đăng sách, kiểm duyệt và phân tích AI.
-- [ ] Kích hoạt phiên.
-- [ ] Đặt giá, khóa theo phiên, cooldown và chống ghi trùng.
-- [ ] Kết thúc phiên và xác định người thắng.
-- [ ] Giao dịch, trò chuyện, đánh giá và khiếu nại.
+## Phần ngoài phạm vi
 
-Chỉ cập nhật hoàn thành khi có mã và kết quả kiểm tra phù hợp.
-Không suy ra các chức năng nghiệp vụ đã có từ việc môi trường chạy thành công.
+Chưa có thanh toán/vận chuyển/hoàn tiền tự động, hồ sơ cá nhân mở rộng, theo dõi phiên/nhắc hết hạn,
+email/push hệ điều hành, CDN bằng chứng riêng tư, chữ ký số PDF, công cụ replay dead-letter hoặc benchmark production.
+Những phần này cần yêu cầu/thiết kế riêng; không được mô tả như chức năng đang hoạt động.

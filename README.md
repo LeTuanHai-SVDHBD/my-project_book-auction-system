@@ -1,204 +1,219 @@
-<!-- Mục đích: Giới thiệu dự án và hướng dẫn cài đặt, chạy, kiểm tra trên máy phát triển. -->
+<!-- Mục đích: Điểm bắt đầu cho cài đặt, sử dụng và đọc tài liệu của nhánh feat/Hai. -->
 
-# my-project_book-auction-system
+# Hệ thống đấu giá sách trực tuyến — Nhóm 15
 
-**BookAuction — Hệ thống đấu giá sách trực tuyến · Nhóm 15**
+Ứng dụng BookBid quản lý một bản sách vật lý từ đăng bài, kiểm duyệt, kích hoạt phiên,
+đặt giá đến kết quả và giao dịch. Kiến trúc hướng sự kiện tách việc tiếp nhận yêu cầu HTTP
+khỏi xử lý đấu giá ở worker; **SQL Server là nguồn trạng thái có thẩm quyền**.
 
-Dự án ứng dụng kiến trúc hướng sự kiện để xử lý yêu cầu đặt giá đồng thời và đồng bộ diễn biến phiên đấu giá. Frontend sử dụng React, Backend sử dụng Express; SQL Server lưu trạng thái nghiệp vụ, Redis Streams chuyển yêu cầu đến worker và Socket.IO hỗ trợ cập nhật thời gian thực.
+Tài liệu được rà soát ngày **06/11/2026**, theo mã nguồn nhánh **`feat/Hai`**.
+Chức năng trong phạm vi các mốc 3–8 đã được triển khai. Mức kiểm chứng, báo cáo của nhóm
+và phần chưa chạy với dịch vụ thật được ghi riêng tại [VALIDATION.md](VALIDATION.md).
+Không coi việc hoàn thành mã nguồn là chứng nhận sẵn sàng vận hành production.
 
-## 1. Phạm vi triển khai
+## Công nghệ và cách tổ chức
 
-| Thành phần | Hiện trạng |
+| Thành phần | Công nghệ / vai trò |
 |---|---|
-| Môi trường phát triển | Chủ dự án xác nhận thiết lập thành công |
-| Hạ tầng | Có API, worker riêng, SQL Server, Redis và màn hình kiểm tra |
-| Cơ sở dữ liệu | Có script khởi tạo 19 bảng, 142 trường theo thiết kế |
-| Luồng kiểm tra | Có probe qua Redis Streams → worker → SQL Server |
-| Chức năng nghiệp vụ | Theo dõi trong [tiến độ triển khai](docs/tasks.md) |
+| Giao diện | React, Vite, JavaScript ES Modules; giao diện BookBid responsive |
+| API | Node.js **24.x**, Express; xác thực HTTP, upload và Socket.IO |
+| Worker | Redis Streams; xử lý giá, hết hạn và kiểm duyệt AI |
+| CSDL | SQL Server 2022 Developer; migration 001–008 |
+| Redis | Redis 8; session, hàng đợi, admission, khóa và Pub/Sub |
+| Ảnh/video | Cloudinary; vé upload Redis, metadata và tham chiếu SQL |
+| AI | Gemini Interactions + Files API; Backend tính hai điểm và hỗ trợ tự duyệt theo ngưỡng cấu hình |
+| Quản lý gói | npm workspaces, một `package-lock.json` ở thư mục gốc |
 
-Probe hiện tại chỉ kiểm tra kết nối bằng truy vấn SQL đọc. Socket.IO nhận sự kiện `system:hello`; kết quả probe được lấy qua HTTP API. Xác thực, đặt giá và xử lý người thắng chưa được triển khai trong mã hiện tại.
+Schema hiện tại: **21 bảng, 166 cột, 100 CHECK, 15 UNIQUE constraints**, theo
+[manifest](backend/schema-manifest.json). Số UNIQUE này không bao gồm việc đếm mọi chỉ mục duy nhất.
+Frontend không truy cập SQL/Redis trực tiếp. Chỉ SQL Server/Redis được Compose khởi động;
+API, worker và web chạy bằng Node trên máy phát triển.
 
-## 2. Công cụ và quản lý thư viện
+## Cài lần đầu
 
-- Windows 11 x64, VS Code và PowerShell.
-- Node.js **24** kèm npm, theo `engines` của dự án.
-- Docker Desktop đang chạy Linux containers.
-- SSMS là tùy chọn để xem database.
-
-```powershell
-node --version
-npm.cmd --version
-docker --version
-docker compose version
-docker info
-```
-
-Dự án dùng npm workspaces và `package-lock.json` để quản lý phiên bản thư viện. Dùng `npm.cmd ci` để cài theo lockfile; ứng dụng không cần Python virtual environment. `.env` chứa cấu hình riêng, không phải môi trường ảo.
-
-## 3. Mở thư mục dự án
-
-Trong VS Code, chọn **File → Open Folder** và mở thư mục `my-project_book-auction-system` đã có trên máy.
-
-Thư mục gốc phải chứa `package.json`, `package-lock.json`, `compose.yaml`, `backend/` và `frontend/`. Các lệnh bên dưới chạy tại thư mục này, trừ khi có ghi chú khác.
-
-## 4. Cài thư viện và tạo cấu hình
+Cần Git, Node.js 24.x kèm npm, Docker Desktop với Linux containers và Compose V2.
+Chạy PowerShell tại thư mục muốn lưu dự án:
 
 ```powershell
+git clone --branch feat/Hai https://github.com/LeTuanHai-SVDHBD/my-project_book-auction-system.git
+cd my-project_book-auction-system
 npm.cmd ci
 npm.cmd run setup
-```
-
-Setup tạo `.env` ở gốc và `frontend/.env` nếu chưa tồn tại. Mật khẩu SQL và token chẩn đoán được sinh tự động; cấu hình đang có được giữ nguyên.
-
-| Biến | Giá trị mặc định |
-|---|---|
-| `API_HOST` / `API_PORT` | `127.0.0.1` / `5000` |
-| `DB_SERVER` / `DB_PORT` | `127.0.0.1` / `14330` |
-| `DB_DATABASE` / `DB_USER` | `BookAuctionDB` / `sa` |
-| `REDIS_URL` | `redis://127.0.0.1:63790` |
-| `DB_PASSWORD` / `DEV_PROBE_TOKEN` | Sinh khi tạo `.env` mới |
-| `SQLSERVER_VOLUME_NAME` / `REDIS_VOLUME_NAME` | Tên volume cho máy cài mới, lấy từ `.env.example` |
-
-Máy đang dùng Docker project cũ cần đọc [hướng dẫn chuyển đổi](docs/docker-migration.md) trước khi chạy lại dịch vụ. Không thay `.env` đang có bằng file mẫu vì có thể đổi mật khẩu hoặc liên kết volume.
-
-Chỉ commit `.env.example`. Không đưa bí mật vào Git hoặc biến `VITE_*`. Tài khoản `sa` và chế độ tin cậy chứng chỉ hiện phục vụ phát triển cục bộ.
-
-## 5. Khởi động SQL Server và Redis
-
-Mở Docker Desktop, sau đó chạy:
-
-```powershell
 docker compose up -d
 docker compose ps
 ```
 
-Compose project có tên `my-project_book-auction-system`. Container được Compose đặt tên theo project, dịch vụ và số thứ tự; không cấu hình `container_name` cố định.
-
-| Dịch vụ | Cổng container | Cổng trên Windows |
-|---|---|---|
-| SQL Server 2022 Developer | `1433` | `127.0.0.1:14330` |
-| Redis 8 | `6379` | `127.0.0.1:63790` |
-
-Chờ cả hai dịch vụ báo **healthy**. Xem log khi cần:
-
-```powershell
-docker compose logs --tail 50 sqlserver
-docker compose logs --tail 50 redis
-```
-
-Dữ liệu được giữ bằng named volume. Redis bật AOF với `appendfsync everysec`; khả năng phục hồi cần được đánh giá thêm khi triển khai nghiệp vụ.
-
-## 6. Khởi tạo database
-
-Sau khi dịch vụ healthy:
+Chờ `sqlserver` và `redis` **healthy**, sau đó:
 
 ```powershell
 npm.cmd run db:init
+npm.cmd run admin:create
+npm.cmd run dev:all
 ```
 
-Script tạo `BookAuctionDB` nếu chưa tồn tại và chạy `backend/migrations/001_schema.sql` khi chưa có bảng đích. Nếu nhận diện đủ 19 bảng/142 trường, script giữ nguyên và bỏ qua DDL; nếu cấu trúc chỉ khớp một phần, script dừng để kiểm tra.
+`admin:create` hỏi thông tin/mật khẩu kín trong terminal; không có tài khoản Admin mặc định.
+Mở **http://127.0.0.1:5173**. API mặc định ở **http://127.0.0.1:5000**.
+`setup` tạo cấu hình riêng khi chưa có, không ghi đè `.env` đã tồn tại.
+Điền Cloudinary để tải media; bật Gemini khi cần dùng AI. Hướng dẫn đầy đủ và bảng cấu hình:
+[setup-guide.md](docs/setup-guide.md).
 
-Đếm bảng/cột chỉ nhận diện cấu trúc cơ bản, chưa xác minh đầy đủ kiểu, chỉ mục hoặc ràng buộc trong database đang tồn tại. Script chưa tạo dữ liệu mẫu hoặc tài khoản Admin.
+## Cập nhật máy đã có dữ liệu
 
-Kết nối bằng SSMS:
-
-| Trường | Giá trị |
-|---|---|
-| Server name | `127.0.0.1,14330` — dùng dấu phẩy |
-| Authentication | SQL Server Authentication |
-| Login | `sa` |
-| Password | `DB_PASSWORD` trong `.env` |
-| Trust server certificate | Bật trong môi trường cục bộ này |
-
-Nếu dùng SQL Server đã cài sẵn, chỉ chạy Redis bằng `docker compose up -d redis` và điều chỉnh cấu hình database. SQL Server đó cần bật TCP và SQL Authentication.
-
-## 7. Chạy API, worker và Frontend
-
-Mở ba terminal tại thư mục gốc:
-
-| Terminal | Lệnh | Kết quả |
-|---|---|---|
-| API | `npm.cmd run dev:api` | Log `API đã chạy`, cổng 5000 |
-| Worker | `npm.cmd run dev:worker` | Log `Worker kiểm tra hạ tầng đã chạy` |
-| Frontend | `npm.cmd run dev:web` | React tại `http://127.0.0.1:5173` |
-
-Giao diện cần có năm trạng thái sẵn sàng: API, SQL Server, Redis, Event Worker và Socket.IO. Ô SQL hiển thị 19/19 bảng và 142/142 trường.
-
-API có thể mở cổng khi SQL/Redis chưa sẵn sàng. Liveness HTTP 200 xác nhận tiến trình đang hoạt động; readiness mới kiểm tra các dịch vụ phụ thuộc.
-
-## 8. Gửi sự kiện kiểm tra
-
-1. Mở `.env` ở gốc và sao chép giá trị `DEV_PROBE_TOKEN`.
-2. Dán vào ô **Khóa kiểm tra cục bộ** trên giao diện.
-3. Chọn **Gửi sự kiện kiểm tra**.
-4. Kiểm tra chuyển từ `queued` sang `completed` và hiện tên worker.
-
-API chẩn đoán chỉ mở trong development và yêu cầu token. Token này không phải cơ chế đăng nhập người dùng.
-
-Luồng dùng stream `bookauction:infra:requests`, consumer group `infrastructure-workers` và kết nối Redis riêng cho lệnh BLOCK. Kết quả có TTL 10 phút; heartbeat hết hạn sau 10 giây; pending có thể được nhận lại sau tối thiểu 30 giây idle.
-
-## 9. Kiểm tra hệ thống
+Dừng `dev:all` bằng Ctrl+C, giữ Docker/volume và cấu hình riêng. Nếu có sửa local, xử lý chúng
+trước khi chuyển nhánh/pull; không dùng reset để bỏ thay đổi chưa lưu.
 
 ```powershell
-npm.cmd run check
-npm.cmd test
-npm.cmd run build
-npm.cmd run smoke
+git switch feat/Hai
+git pull --ff-only origin feat/Hai
+npm.cmd ci
+npm.cmd run setup
+npm.cmd run setup:auth
+npm.cmd run setup:media
+npm.cmd run setup:ai
+docker compose up -d
 ```
 
-| Lệnh | Phạm vi |
-|---|---|
-| `check` | Cú pháp JavaScript máy chủ và script |
-| `test` | Kiểm thử với dịch vụ giả lập |
-| `build` | Build Frontend vào `frontend/dist/` |
-| `smoke` | Kiểm tra API, SQL, Redis, worker, Socket.IO và probe bằng dịch vụ thật |
-
-Giữ API, worker, SQL Server và Redis hoạt động khi chạy smoke. Xem [kết quả kiểm tra](VALIDATION.md); bằng chứng của nhóm lưu trong `academic/evidence/`.
-
-## 10. Tài liệu và cấu trúc
-
-| Đường dẫn | Nội dung |
-|---|---|
-| [AGENTS.md](AGENTS.md) | Quy tắc dành cho AI Agent |
-| [docs/architecture.md](docs/architecture.md) | Kiến trúc và kết nối |
-| [docs/flows.md](docs/flows.md) | Luồng nghiệp vụ |
-| [docs/file-map.md](docs/file-map.md) | Trách nhiệm từng thư mục/file |
-| [docs/decisions.md](docs/decisions.md) | Quyết định kỹ thuật |
-| [docs/tasks.md](docs/tasks.md) | Tiến độ triển khai |
-| [docs/docker-migration.md](docs/docker-migration.md) | Chuyển cấu hình Docker đang có |
-| [academic/README.md](academic/README.md) | Báo cáo, slide, mã UML và bằng chứng |
-
-## 11. Xử lý lỗi thường gặp
-
-| Hiện tượng | Hướng xử lý |
-|---|---|
-| `npm.ps1 cannot be loaded` | Dùng `npm.cmd` trong PowerShell |
-| Docker không kết nối được | Mở Docker Desktop, chờ Engine và kiểm tra Linux containers |
-| Cổng SQL/Redis bị chiếm sau đổi tên | Dừng project cũ theo hướng dẫn chuyển đổi |
-| SQL báo login failed hoặc dữ liệu trống | Kiểm tra mật khẩu và volume; đổi `.env` không tự đổi mật khẩu SQL đã lưu |
-| SQL kết nối nhưng chưa có bảng | Chạy `npm.cmd run db:init` vào đúng database |
-| Redis chưa sẵn sàng | Kiểm tra Docker/log; khởi động lại API/worker nếu kết nối đã ngừng thử lại |
-| Worker chưa sẵn sàng | Kiểm tra terminal worker và database |
-| Token chẩn đoán sai | Lấy giá trị trong `.env` ở gốc, không lấy từ `frontend/.env` |
-| Probe vẫn queued | Kiểm tra worker và SQL; pending có thể cần hơn 30 giây để nhận lại |
-| CORS error | Mở đúng địa chỉ Frontend và kiểm tra `CLIENT_ORIGINS` |
-
-## 12. Dừng và chạy lại
-
-Nhấn **Ctrl+C** ở các terminal ứng dụng. Dừng dịch vụ và giữ dữ liệu:
+Sau khi Docker healthy:
 
 ```powershell
-docker compose stop
+npm.cmd run db:migrate
+npm.cmd run dev:all
 ```
 
-Lần sau chạy `docker compose start`, chờ healthy rồi mở lại ba tiến trình ứng dụng. Không cần tạo lại `.env` hoặc database mỗi lần chạy.
+Ctrl+F5 sau khi cập nhật frontend. Các script `setup:*` chỉ thêm khóa thiếu, giữ giá trị đang có;
+`db:migrate` áp dụng 002–008 lên schema nền có sẵn. Không dùng `db:migrate` thay `db:init` trên database trống.
+Không xóa database/Redis/volume để chữa readiness. Nếu đổi Docker project hoặc máy có volume cũ,
+đọc [docker-migration.md](docs/docker-migration.md) trước khi khởi động.
 
-## 13. Tài liệu công nghệ
+Mỗi ngày chỉ cần giữ Docker chạy và dùng **một terminal**:
 
-- [Node.js](https://nodejs.org/en/download)
-- [Vite](https://vite.dev/guide/)
-- [Express](https://expressjs.com/en/starter/installing.html)
-- [SQL Server Docker](https://learn.microsoft.com/en-us/sql/linux/quickstart-install-connect-docker?view=sql-server-ver16)
-- [node-mssql](https://github.com/tediousjs/node-mssql)
-- [Redis Streams](https://redis.io/docs/latest/develop/use-cases/streaming/nodejs/)
-- [Socket.IO](https://socket.io/docs/v4/server-initialization/)
+```powershell
+npm.cmd run dev:all
+```
+
+Lệnh mở ba tiến trình có nhãn `[API]`, `[WORKER]`, `[WEB]`; một tiến trình dừng sẽ kéo các tiến trình
+còn lại dừng theo `--kill-others`. Muốn chạy kiểm tra/smoke thì mở terminal thứ hai, không mở thêm một `dev:all`.
+
+## Chức năng theo vai trò
+
+| Vai trò | Chức năng |
+|---|---|
+| Khách | Xem/tìm phiên công khai, ảnh/video, giá, lịch sử, kết quả, bình luận và uy tín |
+| Người dùng | Đăng sách, lưu nháp, bổ sung bài bị từ chối, kích hoạt/đăng lại đủ điều kiện; đặt giá sách của người khác |
+| Hai bên giao dịch | Chat riêng, xác nhận hoàn tất phần giao dịch của mình, khiếu nại; người mua đánh giá sau hoàn tất |
+| Admin | Theo dõi kiểm duyệt AI, yêu cầu phân tích lại khi bài còn chờ; xử lý khiếu nại |
+
+Admin dùng sidebar riêng, không có chức năng đăng sách. Khách không thấy avatar tài khoản hoặc hộp thông báo.
+Đăng nhập cùng tài khoản ở nơi mới thu hồi phiên cũ; F5 không khôi phục phiên đã bị thu hồi.
+Khác tài khoản vẫn có thể dùng đồng thời ở các tab. Xem [account-control.md](docs/account-control.md).
+
+## Luồng sử dụng chính
+
+1. **Đăng sách:** điền bốn bước, gồm thông tin sách, ảnh/video, thông số đấu giá, kiểm tra và gửi.
+   ISBN tùy chọn, tối đa 100 ký tự; thể loại chọn từ danh mục chung, gõ chỉ để lọc.
+   Một ô **Tình trạng, yếu tố quý hiếm và bằng chứng** thay cho hai mô tả tình trạng trùng nhau.
+2. **Kiểm duyệt:** Bài được đưa vào hàng đợi AI sau khi lưu; worker đối chiếu hai điểm độc lập với hai ngưỡng.
+   Đạt cả hai thì phê duyệt; điểm thấp hoặc thiếu bằng chứng sau khi phân tích thì từ chối kèm lý do.
+   Sự cố dịch vụ giữ bài chờ. Admin có thể yêu cầu AI phân tích lại, còn quyết định luôn do hệ thống lưu.
+   Bật Gemini và xem hai ngưỡng theo [hướng dẫn cấu hình](docs/ai-analysis.md#kiểm-duyệt-tự-động).
+3. **Bổ sung:** chủ bài bị từ chối sửa hồ sơ, đánh dấu gỡ media cũ, thêm media và gửi duyệt lại.
+   Lưu hồ sơ theo bài, giữ media/quyết định/PDF của vòng trước. Bài đã duyệt rời danh sách kiểm duyệt.
+4. **Kích hoạt:** chủ sách đặt lịch tương lai cho đúng phiên đã duyệt. Phê duyệt chưa tự mở đấu giá.
+5. **Đặt giá:** HTTP 202 chỉ là **đang chờ xử lý**. Worker kiểm tra và ghi quyết định SQL;
+   giao diện mới chuyển sang **được chấp nhận/bị từ chối**. Giá/trạng thái được đồng bộ giữa các trình duyệt.
+6. **Kết thúc:** hết hạn hoặc lượt hợp lệ đạt/vượt giá kết thúc sớm. Có người thắng mới tạo giao dịch/chat.
+   Hai bên xác nhận độc lập; sau hoàn tất, người mua được đánh giá một lần.
+7. **Kết quả kiểm duyệt:** người bán xem sau quyết định; nút xuất mở bản in để lưu PDF.
+   Ảnh/video trong bản kết quả là link Cloudinary, không nhúng tệp.
+
+### Quy tắc giá
+
+- Mỗi bài là **một bản sách vật lý**. Chủ sách không tự đặt giá; Admin không đặt giá.
+- Lượt đầu: `gia_khoi_diem + k × buoc_gia`, `k ≥ 0`.
+- Lượt sau: `gia_hien_tai + k × buoc_gia`, `k ≥ 1`.
+- Cooldown cùng người/cùng phiên mặc định 20 giây, Backend nhận 10–30 giây;
+  giao diện chọn 10/15/20/25/30 giây. Trong thời gian chờ, ẩn thao tác đặt tiếp.
+- `gia_toi_thieu` là **ngưỡng kết thúc sớm**, chỉ chủ sách/Admin thấy; không phải điều kiện bắt buộc
+  để có người thắng khi hết hạn. Hết hạn có lượt hợp lệ thì giá cao nhất thắng dù chưa đạt ngưỡng.
+- Tiền VND nguyên là chuỗi tối đa 18 chữ số; ô nhập không chèn dấu khi gõ, dòng xem trước có dấu nhóm nghìn.
+- Chỉ cho đăng lại khi phiên mới nhất đã kết thúc và có kết quả xác nhận không có người thắng.
+  Không có chức năng kết thúc thủ công, hủy giữa phiên hoặc xóa bài đăng.
+
+### Media, nháp và AI
+
+| Phần | Hành vi hiện tại |
+|---|---|
+| Upload | Không đặt trần số ảnh/bài; mặc định 10 MiB/ảnh, 3 video, 50 MiB/video; vẫn có giới hạn rate/request |
+| Định dạng | JPG/JPEG/JFIF, PNG, WebP, GIF, BMP, TIFF, AVIF, HEIC/HEIF; MP4, M4V, MOV/QT, WebM, MKV, AVI |
+| Nhận diện | Dựa trên nội dung tệp ở client và API, không chỉ đuôi `.jpg`; provider vẫn kiểm tra codec/tệp |
+| Nháp | Lưu trên trình duyệt theo tài khoản/chế độ/bài; chuyển trang trong SPA giữ lượt upload |
+| Giới hạn nháp | Reload/đóng trình duyệt có thể ngắt upload chưa xong; vé chưa gửi bài hết hạn sau 1 giờ |
+| Ảnh gửi AI | Inline, tổng mặc định/tối đa 12 MiB, tách khỏi giới hạn upload |
+| Video gửi AI | Gemini Files API; gửi toàn bộ tệp, không cắt ở phút thứ 5; Gemini lấy mẫu theo cơ chế của mô hình |
+| Kết quả AI | Hai điểm độc lập, thiếu bằng chứng giữ NULL; lỗi provider hiện thất bại, không thay bằng điểm 0 |
+
+Thời lượng hơn 5 phút không tự bị loại, nhưng dung lượng/deadline/quota/model vẫn giới hạn việc xử lý.
+Hệ thống dùng video Cloudinary đã tải lên; chưa có ô nhập YouTube để phân tích video.
+Chi tiết: [media-upload.md](docs/media-upload.md), [ai-analysis.md](docs/ai-analysis.md).
+
+## Tìm kiếm và thông báo
+
+Tìm kiếm chạy SQL tham số hóa trên tên sách, tiêu đề, tác giả, ISBN và thể loại, có/không dấu;
+lọc nhóm/thể loại, trạng thái phiên và sắp xếp/phân trang. **Không thêm bảng tìm kiếm**.
+Bốn nhóm trang chủ lấy từ [bookGenres.js](shared/bookGenres.js).
+
+Hộp thông báo riêng dùng bảng **ThongBao** (migration 004), lưu đã đọc và chống trùng nguồn.
+Khi đọc hộp, Backend đồng bộ từ dữ liệu nghiệp vụ đã COMMIT; frontend cập nhật mỗi 10 giây/focus/online.
+Đây là hộp tin trong web, không phải push/email tức thời. Xem [ui-integration.md](docs/ui-integration.md).
+
+## Kiểm tra
+
+Tất cả lệnh dưới chạy ở gốc repository; danh sách lấy từ [package.json](package.json).
+
+| Lệnh Windows | Phạm vi / yêu cầu |
+|---|---|
+| `npm.cmd run check` | Cú pháp JS phía server, scripts và shared; không thay kiểm tra JSX |
+| `npm.cmd test` | Toàn bộ test Backend; bài cần dịch vụ thật có thể SKIP nếu chưa bật |
+| `npm.cmd run build` | Build frontend, kiểm tra import/JSX |
+| `npm.cmd run test:ai` | Bộ AI, có bài Redis/SQL opt-in |
+| `npm.cmd run test:community` | Policy/HTTP sau phiên và SQL opt-in |
+| `npm.cmd run ai:example` | Dữ liệu mẫu, quy đổi điểm; không gọi API |
+| `npm.cmd run ai:check` | Một yêu cầu Gemini văn bản thật; không kiểm tra SQL/Redis/video |
+| `npm.cmd run smoke` | API/SQL/Redis/worker và probe thật |
+| `npm.cmd run smoke:auth` | Tài khoản/session trên dịch vụ thật |
+| `npm.cmd run smoke:m4` | Bài đăng, Cloudinary thật, kiểm duyệt và xuất bản kết quả |
+| `npm.cmd run smoke:m5` | Quy tắc giá, tranh chấp và chốt phiên thật; không cần Cloudinary |
+| `npm.cmd run smoke:m6` | Thêm đồng bộ Socket và snapshot trên fixture đấu giá |
+| `npm.cmd run smoke:ai` | Gemini qua worker, lưu SQL; hồ sơ thử thiếu ảnh giữ NULL và kiểm tra chế độ đang bật |
+| `npm.cmd run smoke:m8` | Kết thúc và luồng sau phiên, tìm kiếm/thông báo; ảnh khiếu nại thật kiểm tra riêng |
+
+Smoke cần giữ `dev:all` ở terminal thứ nhất, chạy lệnh ở terminal thứ hai. Các smoke tạo/dọn fixture
+UUID riêng; FAIL hoặc pending chưa rõ có thể giữ fixture để đối soát. Không chạy song song các smoke.
+M4/M5/M6/M8 cần [môi trường fixture riêng](docs/ai-analysis.md#kiểm-tra-và-nghiệm-thu).
+Cách bật test SQL/Redis riêng và checklist nghiệm thu: [VALIDATION.md](VALIDATION.md).
+
+## Tài liệu
+
+| Tệp | Nội dung |
+|---|---|
+| [setup-guide.md](docs/setup-guide.md) | Cài mới, cập nhật, cấu hình, địa chỉ và chẩn đoán trên Windows |
+| [architecture.md](docs/architecture.md) | Thành phần, ranh giới trách nhiệm, SQL và các luồng sự kiện |
+| [flows.md](docs/flows.md) | Vòng đời, trạng thái và danh mục HTTP API |
+| [auction-processing.md](docs/auction-processing.md) | Giá, khóa, transaction, retry/reclaim và kết thúc |
+| [realtime.md](docs/realtime.md) | Socket, snapshot, reconnect và giới hạn giao nhận |
+| [account-control.md](docs/account-control.md) | Một phiên/tài khoản và thu hồi phiên cũ |
+| [media-upload.md](docs/media-upload.md) | Upload, đối soát Cloudinary, định dạng và lưu nháp |
+| [ai-analysis.md](docs/ai-analysis.md) | Chín tiêu chí, NULL, Gemini/Files, thời gian chờ và quyền xem |
+| [after-sales.md](docs/after-sales.md) | Giao dịch, chat, đánh giá, khiếu nại và bình luận |
+| [review-exports.md](docs/review-exports.md) | Snapshot theo quyết định và lưu PDF |
+| [ui-integration.md](docs/ui-integration.md) | Màn hình, tìm kiếm, thông báo và hành vi frontend |
+| [decisions.md](docs/decisions.md) | Quyết định kỹ thuật và lý do lựa chọn |
+| [file-map.md](docs/file-map.md) | Bản đồ thư mục/mô-đun thực tế |
+| [tasks.md](docs/tasks.md) | Phạm vi hoàn thành và checklist bàn giao |
+| [VALIDATION.md](VALIDATION.md) | Bằng chứng kiểm thử và giới hạn xác nhận |
+| [docker-migration.md](docs/docker-migration.md) | Giữ volume khi chuyển Docker project |
+| [academic/README.md](academic/README.md) | Quy ước báo cáo, slide và UML; các tệp học thuật chưa nằm trong repo |
+| [AGENTS.md](AGENTS.md) | Quy tắc làm việc với mã nguồn |
+
+Chưa tích hợp thanh toán/vận chuyển/hoàn tiền tự động, CDN bằng chứng riêng tư, email/push,
+chữ ký số PDF hoặc công cụ tự động replay dead-letter. Những phần này không nằm trong phạm vi hoàn thành hiện tại.

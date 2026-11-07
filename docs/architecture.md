@@ -1,121 +1,98 @@
-<!-- Mục đích: Mô tả kiến trúc, kết nối và ranh giới trách nhiệm của hệ thống. -->
+<!-- Mục đích: Kiến trúc thực tế, ranh giới dữ liệu và trách nhiệm của từng tiến trình. -->
 
 # Kiến trúc hệ thống
 
-## 1. Tổng quan
+## Thành phần
 
-Repository `my-project_book-auction-system` chứa Frontend, Backend, tài liệu kỹ thuật và tài liệu học thuật.
+Một repository dùng npm workspaces, Node.js 24.x và JavaScript ES Modules. API, worker và web là ba
+­tiến trình phát triển; không phải ba microservice độc lập. Compose chạy SQL Server 2022 Developer/Redis 8.
 
-- Tên hiển thị: BookAuction — Hệ thống đấu giá sách trực tuyến.
-- npm package gốc và Docker Compose project: `my-project_book-auction-system`.
-- Database: `BookAuctionDB`; tên bảng/cột giữ theo thiết kế đã thống nhất.
-
-Backend được tổ chức theo các mô-đun, có hai tiến trình:
-- API: tiếp nhận HTTP request và quản lý kết nối Socket.IO.
-- Worker: đọc sự kiện từ Redis Streams và xử lý công việc nền.
-
-SQL Server lưu dữ liệu nghiệp vụ có thẩm quyền.
-Redis hỗ trợ truyền sự kiện và phối hợp xử lý.
-
-Đây chưa phải kiến trúc microservices; API và worker dùng chung mã nguồn Backend.
-
-## 2. Thành phần
-
-| Thành phần | Trách nhiệm |
+| Thành phần | Trách nhiệm và kết nối |
 |---|---|
-| React | Hiển thị dữ liệu, gửi yêu cầu, nhận cập nhật |
-| Express API | Xác thực, phân quyền, kiểm tra đầu vào và tiếp nhận yêu cầu |
-| Redis Streams | Lưu và phân phối yêu cầu cho worker |
-| Event Worker | Xử lý sự kiện và điều phối nghiệp vụ |
-| Redis lock | Phối hợp xử lý các yêu cầu của cùng một phiên |
-| SQL Server | Lưu tài khoản, bài đăng, phiên, lượt giá, kết quả và giao dịch |
-| Socket.IO | Gửi cập nhật sau khi thay đổi đã được xác nhận |
-| Gemini API | Hỗ trợ phân tích sách; Admin quyết định kiểm duyệt |
+| React/Vite | BookBid, biểu mẫu/nháp cục bộ, HTTP có cookie, Socket.IO công khai và namespace tài khoản |
+| Express API | Session/CSRF/quyền, validate HTTP, upload Cloudinary, admission đặt giá và đọc kết quả AI |
+| SQL Server | Tài khoản, sách/hồ sơ bài, phiên/receipt giá, kết quả/giao dịch, kiểm duyệt/AI, tương tác và thông báo |
+| Redis | Session, quyền phiên, rate limit, vé media, Streams, lease, Pub/Sub, probe và heartbeat |
+| Worker | Ba consumer probe/đấu giá/AI với kết nối BLOCK riêng; job chốt hạn độc lập |
+| Cloudinary | Lưu ảnh/video gốc; Backend xác minh URL/public ID, SQL giữ tham chiếu |
+| Gemini | Quan sát theo JSON Schema; ảnh inline, video qua Files API; không quyết định duyệt |
 
-## 3. Mô hình kết nối
+Frontend không đọc SQL/Redis hoặc nắm credentials provider. API có Redis subscriber để chuyển tín hiệu
+sau COMMIT tới các socket đang nối với chính API đó. Chưa có outbox hoặc Redis Socket.IO Adapter.
 
-| Nguồn | Đích | Cách kết nối | Mục đích |
-|---|---|---|---|
-| Frontend | API | HTTP/JSON | Truy vấn dữ liệu và gửi thao tác |
-| Frontend | Socket.IO trên API | Kết nối thời gian thực | Nhận cập nhật |
-| API | SQL Server | Thư viện `mssql` | Đọc/ghi dữ liệu theo nghiệp vụ |
-| API | Redis Streams | Redis client | Đưa yêu cầu bất đồng bộ vào hàng đợi |
-| Worker | Redis Streams | Consumer group | Nhận và xác nhận sự kiện |
-| Worker | SQL Server | Giao dịch SQL | Ghi nhận kết quả xử lý |
-| Worker | Redis | Khóa theo phiên | Phối hợp xử lý đồng thời |
+## Phân lớp và luồng sự kiện
 
-Frontend không truy cập trực tiếp SQL Server hoặc Redis.
+HTTP: `Route → Middleware → Controller → Service → Model → SQL`.
+Routes khai báo quyền; controller chuẩn hóa đầu vào/projection; service điều phối; model truy vấn tham số hóa,
+transaction và khóa. Các policy/utility tách quy tắc giá, quyền, tiền, rowversion và trạng thái.
 
-## 4. Phân lớp Backend
+| Luồng | Trình tự | Trạng thái bền vững |
+|---|---|---|
+| Probe | HTTP development → stream probe → worker → SQL SELECT → Redis result | Không ghi nghiệp vụ |
+| Đặt giá | HTTP → admission/stream → consumer → lease phiên → transaction SQL → publish → ACK | YeuCauDatGia và các thay đổi hợp lệ trong SQL |
+| Hết hạn | Job đọc giờ SQL → stream đấu giá → cùng processor/khóa phiên | Kết quả, giao dịch/chat nếu có người thắng |
+| AI | API xếp hàng sau khi lưu, worker quét hồ sơ chờ để phục hồi → stream AI → worker chuẩn bị media/Gemini → kiểm tra/tính điểm → SQL | PhanTichAI, ChiTietPhanTichAI; KiemDuyet khi tự duyệt |
+| Hộp tin | GET hộp → đồng bộ nguồn đã COMMIT dưới khóa SQL → đọc ThongBao | Nội dung ngắn, nguồn UNIQUE và thời điểm đọc |
 
-Luồng HTTP nghiệp vụ dự kiến:
+HTTP 202 là tiếp nhận, chưa phải nghiệp vụ thành công. SQL receipt và UNIQUE bảo vệ replay;
+không khẳng định transport xử lý/giao nhận đúng một lần.
 
-`Route → Middleware → Controller → Service → Model → SQL Server`
+## Mô hình dữ liệu
 
-Luồng xử lý sự kiện:
+[Manifest](../backend/schema-manifest.json) sau migration 008: **21 bảng/166 cột, 100 CHECK, 15 UNIQUE constraints**.
 
-`Redis Streams → Consumer → Processor → Service/Model → SQL Server`
-
-- Controller không chứa toàn bộ nghiệp vụ.
-- Model không phụ thuộc đối tượng HTTP request/response.
-- Processor không tự quyết định quy tắc khác với service.
-- API và worker dùng chung quy tắc nghiệp vụ khi cần.
-
-## 5. Nhất quán dữ liệu
-
-- Redis lock hỗ trợ phối hợp, không thay thế giao dịch SQL.
-- Worker đọc lại dữ liệu phiên sau khi lấy quyền xử lý.
-- Các thay đổi liên quan được ghi trong cùng giao dịch SQL.
-- Cập nhật phiên đối chiếu `row_version` để phát hiện xung đột.
-- Ràng buộc UNIQUE bảo vệ mã yêu cầu và các quan hệ cần duy nhất.
-- Chỉ xác nhận xử lý sự kiện sau khi kết quả đã được ghi nhận.
-- Yêu cầu được xử lý lại phải an toàn và không tạo dữ liệu trùng.
-
-Ghi SQL và phát thông báo là hai thao tác khác nhau.
-Cơ chế bảo đảm phát lại thông báo khi tiến trình dừng sau COMMIT
-cần được quyết định trước khi triển khai luồng đấu giá hoàn chỉnh.
-
-## 6. Cập nhật thời gian thực
-
-Trong triển khai hiện tại:
-- Socket.IO chạy cùng tiến trình API.
-- Client nhận `system:hello`.
-- Kết quả probe được giao diện lấy qua HTTP API.
-
-Trong các mốc nghiệp vụ:
-- Chỉ phát thay đổi sau khi SQL COMMIT.
-- Khi kết nối lại, client lấy trạng thái mới nhất từ API.
-- Room theo phiên/giao dịch phải được kiểm tra quyền.
-- Cơ chế chuyển thông báo từ worker sang API chưa được triển khai.
-
-## 7. Cấu hình phát triển mặc định
-
-| Dịch vụ | Địa chỉ/cổng |
+| Nhóm | Bảng chính |
 |---|---|
-| React | `127.0.0.1:5173` |
-| API và Socket.IO | `127.0.0.1:5000` |
-| SQL Server trên máy chủ | `127.0.0.1:14330` |
-| Redis trên máy chủ | `127.0.0.1:63790` |
+| Tài khoản và bản sách | NguoiDung, Sach, BaiDang, HinhAnh, Video |
+| Kiểm duyệt và AI | KiemDuyet, PhanTichAI, ChiTietPhanTichAI |
+| Đấu giá | PhienDauGia, YeuCauDatGia, LuotDatGia, LichSuDauGia, KetQuaDauGia |
+| Sau phiên | GiaoDich, CuocTroChuyen, TinNhan, DanhGia, BinhLuan |
+| Khiếu nại/hộp tin | KhieuNai, BangChungKhieuNai, ThongBao |
 
-SQL Server và Redis chạy trong Docker.
-API, worker và React chạy bằng các terminal riêng.
+Sach là bản vật lý/khóa ổn định để đăng lại. BaiDang.ho_so_sach giữ hồ sơ của lần đăng;
+chi tiết/tìm kiếm/giao dịch/AI dùng cùng phép gộp hồ sơ, fallback về Sach cho dữ liệu cũ.
+Gửi duyệt lại không ghi đè Sach/lịch sử phiên khác. HinhAnh/Video.dang_su_dung phân biệt tệp active
+với tệp đã gỡ khỏi hồ sơ mới, không DELETE hàng/file lịch sử.
+KiemDuyet.ket_qua_snapshot giữ sách/media/AI của đúng quyết định; migration 008 thêm `phan_tich_id` cho quyết định tự duyệt.
 
-Cấu hình riêng nằm trong `.env` ở gốc và `frontend/.env`.
-Chi tiết khởi động: [README](../README.md).
-Máy đang dùng Docker project cũ: [hướng dẫn chuyển đổi](docker-migration.md).
-Báo cáo, slide và UML: [academic](../academic/README.md).
+FK bảo vệ tham chiếu, UNIQUE bảo vệ tối đa một kết quả/phiên, một giao dịch/kết quả, một phòng/giao dịch
+và một đánh giá/giao dịch. Chúng không tự tạo bản ghi bắt buộc; transaction nghiệp vụ thực hiện việc đó.
+Schema nền 001 được giữ; nâng cấp chạy 002–008, không reset database.
 
-## 8. Phạm vi hiện tại
+## Xác thực và quyền
 
-Đã có bộ khung:
-- Kiểm tra liveness và readiness.
-- Kết nối SQL Server và Redis.
-- Worker nhận sự kiện kiểm tra.
-- Socket.IO kiểm tra kết nối.
-- Script khởi tạo schema 19 bảng.
+Cookie HttpOnly riêng được chọn theo X-Tab-ID; selector nằm trong sessionStorage, không thay cookie/CSRF.
+Một tài khoản chỉ có một phiên đăng nhập hiện hành: login đúng mật khẩu đổi session/CSRF, Lua đổi owner,
+xóa session cũ và phát tín hiệu. F5/GET/control/Socket không claim phiên; tab cũ về đăng nhập.
+Khác tài khoản vẫn độc lập. Vai trò/tài khoản được đọc lại từ SQL; owner/session kiểm tra Redis.
+Cookie SameSite=Lax, Secure khi production; CSRF giữ ở bộ nhớ frontend.
 
-Chưa triển khai:
-- Xác thực và phân quyền người dùng.
-- Nghiệp vụ đăng sách, đặt giá và kết thúc phiên.
-- Giao dịch, trò chuyện, đánh giá và khiếu nại.
-- Phân tích sách bằng Gemini API.
+Namespace `/account` có xác thực và heartbeat để ngắt phiên bị thu hồi. `/auctions` chỉ công khai;
+không chứa cookie dùng làm quyền đấu giá, chat hoặc gia_toi_thieu. Quyền ghi nghiệp vụ luôn kiểm tra HTTP/worker/SQL.
+Chi tiết tại [account-control.md](account-control.md).
+
+## Nhất quán và phục hồi
+
+- SQL dùng transaction SERIALIZABLE và UPDLOCK/HOLDLOCK tại các thao tác cần tuần tự hóa.
+- Redis lease/token phối hợp; rowversion và UNIQUE tiếp tục bảo vệ khi lease mất/COMMIT kéo dài.
+- Rowversion được mã hóa từ BINARY(8) thành hex 16 ký tự, không chuyển qua Number.
+- Tiền DECIMAL(18,0) đi qua JSON dạng chuỗi; giờ nghiệp vụ lưu UTC và kiểm tra bằng giờ SQL.
+- Tệp được upload trước, ngoài transaction SQL; vé Redis claim nguyên tử xác nhận chủ sở hữu.
+  ACK Redis lỗi sau COMMIT không biến kết quả SQL thành rollback giả; claim chưa rõ giữ để đối soát.
+- Cleanup media phải kiểm tra tham chiếu SQL, kể cả hàng lịch sử/bằng chứng, trước khi destroy Cloudinary.
+- Giá/trạng thái phát tín hiệu sau COMMIT. Snapshot SQL sau join/reconnect và mỗi 5 giây bù sự kiện lỡ;
+  Socket/Pub/Sub không là nhật ký bền vững. Quyết định đặt giá của riêng người dùng đọc qua HTTP riêng.
+- Chat/bình luận/khiếu nại dùng HTTP/polling, không phát nội dung riêng vào room công khai.
+
+## AI, video và nháp
+
+API xếp hàng sau khi lưu bài. Worker quét SQL để phục hồi bài chờ theo phiên bản, kể cả sau restart.
+Các lần đọc không tạo job. Yêu cầu phân tích lại của Admin dùng cùng hàng đợi và khóa chống trùng.
+Ảnh có ngân sách inline 12 MiB; video tải tuần tự, upload Files API, chờ ACTIVE rồi tham chiếu URI.
+Không cắt ở phút thứ 5; Gemini vẫn lấy mẫu và chịu quota/model/deadline. Thử xóa file Google khi xong,
+không lưu URI tạm vào SQL. Backend tính hai điểm độc lập, NULL khi thiếu chứng cứ. Ở chế độ tự duyệt, điểm và quyết định cập nhật cặp trạng thái bài/phiên trong một transaction.
+
+Nháp nằm trong localStorage theo tài khoản/chế độ/bài. Tác vụ upload sống ngoài component để tiếp tục qua
+điều hướng SPA; reload có thể ngắt lượt chưa xong. Vé chưa gửi bài hết hạn một giờ, không phải lưu nháp SQL.
+Xem [AI](ai-analysis.md), [media/nháp](media-upload.md), [đấu giá](auction-processing.md),
+[realtime](realtime.md), [sau phiên](after-sales.md) và [xuất kết quả](review-exports.md).

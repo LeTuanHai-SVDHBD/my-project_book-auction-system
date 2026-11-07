@@ -198,13 +198,11 @@ export default function AiPanel({ post, user }) {
                 <div>
                   <h4>Hỗ trợ đánh giá độ hiếm</h4>
                   <strong>{score(analysis.diem_do_hiem)}</strong>
-                  {analysis.thong_tin?.moderation && <p className="field-hint">Mức đạt: {analysis.thong_tin.moderation.thresholds.rarity}/100</p>}
                   {analysis.tinh_diem?.do_hiem?.ly_do_null && <p>{analysis.tinh_diem.do_hiem.ly_do_null}</p>}
                 </div>
                 <div>
                   <h4>Tình trạng vật lý</h4>
                   <strong>{score(analysis.diem_tinh_trang)}</strong>
-                  {analysis.thong_tin?.moderation && <p className="field-hint">Mức đạt: {analysis.thong_tin.moderation.thresholds.condition}/100</p>}
                   {analysis.tinh_diem?.tinh_trang?.ly_do_null && <p>{analysis.tinh_diem.tinh_trang.ly_do_null}</p>}
                 </div>
               </div>

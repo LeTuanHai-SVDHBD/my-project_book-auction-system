@@ -51,7 +51,8 @@ Bốn nhóm lấy từ `shared/bookGenres.js`: **Văn học và hư cấu**, **K
 ## Đăng sách và nháp
 
 Bốn bước: **Thông tin sách → Ảnh và video → Thông số đấu giá → Kiểm tra và gửi**.
-Chọn thể loại bằng combobox; gõ để tìm, phải chọn mục hợp lệ. ISBN có/không, tối đa 100 ký tự nếu nhập,
+Thể loại và năm xuất bản dùng danh sách có tìm kiếm. Năm xuất bản ưu tiên các năm gần đây khi mở danh sách;
+gõ để tìm năm cụ thể (1–9999) hoặc để trống nếu chưa rõ. ISBN có/không, tối đa 100 ký tự nếu nhập,
 không ép 10/13. Một ô bắt buộc tình trạng/quý hiếm/bằng chứng; Giới thiệu sách vẫn riêng.
 Backend giữ tương thích trường tình trạng cũ, lấy preview tối đa 1000 ký tự khi không gửi trường đó.
 

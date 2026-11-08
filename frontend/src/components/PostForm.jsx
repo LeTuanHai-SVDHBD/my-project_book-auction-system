@@ -13,6 +13,7 @@ import { postApi } from "../services/postApi.js";
 import UploadMediaCard from "./UploadMediaCard.jsx";
 import MoneyInput from "./MoneyInput.jsx";
 import GenreSelect from "./GenreSelect.jsx";
+import PublicationYearSelect from "./PublicationYearSelect.jsx";
 import { ISBN_MAX_LENGTH } from "../../../shared/bookIdentifiers.js";
 export default function PostForm({
   source,
@@ -301,7 +302,7 @@ export default function PostForm({
             {editableBook ? (
               <>
                 <h3>Thông tin bản sách</h3>
-                <div className="form-grid">
+                <div className="form-grid book-info-grid">
                   {input("ten_sach", "Tên sách", 300, true)}
                   {input("tac_gia", "Tác giả", 200)}
                   <GenreSelect
@@ -309,7 +310,10 @@ export default function PostForm({
                     onValueChange={() => setEditRevision((v) => v + 1)}
                   />
                   {input("nha_xuat_ban", "Nhà xuất bản", 200)}
-                  {input("nam_xuat_ban", "Năm xuất bản", 4, false, "number")}
+                  <PublicationYearSelect
+                    initialValue={initial.nam_xuat_ban}
+                    onValueChange={() => setEditRevision((v) => v + 1)}
+                  />
                   <div className="isbn-field">
                     <fieldset className="isbn-choice">
                       <legend>ISBN</legend>

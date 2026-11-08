@@ -2065,11 +2065,11 @@ dd {
   place-items: center;
   color: #8f9b98;
 }
-.genre-options {
+.search-select-options {
   position: absolute;
   left: 0;
   right: 0;
-  top: 74px;
+  top: 100%;
   z-index: 45;
   max-height: 280px;
   overflow: auto;
@@ -2079,7 +2079,7 @@ dd {
   padding: 5px;
   box-shadow: 0 8px 30px #1f3a5f22;
 }
-.genre-options strong {
+.search-select-options strong {
   display: block;
   font-size: 16px;
   text-transform: uppercase;
@@ -2087,7 +2087,7 @@ dd {
   color: #94a08f;
   padding: 12px 9px 6px;
 }
-.genre-options button {
+.search-select-options button {
   display: block;
   width: 100%;
   text-align: left;
@@ -2095,11 +2095,11 @@ dd {
   padding: 9px;
   border-radius: 3px;
 }
-.genre-options button:hover,
-.genre-options button.active {
+.search-select-options button:hover,
+.search-select-options button.active {
   background: #f0f3eb;
 }
-.genre-options p {
+.search-select-options p {
   font-size: 16px;
   padding: 10px;
 }

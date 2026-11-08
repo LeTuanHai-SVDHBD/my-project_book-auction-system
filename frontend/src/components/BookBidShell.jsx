@@ -109,6 +109,15 @@ export default function BookBidShell({ user, route, children }) {
       </a>
     </>
   );
+  const repliesDue = user ? inbox.data?.complaintsToReply ?? 0 : 0;
+  const menuLabel = (page, label) => <>
+    {label}
+    {page === "complaints" && repliesDue > 0 && (
+      <span className="complaint-menu-count" aria-label={`${repliesDue} hồ sơ cần phản hồi`}>
+        {repliesDue > 99 ? "99+" : repliesDue}
+      </span>
+    )}
+  </>;
   const links = [
     ["home", "Trang chủ"],
     ["catalog", "Đấu giá"],
@@ -117,6 +126,7 @@ export default function BookBidShell({ user, route, children }) {
           ["create", "Đăng sách"],
           ["mine", "Bài của tôi"],
           ["trades", "Giao dịch"],
+          ["complaints", "Khiếu nại"],
         ]
       : [["account", "Đăng nhập"]]),
   ];
@@ -185,7 +195,7 @@ export default function BookBidShell({ user, route, children }) {
                   href={`#/${page}`}
                   aria-current={route.page === page ? "page" : undefined}
                 >
-                  {label}
+                  {menuLabel(page, label)}
                 </a>
               ))}
             </nav>
@@ -210,12 +220,9 @@ export default function BookBidShell({ user, route, children }) {
           </div>
           {menu && (
             <nav className="mobile-nav" aria-label="Điều hướng di động">
-              {[
-                ...links,
-                ...(user ? [["complaints", "Khiếu nại của tôi"]] : []),
-              ].map(([page, label]) => (
+              {links.map(([page, label]) => (
                 <a key={page} href={`#/${page}`} onClick={() => setMenu(false)}>
-                  {label}
+                  {menuLabel(page, label)}
                 </a>
               ))}
             </nav>
@@ -250,7 +257,7 @@ export default function BookBidShell({ user, route, children }) {
               : [
                   ["mine", "Bài đăng của tôi"],
                   ["trades", "Giao dịch"],
-                  ["complaints", "Khiếu nại của tôi"],
+                  ["complaints", "Khiếu nại"],
                 ]
             ).map(([page, label]) => (
               <a key={page} href={`#/${page}`}>

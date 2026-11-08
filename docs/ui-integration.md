@@ -17,7 +17,7 @@ Cài đặt/cập nhật tại [setup-guide.md](setup-guide.md); tài nguyên fo
 | `#/mine`, `#/mine/:postId` | Bài của mình, bổ sung/kích hoạt/đăng lại, quyết định và PDF |
 | `#/pending`, `#/pending/:postId` | Admin: bài chờ/từ chối, bằng chứng/AI và quyết định |
 | `#/trades`, `#/trades/:tradeId` | Hai bên giao dịch/chat/xác nhận/đánh giá/khiếu nại |
-| `#/complaints`, `#/complaints/:complaintId` | Người gửi hoặc Admin; chat chỉ đọc theo quyền phân công |
+| `#/complaints`, `#/complaints/:complaintId` | Hai bên giao dịch hoặc Admin (hồ sơ mới); chat Admin chỉ đọc theo quyền phân công |
 | `#/account` | Đăng ký/đăng nhập/tài khoản/đăng xuất |
 | `#/infra` | Công cụ health/probe của môi trường phát triển |
 
@@ -26,6 +26,7 @@ không giả định bằng mã bài. Hash route giữ được Back/F5; Backend
 
 Admin chỉ có sidebar, chứa avatar/tài khoản và thông báo, không có header ngang hoặc nút đăng sách.
 Người dùng dùng header/menu responsive. Khách không thấy avatar/hộp thông báo của người dùng.
+Mục **Khiếu nại** nằm cạnh **Giao dịch**; số cạnh mục này chỉ đếm hồ sơ còn hạn cần người dùng phản hồi.
 Login mới cùng tài khoản thu hồi phiên cũ, tab cũ về đăng nhập, không dùng lớp phủ F5 để giành quyền.
 CSRF chỉ giữ trong bộ nhớ; lỗi INVALID_CSRF được lấy token mới/thử lại tối đa một lần, không tự retry lỗi mạng.
 Xác nhận thao tác thành công hiện ở đầu màn hình trong khoảng 4 giây. Lỗi và trạng thái nghiệp vụ vẫn hiển thị tại nơi thao tác; hộp thông báo tài khoản lưu các cập nhật riêng.
@@ -120,7 +121,7 @@ bù thông báo lỡ, xem [realtime.md](realtime.md).
 Migration 004 thêm **ThongBao**, không thêm bảng tìm kiếm. Mỗi tài khoản chỉ đọc hộp của mình;
 30 mục/trang, số chưa đọc, đánh dấu từng thông báo bằng POST có CSRF và giữ thời điểm đọc đầu.
 Nguồn gồm gửi duyệt → Admin; quyết định → chủ bài; kết quả → chủ/người thắng; tin nhắn → người nhận;
-xác nhận → bên còn lại; khiếu nại mới → Admin; phản hồi → người gửi.
+xác nhận → bên còn lại; khiếu nại mới → Admin và bên cần giải trình; giải trình → người gửi và Admin phụ trách; kết luận hồ sơ mới → cả hai bên.
 
 Hộp được **đồng bộ khi đọc** từ các bản ghi nguồn đã COMMIT, trong transaction riêng với khóa người nhận
 và UNIQUE `(nguoi_dung_id,nguon)`. Lỗi đồng bộ không rollback nghiệp vụ đã xong; lần đọc sau bổ sung nguồn còn lưu.

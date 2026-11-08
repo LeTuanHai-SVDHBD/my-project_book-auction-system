@@ -9,8 +9,8 @@ Không tích hợp cổng thanh toán, đối soát tài chính, vận chuyển,
 
 ## Cài đặt và phạm vi
 
-Cài/nâng cấp và các lệnh chạy tại [setup-guide.md](setup-guide.md). Schema hiện tại sau migration 008:
-**21 bảng/166 cột**, theo manifest. Các bảng giao dịch/chat/đánh giá/khiếu nại/bình luận có từ nền;
+Cài/nâng cấp và các lệnh chạy tại [setup-guide.md](setup-guide.md). Schema hiện tại sau migration 009:
+**21 bảng/172 cột**, theo manifest. Các bảng giao dịch/chat/đánh giá/khiếu nại/bình luận có từ nền;
 004 thêm thông báo, 005 snapshot kiểm duyệt, 006 mở ô ISBN, 007 hồ sơ theo bài/media active.
 Không thay cơ chế xác thực; thông tin sách lấy theo hồ sơ của đúng bài, giữ lịch sử phiên khác.
 
@@ -70,22 +70,27 @@ Do bảng bằng chứng hiện chỉ có URL, kiểm tra tham chiếu dùng CHA
 Ảnh dùng cơ chế delivery Cloudinary hiện tại: API kiểm soát ai lấy hồ sơ, nhưng URL ảnh không phải URL xác thực riêng.
 Đây chưa phải kho bằng chứng riêng tư được ký URL/kiểm soát truy cập tại CDN.
 
-| Người xem | Quyền |
+| Người xem | Quyền với hồ sơ mới |
 |---|---|
-| Người gửi khiếu nại | Xem hồ sơ, ảnh, trạng thái và phản hồi của mình |
-| Bên còn lại | Không tự được xem hồ sơ của người gửi; vẫn có chat của giao dịch mình tham gia |
-| Admin | Xem danh sách/nội dung/bằng chứng để tiếp nhận |
-| Admin được phân công, hồ sơ đang xử lý | Xem chat liên quan ở chế độ chỉ đọc, ghi phản hồi xử lý |
-| Admin khác hoặc hồ sơ đã xử lý | Không được đọc chat qua quyền xử lý khiếu nại này |
+| Người gửi | Xem nội dung đã gửi, giải trình và kết luận chung |
+| Người mua hoặc người bán còn lại | Nhận thông báo, xem hồ sơ, gửi một giải trình kèm tối đa 5 ảnh trong 72 giờ |
+| Admin | Xem hồ sơ, bằng chứng và ghi chú nội bộ |
+| Admin đã tiếp nhận, hồ sơ đang xử lý | Xem chat giao dịch chỉ đọc và lưu kết luận |
+| Người ngoài | Không có quyền xem hoặc phản hồi |
 
-Tiếp nhận chuyển cho_xu_ly → dang_xu_ly và gán Admin. Hai Admin cùng tiếp nhận chỉ một người thành công.
-Admin đã được gán mới ghi phản hồi tối đa 8.000 ký tự, chuyển da_xu_ly và ghi giờ SQL.
-Gửi lại cùng phản hồi không ghi đè ngày xử lý; phản hồi khác bị chặn. Không có chuyển hồ sơ ngược hoặc phân công lại.
-Kết thúc xử lý chấm dứt quyền xem chat qua hồ sơ; tin nhắn của hai bên vẫn giữ nguyên.
-Khiếu nại không thêm trạng thái mới cho giao dịch, không hủy hoặc thay đổi kết quả đấu giá.
+Mỗi giao dịch chỉ mở một hồ sơ tại một thời điểm. Khóa dòng giao dịch bảo vệ khi hai bên gửi đồng thời.
+Hồ sơ cũ trước migration 009 vẫn chỉ hiển thị cho người gửi và Admin; không công khai lại ảnh cũ.
+Nếu giao dịch có hồ sơ cũ đang mở thì cần xử lý xong trước khi tạo hồ sơ mới.
 
-Người dùng theo dõi **Khiếu nại của tôi** hoặc mở hồ sơ trong chi tiết giao dịch; Admin dùng **Khiếu nại**.
-Danh sách 30 hồ sơ/trang, tự cập nhật trang mới nhất. Lịch sử cũ không bị xóa khi có hồ sơ mới.
+Tiếp nhận chuyển `cho_xu_ly` → `dang_xu_ly` và gán Admin. Bên còn lại được giải trình ngay từ lúc hồ sơ
+được tạo, trước hạn tính theo giờ SQL. Hết hạn không tự kết luận hoặc xử phạt. Admin chỉ được kết luận
+sau khi có giải trình hoặc hết hạn; chọn **Có căn cứ**, **Không có căn cứ** hoặc **Hai bên đã thỏa thuận**,
+kèm lý do và hướng xử lý. Kết luận chuyển sang `da_xu_ly`, gửi thông báo cho hai bên và đóng quyền
+đọc chat của Admin qua hồ sơ. Ghi chú nội bộ không trả trong API của người mua hoặc người bán.
+
+Tạo hồ sơ từ **Giao dịch**; theo dõi và phản hồi ở **Khiếu nại** cạnh **Giao dịch**. Bộ lọc
+**Tôi đã gửi** và **Cần tôi phản hồi** phân trang trên máy chủ. Số cạnh menu đếm hồ sơ còn hạn cần phản hồi.
+Không thay đổi kết quả đấu giá, trạng thái giao dịch, xác nhận của hai bên hoặc tự thực hiện hoàn tiền.
 
 ## Bình luận phiên
 
@@ -113,10 +118,11 @@ Các endpoint riêng yêu cầu cookie/session theo tab, POST thêm CSRF; chủ 
 | POST | `/trades/:id/confirm` | Hai bên; `{}`; ghi xác nhận của mình |
 | POST | `/trades/:id/review` | Người mua đã hoàn tất; `{so_sao,noi_dung}` |
 | POST | `/trades/:id/complaints` | Hai bên; `{ly_do,noi_dung,media:[{upload_id,tieu_de}]}` |
-| GET | `/complaints` | Người dùng chỉ hồ sơ mình; Admin mọi hồ sơ; `before` |
-| GET | `/complaints/:id` | Người gửi hoặc Admin; hồ sơ/bằng chứng/liên kết giao dịch |
+| GET | `/complaints` | Hai bên xem hồ sơ liên quan; Admin xem mọi hồ sơ; `before`, `scope=all/mine/reply` |
+| GET | `/complaints/:id` | Hai bên (hồ sơ mới) hoặc Admin; hồ sơ/bằng chứng/liên kết giao dịch |
+| POST | `/complaints/:id/response` | Bên còn lại, còn hạn; `{noi_dung,media:[{upload_id,tieu_de}]}` |
 | POST | `/complaints/:id/claim` | Admin; `{}` |
-| POST | `/complaints/:id/resolve` | Admin được gán; `{phan_hoi_admin}` |
+| POST | `/complaints/:id/resolve` | Admin được gán; `{ket_luan,phan_hoi_admin,ghi_chu_noi_bo?}` |
 | GET | `/complaints/:id/messages` | Admin được gán và đang xử lý; `before` |
 | GET | `/auctions/:id/comments` | Công khai, `before`; trả cờ duoc_binh_luan và giờ SQL |
 | POST | `/auctions/:id/comments` | Người dùng thường; `{noi_dung}` |

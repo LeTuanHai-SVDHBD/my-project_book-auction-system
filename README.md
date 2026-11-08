@@ -24,7 +24,7 @@ Không coi việc hoàn thành mã nguồn là chứng nhận sẵn sàng vận 
 | AI | Gemini Interactions + Files API; Backend tính hai điểm và hỗ trợ tự duyệt theo ngưỡng cấu hình |
 | Quản lý gói | npm workspaces, một `package-lock.json` ở thư mục gốc |
 
-Schema hiện tại: **21 bảng, 166 cột, 100 CHECK, 15 UNIQUE constraints**, theo
+Schema hiện tại: **21 bảng, 172 cột, 102 CHECK, 15 UNIQUE constraints**, theo
 [manifest](backend/schema-manifest.json). Số UNIQUE này không bao gồm việc đếm mọi chỉ mục duy nhất.
 Frontend không truy cập SQL/Redis trực tiếp. Chỉ SQL Server/Redis được Compose khởi động;
 API, worker và web chạy bằng Node trên máy phát triển.

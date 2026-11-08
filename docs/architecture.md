@@ -39,7 +39,7 @@ không khẳng định transport xử lý/giao nhận đúng một lần.
 
 ## Mô hình dữ liệu
 
-[Manifest](../backend/schema-manifest.json) sau migration 008: **21 bảng/166 cột, 100 CHECK, 15 UNIQUE constraints**.
+[Manifest](../backend/schema-manifest.json) sau migration 009: **21 bảng/172 cột, 102 CHECK, 15 UNIQUE constraints**.
 
 | Nhóm | Bảng chính |
 |---|---|

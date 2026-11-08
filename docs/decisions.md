@@ -3,7 +3,7 @@
 # Quyết định kỹ thuật
 
 Rà soát theo source ngày 03/11/2026. Các ADR ghi lý do và giới hạn đã chọn, không tự chứng nhận mọi
-kiểm thử dịch vụ thật. Các số schema gắn migration cũ là mốc nâng cấp; schema đích hiện tại 21/166/100/15.
+kiểm thử dịch vụ thật. Các số schema gắn migration cũ là mốc nâng cấp; schema đích hiện tại 21/172/102/15.
 Chính sách mới về phiên đăng nhập, AI manual, Files API và nháp bên dưới thay thế các mô tả cũ tương ứng.
 Hướng dẫn chạy hiện tại tại [setup-guide.md](setup-guide.md), bằng chứng tại [VALIDATION](../VALIDATION.md).
 

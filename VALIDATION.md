@@ -39,7 +39,7 @@
 | Tương tác UI | Tìm kiếm rỗng/lỗi, Home/End gallery, trạng thái lượt giá mô phỏng, bốn bước gửi lại, gỡ ảnh cũ và khôi phục nháp, thông báo/Escape, menu Admin di động |
 | Quyết định tự duyệt | Test hai ngưỡng độc lập, biên bằng ngưỡng, NULL và lỗi kỹ thuật, chống replay/version cũ, chặn thao tác Admin khi bật tự duyệt. UI fixture xác nhận lý do và nguồn AI hiển thị đúng. |
 
-Schema đích sau [migration 008](backend/migrations/008_auto_moderation.sql): **21 bảng, 166 cột, 100 CHECK, 15 UNIQUE constraints**.
+Schema đích sau [migration 009](backend/migrations/009_two_party_complaints.sql): **21 bảng, 172 cột, 102 CHECK, 15 UNIQUE constraints**.
 Lượt này chưa chạy migration/SQL opt-in, Redis thật, Gemini thật hoặc smoke. Kiểm tra trên dịch vụ thật bằng `npm.cmd run db:migrate`, `npm.cmd run smoke:ai` và hồ sơ có ảnh/video sau khi cấu hình [hai ngưỡng](docs/ai-analysis.md#kiểm-duyệt-tự-động). Các bài test SQL mới kiểm tra cùng COMMIT, rollback và đúng snapshot khi có database test.
 
 ## Lượt rà soát tài liệu trước đó

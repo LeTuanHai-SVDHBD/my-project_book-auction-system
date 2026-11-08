@@ -18,7 +18,7 @@ npm.cmd run setup:ai
 
 Script chỉ bổ sung biến thiếu, giữ key/cờ bật/timeout đang có; AI tắt mặc định.
 Tự duyệt dùng các bảng đã có. Migration 008 thêm liên kết quyết định với lần phân tích; không thêm SDK.
-Toàn hệ thống hiện có 21 bảng/166 cột sau migration 008; không dùng số schema của phiên bản trước.
+Toàn hệ thống hiện có 21 bảng/172 cột sau migration 009; không dùng số schema của phiên bản trước.
 
 Mở `.env` ở thư mục gốc trên máy phát triển:
 

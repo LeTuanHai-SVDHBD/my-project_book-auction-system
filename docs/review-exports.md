@@ -4,7 +4,7 @@
 
 Cập nhật theo [setup-guide.md](setup-guide.md), giữ cấu hình/volume và chạy migration 002–008.
 005 thêm snapshot JSON; 008 gắn quyết định tự duyệt với `phan_tich_id`, không thêm bảng. 007 cho sửa hồ sơ sách theo bài
-và gỡ media active mà giữ lịch sử; schema đích **21 bảng/166 cột**. Không chạy lại DDL nền để xóa dữ liệu.
+và gỡ media active mà giữ lịch sử; schema đích **21 bảng/172 cột**. Không chạy lại DDL nền để xóa dữ liệu.
 
 ## Cách dùng
 

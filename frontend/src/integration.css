@@ -2426,3 +2426,34 @@ figure.upload-media-card.is-cover {
 .post-draft-status > div { flex:1; min-width:0; }
 .post-sheet .post-draft-status > button { width:auto; }
 @media (max-width:600px) { .post-sheet .post-draft-status > button { width:100%; } }
+
+.complaint-menu-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0 5px;
+  margin-inline-start: 5px;
+  border-radius: 99px;
+  background: #f8e7bd;
+  color: #694709;
+  font-size: 12px;
+  font-weight: 700;
+}
+.complaint-filters button {
+  width: auto;
+  margin: 0;
+}
+.complaint-filters [aria-pressed="true"] {
+  background: #1f3a5f;
+  color: white;
+}
+.complaint-detail .case-overview {
+  margin-block: 18px 0;
+}
+.complaint-detail .case-overview h2 {
+  margin: 0;
+}
+.complaint-detail .case-section {
+  padding-block: 18px;
+}

@@ -75,7 +75,8 @@ Các file `.gitkeep` chỉ giữ cấu trúc, không phải mô-đun chức năn
 | `006_isbn_input.sql` | ISBN NVARCHAR(100), không ép 10/13 ký tự |
 | `007_resubmission_profiles.sql` | BaiDang.ho_so_sach, HinhAnh/Video.dang_su_dung |
 | `008_auto_moderation.sql` | Liên kết KiemDuyet–PhanTichAI, phân biệt nguồn Admin/AI |
-| `backend/schema-manifest.json` | Chữ ký đích: 21 bảng, 166 cột, 100 CHECK, 15 UNIQUE |
+| `009_two_party_complaints.sql` | Khiếu nại hai bên, hạn giải trình, kết luận và giới hạn hồ sơ đang mở |
+| `backend/schema-manifest.json` | Chữ ký đích: 21 bảng, 172 cột, 102 CHECK, 15 UNIQUE |
 | `backend/scripts/` | Init/migrate, danh sách migration dùng chung và CLI tạo Admin |
 
 Các dòng tên migration 002–008 ở bảng trên đều nằm trong `backend/migrations/`.

@@ -31,7 +31,7 @@ Nghiệm thu bằng dữ liệu thật, đánh giá chất lượng AI và thử
 Các ô trống là **chưa ghi nhận bằng chứng mới cho lượt bàn giao này**, không phủ nhận xác nhận mốc trước đó.
 
 - [ ] Đúng nhánh; giữ `.env`/volume, Node 24.x; đã cập nhật dependency theo lockfile và migration 002–008.
-- [ ] SQL readiness **21 bảng/166 cột**; Docker healthy, API/worker chạy; probe hoàn tất.
+- [ ] SQL readiness **21 bảng/172 cột**; Docker healthy, API/worker chạy; probe hoàn tất.
 - [ ] Khách không có avatar/hộp tin; hai tài khoản khác nhau dùng hai tab được.
 - [ ] Login cùng tài khoản nơi mới thu hồi tab cũ; F5 không hồi sinh phiên cũ hoặc làm mất phiên mới.
 - [ ] Nhập tiền không lặp/chèn số, giữ 18 chữ số; thể loại, ISBN và mô tả lưu đúng.

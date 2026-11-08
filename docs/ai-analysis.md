@@ -100,6 +100,12 @@ Không khẳng định số bản còn lại toàn cầu; không suy từ vẻ c
 Nhãn sở hữu đọc được là dấu hiệu quan sát được, không tự xác nhận chuỗi sở hữu hay tính xác thực.
 URL do người đăng cung cấp được ghi là chưa đối chiếu độc lập; hệ thống không truy cập hay xác thực website bên ngoài.
 
+**Lai lịch và dấu ấn riêng** vẫn chiếm 25%, không dùng **Không áp dụng**.
+Nếu hồ sơ không khai dấu ấn hay lai lịch đặc biệt và ảnh chụp đủ rõ các vị trí liên quan nhưng không ghi nhận dấu ấn,
+Gemini trả **Đã đánh giá / không đáp ứng** kèm mã ảnh; Backend chấm 0 riêng tiêu chí này.
+Thiếu ảnh thì giữ **Chưa đủ dữ liệu**; có dấu hiệu hoặc lời khai chưa xác thực thì giữ **Cần xác minh**.
+Ba tiêu chí độ hiếm đạt 100 và tiêu chí này được chấm 0 cho tổng độ hiếm 75/100.
+
 ### Tình trạng vật lý
 
 | Tiêu chí | Trọng số gốc |

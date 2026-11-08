@@ -10,7 +10,7 @@ const evidenceHints={
   limited_edition:'Bổ sung ảnh rõ trang ghi giới hạn phát hành, số bản hoặc dấu hiệu nhận diện đúng ấn bản.',
   special_edition:'Bổ sung ảnh trang nhan đề, bản quyền hoặc chi tiết phân biệt ấn bản này với các lần in khác.',
   historical_context:'Bổ sung ảnh trang có năm xuất bản, nhà in hoặc nhà xuất bản; nêu căn cứ cho bối cảnh lịch sử đã khai.',
-  provenance:'Bổ sung ảnh rõ dấu sở hữu và tài liệu có mã lưu trữ, số hiệu hoặc dấu hiệu nhận diện khớp đúng bản sách đang đăng.',
+  provenance:'Bổ sung ảnh rõ các vị trí liên quan, như giấy lót, trang nhan đề hoặc trang giới hạn. Nếu có khai chữ ký, dấu sở hữu hoặc lai lịch đặc biệt, kèm ảnh chi tiết và tài liệu có mã lưu trữ, số hiệu hoặc dấu hiệu nhận diện khớp đúng bản sách.',
   cover:'Bổ sung ảnh bìa trước, bìa sau và cận cảnh vị trí có dấu hiệu hư hỏng.',
   spine:'Bổ sung ảnh gáy, bản lề và chỗ liên kết giữa bìa với khối trang.',
   pages:'Bổ sung ảnh các trang ruột đại diện và cận cảnh chỗ ố, rách hoặc nghi thiếu trang.',

@@ -6,7 +6,12 @@ export const CRITERIA=Object.freeze([
   {id:'limited_edition',group:'do_hiem',name:'Ấn bản giới hạn',weight:25,guide:'Thông tin giới hạn phát hành khớp đúng ấn bản; không suy ra số bản hiện còn toàn cầu.'},
   {id:'special_edition',group:'do_hiem',name:'Ấn bản đặc biệt và lịch sử xuất bản',weight:25,guide:'Đặc điểm bản in thử/ấn bản có ý nghĩa lịch sử có căn cứ; không coi mọi lần in đầu hoặc lỗi in là hiếm.'},
   {id:'historical_context',group:'do_hiem',name:'Niên đại và bối cảnh lịch sử',weight:25,guide:'Năm xuất bản đọc được và bối cảnh phù hợp; không suy từ vẻ cũ, không bắt buộc trước 1945.'},
-  {id:'provenance',group:'do_hiem',name:'Lai lịch và dấu ấn riêng',weight:25,guide:'Dấu hiệu chữ ký/con dấu không chứng minh chữ ký thật hoặc danh tính; chưa xác minh thì cần xác minh.'},
+  {id:'provenance',group:'do_hiem',name:'Lai lịch và dấu ấn riêng',weight:25,guide:[
+    'Không dùng not_applicable cho tiêu chí này.',
+    'Nếu người bán không khai chữ ký, dấu sở hữu hoặc lai lịch đặc biệt, không có dấu hiệu nào khác cần xác minh và ảnh đủ rõ ở các vị trí liên quan, chọn assessed + does_not_meet nếu không ghi nhận dấu ấn. Dẫn đúng media_refs và mô tả các vị trí đã quan sát, ví dụ giấy lót, trang nhan đề hoặc trang giới hạn. Chỉ nói không ghi nhận trong ảnh đã xem; không khẳng định bản sách hoàn toàn không có dấu ấn.',
+    'Nếu không có dấu hiệu/lời khai cần xác minh nhưng thiếu góc chụp hoặc ảnh không đủ rõ để đánh giá, chọn missing, không dùng does_not_meet.',
+    'Nếu có dấu hiệu hoặc lời khai về chữ ký, dấu sở hữu hay lai lịch đặc biệt mà chưa đủ căn cứ xác thực, chọn verify. Không suy từ nhãn, con dấu hoặc chữ ký ra danh tính, quyền sở hữu hay tính xác thực.',
+  ].join(' ')},
   {id:'cover',group:'tinh_trang',name:'Bìa',weight:20,guide:'Nguyên vẹn; sờn nhẹ; rách nhỏ/bong cục bộ; rách lớn/mất một phần; xác định mất bìa.'},
   {id:'spine',group:'tinh_trang',name:'Gáy và liên kết',weight:25,guide:'Liên kết chắc; sờn nhẹ; lỏng cục bộ; bung đáng kể/tách một phần; cấu trúc bị phá hủy.'},
   {id:'pages',group:'tinh_trang',name:'Trang ruột',weight:30,guide:'Đủ căn cứ nguyên vẹn/đọc được; ngả màu nhẹ; bẩn/gấp/rách nhỏ; che/mất một phần nội dung; thiếu trang/không đọc được.'},

@@ -24,6 +24,20 @@ test('NULL needs evidence, while provider/media outage stays pending',()=>{
   assert.equal(moderationDecision(partial,{media:[{sent:false,reason:'video_timeout'}]},thresholds),null);
   assert.equal(moderationDecision({...partial,trang_thai:'that_bai'}, {}, thresholds),null);
 });
+test('separate missing photos and unverified provenance into concrete steps for the seller',()=>{
+  const partial={...scored,trang_thai:'chua_day_du',diem_do_hiem:null,diem_tinh_trang:null,chi_tiet:[
+    {nhom_tieu_chi:'do_hiem',tieu_chi:'Lai lịch và dấu ấn riêng',trang_thai_danh_gia:'Cần xác minh',
+      bang_chung:'M2 đọc được nhãn sở hữu.',canh_bao:'Admin cần xác minh thủ công.'},
+    {nhom_tieu_chi:'tinh_trang',tieu_chi:'Mép giấy',trang_thai_danh_gia:'Chưa đủ dữ liệu'},
+    {nhom_tieu_chi:'tinh_trang',tieu_chi:'Bìa áo',trang_thai_danh_gia:'Không áp dụng'},
+  ]};
+  const verdict=moderationDecision(partial,{},thresholds);
+  assert.equal(verdict.approve,false);
+  assert.match(verdict.reason,/Cần xác minh\. Quan sát: M2 đọc được nhãn sở hữu/);
+  assert.match(verdict.reason,/mã lưu trữ/);
+  assert.match(verdict.reason,/mép trên, mép dưới và mép ngoài/);
+  assert.doesNotMatch(verdict.reason,/Admin|Bìa áo|Mức đạt/);
+});
 test('legacy false does not disable automatic moderation; only isolated smoke can exercise manual decisions',()=>{
   assert.deepEqual(parseAiConfig({AI_AUTO_MODERATION:'false',AI_MIN_RARITY_SCORE:'',AI_MIN_CONDITION_SCORE:''}).autoModeration,{rarity:70,condition:70});
   assert.throws(()=>parseAiConfig({AI_MIN_CONDITION_SCORE:'101'}),/AI_MIN_CONDITION_SCORE/);

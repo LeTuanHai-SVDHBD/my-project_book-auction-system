@@ -97,7 +97,8 @@ Duyệt tay trả 409 `AUTO_MODERATION_ENABLED`; POST phân tích lại được
 Khi đã có căn cứ quan sát phù hợp: đáp ứng → 100, không đáp ứng → 0.
 Chưa xác minh/không đủ căn cứ → NULL, không tự suy thành 0.
 Không khẳng định số bản còn lại toàn cầu; không suy từ vẻ cũ ra niên đại, hoặc từ nét ký ra chữ ký thật.
-Các nguồn đầu vào chỉ giúp Admin đối chiếu; bản triển khai không tìm kiếm hay xác thực website bên ngoài.
+Nhãn sở hữu đọc được là dấu hiệu quan sát được, không tự xác nhận chuỗi sở hữu hay tính xác thực.
+URL do người đăng cung cấp được ghi là chưa đối chiếu độc lập; hệ thống không truy cập hay xác thực website bên ngoài.
 
 ### Tình trạng vật lý
 
@@ -129,6 +130,10 @@ Backend dùng phép chia số nguyên chính xác ở bước làm tròn. Không
 - **Chưa đủ dữ liệu / Cần xác minh:** điểm thành phần NULL. Nếu tiêu chí áp dụng chưa được đánh giá, tổng nhóm NULL.
 - **Không áp dụng:** phải có bằng chứng/media; loại trọng số khỏi mẫu số. Không dùng thay cho thiếu ảnh.
 - Không còn tiêu chí áp dụng thì tổng NULL. Không chuyển NULL thành 0 và không bỏ tiêu chí thiếu để làm tăng điểm.
+
+Khi hồ sơ chưa đạt, lý do nêu tiêu chí còn thiếu hoặc cần xác minh, quan sát hiện có và ảnh/tài liệu nên bổ sung.
+Chẳng hạn, tiêu chí mép giấy cần ảnh mép trên, mép dưới và mép ngoài khi đóng sách.
+Luồng tự duyệt hiện tại cho người bán bổ sung rồi gửi lại, không chuyển hồ sơ sang hàng đợi xác minh thủ công.
 
 Đầu ra có trường ngoài hợp đồng, điểm/trọng số do mô hình tự chèn, mã media hoặc nguồn lạ được chặn/hạ về cần xác minh.
 Độ tin cậy chỉ là mô hình tự báo cáo, không dùng làm trọng số hoặc bằng chứng xác thực.
@@ -188,7 +193,7 @@ gửi toàn tệp không có nghĩa mô hình kiểm tra mọi frame hoặc mọ
 khi quan sát được; không tự sinh timestamp hay gán điểm 0 khi không quan sát được. Không đặt FPS thấp,
 không lặng lẽ trích vài frame thay thế video. Quota/token/context/model vẫn do tài khoản Gemini quyết định;
 Files API không làm video dài miễn phí. Luồng này dùng video đã upload, chưa thêm ô YouTube;
-link YouTube trong mô tả vẫn chỉ là nguồn văn bản cần Admin xác minh.
+link YouTube trong mô tả vẫn chỉ là nguồn văn bản do người đăng cung cấp, chưa được đối chiếu độc lập.
 
 Tham chiếu protocol Google đã dùng khi triển khai ngày 01/11/2026 (quyền/quota/giới hạn dịch vụ do nhà cung cấp quản lý):
 [Video/Files với Interactions](https://ai.google.dev/gemini-api/docs/video-understanding),

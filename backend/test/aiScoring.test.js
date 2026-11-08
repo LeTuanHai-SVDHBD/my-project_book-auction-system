@@ -30,6 +30,17 @@ test('không dùng N/A thiếu bằng chứng, nguồn/media tự chế hoặc �
   }
   const data=complete();data.criteria.push(data.criteria[0]);assert.throws(()=>score(data));
 });
+test('URL do người đăng cung cấp có cảnh báo trung tính; không thay bằng chứng hoặc tự làm mất điểm',()=>{
+  const data=complete(),url='https://example.test/catalog';
+  data.criteria[0].sources=[url];
+  data.criteria[3]={...data.criteria[3],status:'verify',evidence:'M1 thấy nhãn sở hữu, chưa đối chiếu được đúng bản.',sources:[url]};
+  const result=scoreObservations(data,{mediaIds:['M1'],sourceUrls:[url]});
+  assert.equal(result.chi_tiet[0].diem,100);
+  assert.equal(result.chi_tiet[0].canh_bao,'Nguồn do người đăng cung cấp; hệ thống chưa đối chiếu độc lập.');
+  assert.equal(result.chi_tiet[3].diem,null);
+  assert.equal(result.diem_do_hiem,null);
+  assert.equal(result.diem_tinh_trang,100);
+});
 test('dữ liệu gửi AI không có giá/tài khoản; fingerprint đổi khi sách/media đổi',()=>{
   const row={ten_sach:'Mẫu',gia_toi_thieu:'secret',email:'secret@example.test',media:[{kind:'image',url:'https://res.cloudinary.com/demo/image/upload/a.jpg'}]};
   assert(!JSON.stringify(analysisInput(row)).includes('secret'));assert.notEqual(inputHash(row),inputHash({...row,tieu_de:'Thay đổi'}));

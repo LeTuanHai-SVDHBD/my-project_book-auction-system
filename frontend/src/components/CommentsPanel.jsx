@@ -49,7 +49,7 @@ export default function CommentsPanel({auctionId,user}){
       {reputation.data&&<>
         <p className="seller-reputation-summary">
           {reputation.data.so_danh_gia
-            ? <><strong>{Number(reputation.data.trung_binh).toFixed(2)}/5 sao</strong> · {reputation.data.so_danh_gia} đánh giá</>
+            ? <><strong>{Number(reputation.data.trung_binh).toLocaleString('vi-VN',{maximumFractionDigits:2})}/5 sao</strong> · {reputation.data.so_danh_gia} đánh giá</>
             : 'Chưa có đánh giá từ giao dịch hoàn tất.'}
         </p>
         {reputation.data.so_danh_gia>0&&<details>

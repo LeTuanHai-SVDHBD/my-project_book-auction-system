@@ -26,6 +26,19 @@ test('explicit discard invalidates pending results, cleans late ready tickets an
 test('success clears local draft without deleting files bound to the submitted post',async()=>{
  let deleted=0;const s=storage(),registry=createPostDrafts({storage:s,api:{discard:async()=>deleted++}}),d=registry.open(opts);d.data.media=[ticket];d.save(data);d.clear({submitted:true});assert.equal(s.rows.size,0);assert.equal(deleted,0);
 });
+test('ảnh chính giữ qua reload và bỏ lựa chọn nếu ảnh đã chọn bị gỡ',async()=>{
+ const s=storage(),image={...ticket,kind:'image',url:'https://res.cloudinary.com/demo/image/upload/v1/a.jpg'};
+ const api={discard:async()=>{}};
+ const first=createPostDrafts({storage:s,now:()=>1000,api}).open(opts);
+ first.data.media=[image];
+ first.selectCover(image);
+ const restored=createPostDrafts({storage:s,now:()=>1001,api}).open(opts);
+ assert.equal(restored.data.coverKey,`upload:${id}`);
+ restored.selectCover(ticket);
+ assert.equal(restored.data.coverKey,`upload:${id}`);
+ await restored.remove(image);
+ assert.equal(restored.data.coverKey,null);
+});
 test('expired files and interrupted reload are explicit; source version change cannot apply stale edits',()=>{
  const s=storage(),r=createPostDrafts({storage:s}),d=r.open(opts);d.data.media=[ticket];d.data.pending=true;d.save(data);
  const restored=createPostDrafts({storage:s,now:()=>3000}).open(opts);assert.equal(restored.data.media.length,0);assert(restored.status.notice.includes('hết hạn'));assert(restored.status.notice.includes('chưa được xác nhận'));

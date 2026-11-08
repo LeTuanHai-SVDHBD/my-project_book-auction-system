@@ -12,7 +12,7 @@ import {createSessionMiddleware} from '../src/middlewares/session.js';
 import {parseAuthConfig} from '../src/config/auth.js';
 import {parseMediaConfig} from '../src/config/media.js';
 import {validatePost,validateReview,validateActivation} from '../src/services/postValidation.js';
-import {canRelist,assertStatePair,assertVersion,assertVideoLimit} from '../src/services/postPolicy.js';
+import {canRelist,assertStatePair,assertVersion,assertVideoLimit,resolveCoverImage} from '../src/services/postPolicy.js';
 import {createPostService} from '../src/services/post.service.js';
 import {publicPost} from '../src/controllers/post.controller.js';
 import {createCloudinary,verifyMedia} from '../src/services/cloudinary.service.js';
@@ -37,6 +37,20 @@ test('không sửa sách dùng trong lịch sử khi đăng lại; reject vé me
   const body=payload();const upload_id=randomUUID();body.media=[{upload_id},{upload_id}];assert.throws(()=>validatePost(body),/lặp/);
   body.media=[];body.sach.ten_sach='x'.repeat(301);assert.throws(()=>validatePost(body));
   const relist=payload();delete relist.sach;relist.reuse_media=true;assert.equal(validatePost(relist,{mode:'relist'}).reuseMedia,true);
+});
+test('ảnh chính chỉ tham chiếu một ảnh đã giữ lại hoặc vé ảnh trong cùng bài',()=>{
+ const upload_id=randomUUID(),data={...payload(),media:[{upload_id}],cover_image:{upload_id}};
+ const image={kind:'image',uploadId:upload_id};
+ const {coverImage}=validatePost(data);
+ assert.equal(resolveCoverImage(coverImage,[],[image]),image);
+ assert.throws(()=>resolveCoverImage(coverImage,[],[{...image,kind:'video'}]),{status:400});
+ for(const value of [{url:'https://example.test/x.jpg'},{id:1},{upload_id,id:1},{upload_id:randomUUID()}]){
+   assert.throws(()=>validatePost({...data,cover_image:value}),{status:400});
+ }
+ const update={...data,row_version:version,cover_image:{id:42},remove_media:[{kind:'image',id:42}]};
+ assert.throws(()=>validatePost(update,{mode:'resubmit'}),{status:400});
+ delete update.remove_media;
+ assert.throws(()=>resolveCoverImage(validatePost(update,{mode:'resubmit'}).coverImage,[{kind:'video',id:42}],[]),{status:400});
 });
 test('một mô tả chung đủ để đăng sách; giữ toàn văn và tương thích tình trạng sách cũ',()=>{
   const body=payload();delete body.sach.tinh_trang_sach;

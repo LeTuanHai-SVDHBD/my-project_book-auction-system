@@ -17,3 +17,12 @@ export function assertRelistable(input) {
 export function assertVideoLimit(items,maxVideos) {
   if(items.filter(item=>item.kind==='video').length>maxVideos)throw new HttpError(400,'MEDIA_COUNT',`Tối đa ${maxVideos} video cho mỗi bài đăng.`);
 }
+
+export function resolveCoverImage(choice,existing,uploads) {
+  if(!choice)return null;
+  const image=choice.uploadId
+    ? uploads.find(item=>item.kind==='image'&&item.uploadId===choice.uploadId)
+    : existing.find(item=>item.kind==='image'&&item.id===choice.id);
+  if(!image)throw new HttpError(400,'INVALID_POST_INPUT','Ảnh chính phải là một ảnh còn giữ hoặc vừa tải lên cho bài này.');
+  return image;
+}

@@ -7,7 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { openPostDraft } from "../services/postDrafts.js";
+import { openPostDraft, postCoverKey } from "../services/postDrafts.js";
 import { mediaAccept } from "../../../shared/mediaFormats.js";
 import { postApi } from "../services/postApi.js";
 import UploadMediaCard from "./UploadMediaCard.jsx";
@@ -32,13 +32,21 @@ export default function PostForm({
   const [config, setConfig] = useState(null);
   const media = draft.data.media;
   const [removed, setRemoved] = useState(draft.data.removed);
+  const [reuseMedia, setReuseMedia] = useState(initial.reuse_media !== "off");
   const [editRevision, setEditRevision] = useState(0),
     [confirmDiscard, setConfirmDiscard] = useState(false);
   const editableBook = mode === "create" || mode === "resubmit";
   const keptMedia = (source?.media || []).filter(
     (item) => !removed.some((x) => x.id === item.id && x.kind === item.kind),
   );
+  const useExisting = mode === "resubmit" || (mode === "relist" && reuseMedia);
+  const availableImages = [...(useExisting ? keptMedia : []), ...media]
+    .filter((item) => postCoverKey(item));
+  const chosenCover = availableImages.find((item) => postCoverKey(item) === draft.data.coverKey);
+  const cover = chosenCover || availableImages[0];
+  const isCover = (item) => Boolean(cover && postCoverKey(item) === postCoverKey(cover));
   function stageRemoval(item) {
+    if (draft.data.coverKey && draft.data.coverKey === postCoverKey(item)) draft.selectCover(null);
     setRemoved((old) => [...old, { id: item.id, kind: item.kind }]);
     setError("");
   }
@@ -76,7 +84,7 @@ export default function PostForm({
           : "off";
       draft.save({ fields, step, isbnMode, isbn, removed });
     }
-  }, [draft, step, isbnMode, isbn, cooldown, removed, editRevision, busy]);
+  }, [draft, step, isbnMode, isbn, cooldown, removed, reuseMedia, editRevision, busy]);
   useEffect(() => {
     let canceled = false;
     postApi
@@ -95,13 +103,10 @@ export default function PostForm({
     const files = [...event.target.files];
     event.target.value = "";
     setError("");
-    const reused =
-      mode === "resubmit" ||
-      (mode === "relist" && formRef.current?.elements.reuse_media?.checked);
     void draft.upload(
       files,
       config,
-      reused ? keptMedia.filter((x) => x.kind === "video").length : 0,
+      useExisting ? keptMedia.filter((x) => x.kind === "video").length : 0,
     );
   }
   function remove(item) {
@@ -141,6 +146,9 @@ export default function PostForm({
       },
       media: media.map(({ upload_id, tieu_de }) => ({ upload_id, tieu_de })),
     };
+    if (chosenCover) body.cover_image = chosenCover.upload_id
+      ? { upload_id: chosenCover.upload_id }
+      : { id: chosenCover.id };
     if (editableBook)
       body.sach = Object.fromEntries(
         ["ten_sach", "tac_gia", "the_loai", "nha_xuat_ban", "isbn", "mo_ta"]
@@ -400,11 +408,8 @@ export default function PostForm({
                 <input
                   type="checkbox"
                   name="reuse_media"
-                  defaultChecked={
-                    initial.reuse_media !== undefined
-                      ? initial.reuse_media === "on"
-                      : true
-                  }
+                  checked={reuseMedia}
+                  onChange={(event) => setReuseMedia(event.target.checked)}
                   disabled={uploading}
                 />
                 Dùng lại media của bài cũ
@@ -430,6 +435,11 @@ export default function PostForm({
                 onChange={upload}
               />
             </label>
+            {availableImages.length > 0 && (
+              <p className="field-hint">
+                Chọn một ảnh làm ảnh chính hiển thị trên danh sách và khi mở bài đăng.
+              </p>
+            )}
             {media.length > 0 && (
               <div className="media-selection-summary">
                 <strong>
@@ -446,11 +456,13 @@ export default function PostForm({
                   key={item.upload_id}
                   item={item}
                   onRemove={remove}
+                  onChooseCover={draft.selectCover}
+                  isCover={isCover(item)}
                   disabled={locked}
                 />
               ))}
             </div>
-            {source?.media?.length > 0 && (
+            {useExisting && source?.media?.length > 0 && (
               <>
                 <h4>Media đã gắn với bản sách</h4>
                 <p className="field-hint">
@@ -459,33 +471,17 @@ export default function PostForm({
                     : "Media đã lưu của bài nguồn được giữ nguyên cùng lịch sử."}
                 </p>
                 <div className="media-grid">
-                  {keptMedia.map((item) =>
-                    mode === "resubmit" ? (
-                      <UploadMediaCard
-                        key={`${item.kind}:${item.id}`}
-                        item={item}
-                        disabled={locked || !item.id}
-                        onRemove={stageRemoval}
-                        removeTitle="Gỡ khỏi hồ sơ gửi duyệt mới"
-                      />
-                    ) : (
-                      <figure key={item.url}>
-                        {item.kind === "image" ? (
-                          <img
-                            src={mediaDisplayUrl(item.url, item.kind)}
-                            alt={item.title || "Ảnh sách"}
-                          />
-                        ) : (
-                          <video
-                            src={mediaDisplayUrl(item.url, item.kind)}
-                            controls
-                            preload="metadata"
-                          />
-                        )}
-                        <figcaption>{item.title}</figcaption>
-                      </figure>
-                    ),
-                  )}
+                  {keptMedia.map((item) => (
+                    <UploadMediaCard
+                      key={`${item.kind}:${item.id}`}
+                      item={item}
+                      disabled={locked || !item.id}
+                      onRemove={mode === "resubmit" ? stageRemoval : undefined}
+                      onChooseCover={draft.selectCover}
+                      isCover={isCover(item)}
+                      removeTitle="Gỡ khỏi hồ sơ gửi duyệt mới"
+                    />
+                  ))}
                 </div>
                 {mode === "resubmit" && removed.length > 0 && (
                   <div className="notice" aria-label="Media dự kiến gỡ">
@@ -607,6 +603,13 @@ export default function PostForm({
               )}
               <dt>Media mới</dt>
               <dd>{media.length} tệp</dd>
+              <dt>Ảnh chính</dt>
+              <dd>{cover ? (
+                <div className="cover-summary">
+                  <img src={mediaDisplayUrl(cover.url, "image")} alt="" />
+                  <span>{cover.tieu_de || cover.title || "Ảnh bản sách"}</span>
+                </div>
+              ) : "Chưa có ảnh"}</dd>
               <dt>Giá khởi điểm</dt>
               <dd>
                 {review.gia_khoi_diem &&

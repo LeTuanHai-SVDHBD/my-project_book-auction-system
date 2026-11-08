@@ -1587,6 +1587,40 @@ figure.upload-media-card {
   font-weight: 500;
   color: #273c48;
 }
+figure.upload-media-card.is-cover {
+  border-color: #355b7c;
+}
+.post-sheet .upload-media-card .cover-choice {
+  justify-self: start;
+  width: fit-content;
+  min-height: 36px;
+  margin-top: 4px;
+  padding: 5px 10px;
+  border: 1px solid #b7c8d7;
+  border-radius: 8px;
+  background: #fff;
+  color: #193755;
+  font-size: 13px;
+}
+.post-sheet .upload-media-card .cover-choice:hover,
+.post-sheet .upload-media-card .cover-choice[aria-pressed="true"] {
+  border-color: #193755;
+  background: #eaf1f7;
+}
+.cover-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}
+.cover-summary img {
+  width: 58px;
+  height: 68px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  background: #eff0e9;
+  border-radius: 6px;
+}
 .post-sheet .upload-media-card > button.remove-upload {
   position: absolute;
   top: 9px;

@@ -88,6 +88,9 @@ Không tự tải lặp liên tục khi kết quả còn chưa rõ. Nếu SQL b�
 
 ## Bổ sung media và nháp
 
+Ở bước **Ảnh và video**, chủ sách có thể chọn **Đặt làm ảnh chính** trên một ảnh đã tải hoặc ảnh được giữ lại. Bước kiểm tra trước khi gửi có ảnh xem trước. Lựa chọn được giữ trong nháp; nếu gỡ ảnh chính hoặc vé ảnh hết hạn thì dùng ảnh còn lại đầu tiên, nếu có.
+API kiểm tra ảnh thuộc đúng hồ sơ hoặc vé của chủ sách, rồi đặt ảnh đó ở đầu thứ tự ảnh trong SQL. Khi bài đủ điều kiện hiển thị công khai, thẻ sách và ảnh mở đầu trang chi tiết lấy cùng thứ tự này. Không cần migration; bản kết quả kiểm duyệt cũ giữ nguyên.
+
 Bài bị từ chối cho sửa đầy đủ hồ sơ, gỡ media cũ bằng × và hoàn tác bằng **Giữ lại**.
 Đây mới là thay đổi nháp; chỉ gửi thành công mới cập nhật SQL. Gỡ media cũ đặt dang_su_dung=0,
 không xóa hàng/file lịch sử. Backend chỉ nhận ID/kind của đúng media active thuộc bài;

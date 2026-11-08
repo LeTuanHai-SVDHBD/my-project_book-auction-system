@@ -18,6 +18,10 @@ const fieldLimits = {
   reuse_media: 3,
 };
 const prefix = "bookbid:post-draft:v1:";
+export const postCoverKey = (item) =>
+  item.kind === "image"
+    ? item.upload_id ? `upload:${item.upload_id}` : item.id ? `saved:${item.id}` : null
+    : null;
 export function createPostDrafts({
   storage,
   api = postApi,
@@ -109,6 +113,9 @@ export function createPostDrafts({
             : source?.isbn || "",
         removed,
         media,
+        coverKey: typeof saved?.coverKey === "string" &&
+          /^(?:upload:[\da-f-]{36}|saved:\d{1,10})$/i.test(saved.coverKey)
+          ? saved.coverKey : null,
         requestId: /^[\da-f-]{36}$/i.test(saved?.requestId || "")
           ? saved.requestId
           : uuid(),
@@ -159,6 +166,13 @@ export function createPostDrafts({
       return () => listeners.delete(notify);
     };
     entry.snapshot = () => revision;
+    entry.selectCover = (item) => {
+      if (entry.closed) return;
+      const key = item ? postCoverKey(item) : null;
+      if (item && !key) return;
+      entry.data.coverKey = key;
+      patch({});
+    };
     entry.save = (values) => {
       if (!entry.closed) {
         const fields = {};
@@ -187,6 +201,7 @@ export function createPostDrafts({
         entry.data.media = entry.data.media.filter(
           (x) => x.upload_id !== item.upload_id,
         );
+        if (entry.data.coverKey === postCoverKey(item)) entry.data.coverKey = null;
       } catch (error) {
         patch({ error: error.message });
       } finally {
@@ -256,6 +271,9 @@ export function createPostDrafts({
       const old = entry.data.media;
       entry.data.media = old.filter((x) => x.expires_at > now());
       if (old.length !== entry.data.media.length) {
+        if (entry.data.coverKey?.startsWith("upload:") &&
+            !entry.data.media.some((item) => postCoverKey(item) === entry.data.coverKey))
+          entry.data.coverKey = null;
         patch({
           error:
             "Một số tệp nháp đã hết hạn. Hãy kiểm tra lại ảnh/video và chọn lại các tệp đó trước khi gửi.",

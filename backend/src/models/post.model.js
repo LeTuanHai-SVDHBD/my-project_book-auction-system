@@ -9,7 +9,7 @@ import {ownerAiResult} from '../services/aiPresentation.js';
 import {createReviewSnapshot,readReviewSnapshot} from '../services/reviewExport.js';
 import {currentReview} from '../../../shared/aiVisibility.js';
 import {withRowVersion} from '../utils/rowVersion.js';
-import {assertVersion,assertStatePair,assertRelistable,assertVideoLimit} from '../services/postPolicy.js';
+import {assertVersion,assertStatePair,assertRelistable,assertVideoLimit,resolveCoverImage} from '../services/postPolicy.js';
 const conflict = message => { throw new HttpError(409,'POST_CONFLICT',message); };
 const notFound = () => { throw new HttpError(404,'POST_NOT_FOUND','Không tìm thấy bài đăng.'); };
 const projection = `b.bai_dang_id,b.sach_id,b.nguoi_dung_id,b.ma_san_pham,b.tieu_de,b.mo_ta_tinh_trang,b.trang_thai AS trang_thai_bai,b.ngay_dang,
@@ -53,15 +53,39 @@ export function createPostModel({ getPool, sql }) {
     const videos=await request(target).input('id',sql.Int,postId).query("SELECT video_id AS id,'video' AS kind,duong_dan_video AS url,tieu_de_video AS title,cloudinary_public_id AS publicId FROM dbo.Video WHERE bai_dang_id=@id AND dang_su_dung=1 ORDER BY thu_tu_video");
     return [...images.recordset,...videos.recordset];
   }
-  async function insertMedia(tx,postId,items,limits,existing=[]) {
+  async function insertMedia(tx,postId,items,limits,existing=[],cover=null) {
     const all=[...existing,...items];
     assertVideoLimit(all,limits.maxVideos);
+    let coverId=null;
     for (const item of items) {
       const image=item.kind==='image'; const table=image?'HinhAnh':'Video'; const suffix=image?'img':'video';
-      await request(tx).input('id',sql.Int,postId).input('url',sql.VarChar(2048),item.url).input('title',sql.NVarChar(500),item.title||null)
+      const result=await request(tx).input('id',sql.Int,postId).input('url',sql.VarChar(2048),item.url).input('title',sql.NVarChar(500),item.title||null)
         .input('publicId',sql.VarChar(255),item.publicId||null)
-        .query(`INSERT dbo.${table}(bai_dang_id,duong_dan_${suffix},tieu_de_${suffix},thu_tu_${suffix},cloudinary_public_id) SELECT @id,@url,@title,COALESCE(MAX(thu_tu_${suffix}),0)+1,@publicId FROM dbo.${table} WHERE bai_dang_id=@id`);
+        .query(`INSERT dbo.${table}(bai_dang_id,duong_dan_${suffix},tieu_de_${suffix},thu_tu_${suffix},cloudinary_public_id)${item===cover?' OUTPUT INSERTED.hinh_anh_id AS id':''} SELECT @id,@url,@title,COALESCE(MAX(thu_tu_${suffix}),0)+1,@publicId FROM dbo.${table} WHERE bai_dang_id=@id`);
+      if(item===cover)coverId=result.recordset[0].id;
     }
+    return coverId;
+  }
+  async function promoteCover(tx,postId,firstId,coverId) {
+    if(firstId===coverId)return;
+    // Keep IDs and inactive media intact; use a free slot to satisfy the unique order constraint during the swap.
+    const result=await request(tx).input('id',sql.Int,postId).input('first',sql.Int,firstId).input('cover',sql.Int,coverId).query(`
+      DECLARE @firstOrder SMALLINT,@coverOrder SMALLINT,@spare SMALLINT;
+      SELECT @firstOrder=thu_tu_img FROM dbo.HinhAnh WHERE bai_dang_id=@id AND hinh_anh_id=@first AND dang_su_dung=1;
+      SELECT @coverOrder=thu_tu_img FROM dbo.HinhAnh WHERE bai_dang_id=@id AND hinh_anh_id=@cover AND dang_su_dung=1;
+      SELECT TOP(1) @spare=c.slot_order+1 FROM (
+        SELECT 0 AS slot_order UNION ALL SELECT thu_tu_img FROM dbo.HinhAnh WHERE bai_dang_id=@id
+      ) c WHERE c.slot_order<32767 AND NOT EXISTS (
+        SELECT 1 FROM dbo.HinhAnh WHERE bai_dang_id=@id AND thu_tu_img=c.slot_order+1
+      ) ORDER BY c.slot_order DESC;
+      IF @firstOrder IS NOT NULL AND @coverOrder IS NOT NULL AND @spare IS NOT NULL
+      BEGIN
+        UPDATE dbo.HinhAnh SET thu_tu_img=@spare WHERE bai_dang_id=@id AND hinh_anh_id=@first;
+        UPDATE dbo.HinhAnh SET thu_tu_img=@firstOrder WHERE bai_dang_id=@id AND hinh_anh_id=@cover;
+        UPDATE dbo.HinhAnh SET thu_tu_img=@coverOrder WHERE bai_dang_id=@id AND hinh_anh_id=@first;
+        SELECT 1 AS moved;
+      END ELSE SELECT 0 AS moved;`);
+    if(result.recordset[0].moved!==1)conflict('Không thể đổi ảnh chính. Hãy tải lại bài đăng.');
   }
   function prices(req,input) {
     for (const key of ['gia_khoi_diem','gia_toi_thieu','buoc_gia']) req.input(key,sql.VarChar(18),input.prices[key]);
@@ -196,7 +220,8 @@ export function createPostModel({ getPool, sql }) {
           .query('INSERT dbo.BaiDang(nguoi_dung_id,sach_id,ma_san_pham,tieu_de,mo_ta_tinh_trang,ho_so_sach) OUTPUT INSERTED.bai_dang_id VALUES(@owner,@book,@code,@title,@description,@profile)')).recordset[0].bai_dang_id;
         const auctionId=(await prices(request(tx).input('post',sql.Int,postId),input).query(`INSERT dbo.PhienDauGia(bai_dang_id,gia_khoi_diem,gia_toi_thieu,buoc_gia,thoi_gian_cho_dat_lai)
           OUTPUT INSERTED.phien_dau_gia_id VALUES(@post,CONVERT(DECIMAL(18,0),@gia_khoi_diem),CONVERT(DECIMAL(18,0),@gia_toi_thieu),CONVERT(DECIMAL(18,0),@buoc_gia),@wait)`)).recordset[0].phien_dau_gia_id;
-        await insertMedia(tx,postId,[...reused,...items],limits);
+        const cover=resolveCoverImage(input.coverImage,reused,items),all=[...reused,...items];
+        await insertMedia(tx,postId,cover?[cover,...all.filter(item=>item!==cover)]:all,limits);
         await history(tx,auctionId,owner,sourceId?`Đăng lại từ bài ${sourceId}; giữ sách ${bookId}; chờ kiểm duyệt`:'Tạo sách, bài đăng và phiên chờ kiểm duyệt');
         return {id:postId,replayed:false};
       });
@@ -220,7 +245,12 @@ export function createPostModel({ getPool, sql }) {
         await request(tx).input('id',sql.Int,postId).input('title',sql.NVarChar(300),input.post.tieu_de).input('description',sql.NVarChar(sql.MAX),input.post.mo_ta_tinh_trang).input('profile',sql.NVarChar(sql.MAX),JSON.stringify(profile))
           .query("UPDATE dbo.BaiDang SET tieu_de=@title,mo_ta_tinh_trang=@description,ho_so_sach=@profile,trang_thai='cho_kiem_duyet' WHERE bai_dang_id=@id");
         await prices(request(tx).input('id',sql.Int,row.phien_dau_gia_id),input).query(`UPDATE dbo.PhienDauGia SET gia_khoi_diem=CONVERT(DECIMAL(18,0),@gia_khoi_diem),gia_toi_thieu=CONVERT(DECIMAL(18,0),@gia_toi_thieu),buoc_gia=CONVERT(DECIMAL(18,0),@buoc_gia),thoi_gian_cho_dat_lai=@wait,trang_thai='cho_kiem_duyet' WHERE phien_dau_gia_id=@id`);
-        await insertMedia(tx,postId,items,limits,await media(tx,postId));
+        const remaining=await media(tx,postId),cover=resolveCoverImage(input.coverImage,remaining,items);
+        const first=remaining.find(item=>item.kind==='image');
+        const isNewCover=cover&&items.includes(cover);
+        const ordered=isNewCover?[cover,...items.filter(item=>item!==cover)]:items;
+        const insertedCoverId=await insertMedia(tx,postId,ordered,limits,remaining,first&&isNewCover?cover:null);
+        if(first&&cover)await promoteCover(tx,postId,first.id,insertedCoverId??cover.id);
         await history(tx,row.phien_dau_gia_id,owner,'Bổ sung thông tin/media và gửi kiểm duyệt lại; giữ lịch sử kiểm duyệt');
         return {id:postId};
       });

@@ -11,23 +11,28 @@ export function createCloudinary({ config, fetchImpl = fetch, wait=delay }) {
   const root=`https://api.cloudinary.com/v1_1/${config.cloudName}`;
   const endpoint = kind => `${root}/${kind}`;
   const headers = { Authorization: `Basic ${Buffer.from(`${config.apiKey}:${config.apiSecret}`).toString('base64')}` };
-  async function call(url,body,{operation,timeout,method='POST',signal=AbortSignal.timeout(timeout),extraHeaders}) {
+  async function call(url,body,{operation,timeout,method='POST',signal=AbortSignal.timeout(timeout),extraHeaders,upload}) {
     if (!config.configured) throw mediaFailure('MEDIA_NOT_CONFIGURED');
+    let stage='awaiting_headers';
+    const diagnostics=()=>upload?{kind:upload.kind,file_bytes:upload.bytes,part:upload.part,parts:upload.parts,timeout_ms:upload.timeout,
+      elapsed_ms:Math.round(performance.now()-upload.started),stage,deadline_reached:signal.aborted}:{};
     try {
       signal.throwIfAborted();
       const response=await fetchImpl(url,{method,headers:{...headers,...extraHeaders},body,signal,redirect:'error'});
       if(!response.ok){
+        stage='http_response';
         void response.body?.cancel().catch(()=>{});
         if(operation==='recover'&&response.status===404)return null;
         const code=[408,504].includes(response.status)?'MEDIA_PROVIDER_TIMEOUT':[401,403].includes(response.status)?'MEDIA_PROVIDER_AUTH':[413,420,429].includes(response.status)?'MEDIA_PROVIDER_LIMIT':response.status>=400&&response.status<500?'MEDIA_PROVIDER_REJECTED':'MEDIA_PROVIDER_ERROR';
-        throw mediaFailure(code,{operation,http_status:response.status});
+        throw mediaFailure(code,{operation,http_status:response.status,...diagnostics()});
       }
       // Plain json() stubs remain supported in existing unit fixtures; real fetch Responses use bounded streams.
+      stage='response_body';
       return response.body===undefined?await response.json():await providerJson(response,signal);
     } catch(error) {
       if(error instanceof HttpError)throw error;
       const code=signal.aborted||['TimeoutError','AbortError'].includes(error.name)?'MEDIA_PROVIDER_TIMEOUT':error instanceof TypeError?'MEDIA_PROVIDER_NETWORK':'MEDIA_PROVIDER_ERROR';
-      throw mediaFailure(code,{operation,transport_code:error.cause?.code});
+      throw mediaFailure(code,{operation,transport_code:error.cause?.code,...diagnostics()});
     }
   }
   function verified(result,kind,publicId) {
@@ -37,18 +42,21 @@ export function createCloudinary({ config, fetchImpl = fetch, wait=delay }) {
   }
   async function sendUpload({kind,publicId,bytes,mime}) {
     const url=`${endpoint(kind)}/upload`;
-    const signal=AbortSignal.timeout(kind==='video'?(config.videoUploadTimeoutMs||300000):config.uploadTimeoutMs);
+    const timeout=kind==='video'?(config.videoUploadTimeoutMs||300000):config.uploadTimeoutMs;
+    const started=performance.now(),signal=AbortSignal.timeout(timeout);
+    const parts=kind==='video'?Math.ceil(bytes.length/VIDEO_CHUNK_BYTES):1;
+    const upload={kind,bytes:bytes.length,parts,timeout,started};
     const formFor=part=>{
       const form=new FormData();
       form.set('file',new Blob([part],{type:mime}),'upload');
       form.set('public_id',publicId);form.set('overwrite','false');
       return form;
     };
-    if(kind!=='video'||bytes.length<=VIDEO_CHUNK_BYTES)return call(url,formFor(bytes),{operation:'upload',signal});
+    if(parts<=1)return call(url,formFor(bytes),{operation:'upload',signal,upload:{...upload,part:1}});
     const uploadId=randomUUID();
     for(let start=0;start<bytes.length;start+=VIDEO_CHUNK_BYTES){
       const end=Math.min(start+VIDEO_CHUNK_BYTES,bytes.length);
-      const response=await call(url,formFor(bytes.subarray(start,end)),{operation:'upload',signal,extraHeaders:{
+      const response=await call(url,formFor(bytes.subarray(start,end)),{operation:'upload',signal,upload:{...upload,part:start/VIDEO_CHUNK_BYTES+1},extraHeaders:{
         'X-Unique-Upload-Id':uploadId,'Content-Range':`bytes ${start}-${end-1}/${bytes.length}`
       }});
       if(response?.existing)return response;

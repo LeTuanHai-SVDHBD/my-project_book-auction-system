@@ -79,7 +79,10 @@ Lookup cần quyền Cloudinary Admin API và chịu quota. Chưa xác minh đư
 | `MEDIA_PROVIDER_REJECTED` | Nội dung/codec hoặc cấu hình upload bị từ chối |
 | `MEDIA_PROVIDER_ERROR`, `INVALID_MEDIA_RESPONSE` | Lỗi provider hoặc metadata không khớp/chưa sẵn sàng |
 
-Log chỉ có operation, HTTP status, transport allowlist; không có Authorization/key/body thô.
+Log chỉ giữ thông tin chẩn đoán an toàn, không có Authorization/key/body thô. Lỗi upload ghi
+`part/parts`, dung lượng, thời gian và giai đoạn: `awaiting_headers` là chưa có phản hồi HTTP (có thể còn đang gửi);
+`response_body` là đã có header nhưng chưa đọc xong nội dung. `deadline_reached` cho biết deadline cục bộ đã hết.
+Nếu đối soát trả `404`, Cloudinary chưa tìm thấy asset theo đúng public ID tại lúc kiểm tra; không kết luận video hỏng.
 Web nêu tên tệp lỗi; lỗi một tệp không bỏ các tệp tốt trong batch, đổi phiên đăng nhập dừng các tệp chưa gửi.
 Không tự tải lặp liên tục khi kết quả còn chưa rõ. Nếu SQL bị xóa thủ công thì không có trigger tự destroy Cloudinary.
 

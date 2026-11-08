@@ -52,6 +52,20 @@ test('không gửi phần tiếp khi Cloudinary chưa xác nhận phần trướ
  await assert.rejects(p.upload({...input,bytes:Buffer.alloc(chunkSize+1)}),{code:'MEDIA_PROVIDER_ERROR'});
  assert.equal(posts,1);
 });
+test('lỗi trước headers ghi đúng phần video và giới hạn, không ghi payload hoặc tên tệp',async()=>{
+ let posts=0;const p=createCloudinary({config,wait:async()=>{},fetchImpl:async(_url,options)=>{
+  if(options.method==='GET')return new Response('',{status:404});
+  if(++posts===1)return Response.json({done:false});
+  throw new DOMException('private-filename.mp4','TimeoutError');
+ }});
+ await assert.rejects(p.upload({...input,bytes:Buffer.alloc(chunkSize+1)}),error=>{
+  const {elapsed_ms,...data}=error.mediaDiagnostics;
+  assert(Number.isSafeInteger(elapsed_ms));
+  assert.deepEqual(data,{operation:'upload',kind:'video',stage:'awaiting_headers',file_bytes:chunkSize+1,part:2,parts:2,timeout_ms:300000,deadline_reached:false});
+  assert.equal(error.recoveryDiagnostics.http_status,404);
+  assert(!JSON.stringify(error).includes('private-filename'));return true;
+ });
+});
 test('video đã lên nhưng upload timeout: một POST, tra đúng public ID, xác minh rồi trả URL thật',async()=>{
  const calls=[];const p=createCloudinary({config,wait:async()=>{},fetchImpl:async(url,options)=>{
   calls.push({url,method:options.method});assert(!url.includes(config.apiSecret));assert(options.headers.Authorization.startsWith('Basic '));
@@ -74,6 +88,13 @@ test('body response treo bị hủy đúng deadline, sau đó phục hồi từ 
   calls++;if(options.method==='GET')return Response.json(asset());let timer;return new Response(new ReadableStream({start(c){timer=setTimeout(()=>c.enqueue(new Uint8Array([1])),200);},cancel(){clearTimeout(timer);cancelled++;}}));
  }});
  const value=await p.upload(input);assert.equal(value.publicId,publicId);assert.equal(calls,2);assert.equal(cancelled,1);
+});
+test('body bị treo khác lỗi chờ headers; nếu đối soát không thấy asset, log giữ nguyên giai đoạn timeout',async()=>{
+ const p=createCloudinary({config:{...config,videoUploadTimeoutMs:20},wait:async()=>{},fetchImpl:async(_url,options)=>{
+  if(options.method==='GET')return new Response('',{status:404});
+  let timer;return new Response(new ReadableStream({start(c){timer=setTimeout(()=>c.enqueue(new Uint8Array([1])),200);},cancel(){clearTimeout(timer);}}));
+ }});
+ await assert.rejects(p.upload(input),error=>error.code==='MEDIA_PROVIDER_TIMEOUT'&&error.mediaDiagnostics.stage==='response_body'&&error.mediaDiagnostics.deadline_reached===true);
 });
 test('HTTP auth/quota/tệp bị từ chối không tự tra hoặc upload lại; body không được phản chiếu',async()=>{
  for(const [status,code] of [[400,'MEDIA_PROVIDER_REJECTED'],[401,'MEDIA_PROVIDER_AUTH'],[403,'MEDIA_PROVIDER_AUTH'],[413,'MEDIA_PROVIDER_LIMIT'],[420,'MEDIA_PROVIDER_LIMIT'],[429,'MEDIA_PROVIDER_LIMIT']]){

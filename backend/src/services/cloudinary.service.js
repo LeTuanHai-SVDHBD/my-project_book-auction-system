@@ -1,18 +1,21 @@
 /** Cloudinary REST phía server; không nhận URL tùy ý, không đưa bí mật vào phản hồi/lỗi. */
 import {detectMedia} from '../../../shared/mediaFormats.js';
+import {randomUUID} from 'node:crypto';
 import { HttpError } from '../middlewares/errorHandler.js';
 import {setTimeout as delay} from 'node:timers/promises';
 import {providerJson} from '../utils/providerJson.js';
 import {mediaFailure,recoverableMediaError} from './mediaErrors.js';
+import {mediaRecoveryDelays} from '../config/media.js';
+const VIDEO_CHUNK_BYTES=6*1024*1024;
 export function createCloudinary({ config, fetchImpl = fetch, wait=delay }) {
   const root=`https://api.cloudinary.com/v1_1/${config.cloudName}`;
   const endpoint = kind => `${root}/${kind}`;
   const headers = { Authorization: `Basic ${Buffer.from(`${config.apiKey}:${config.apiSecret}`).toString('base64')}` };
-  async function call(url,body,{operation,timeout,method='POST'}) {
+  async function call(url,body,{operation,timeout,method='POST',signal=AbortSignal.timeout(timeout),extraHeaders}) {
     if (!config.configured) throw mediaFailure('MEDIA_NOT_CONFIGURED');
-    const signal=AbortSignal.timeout(timeout);
     try {
-      const response=await fetchImpl(url,{method,headers,body,signal,redirect:'error'});
+      signal.throwIfAborted();
+      const response=await fetchImpl(url,{method,headers:{...headers,...extraHeaders},body,signal,redirect:'error'});
       if(!response.ok){
         void response.body?.cancel().catch(()=>{});
         if(operation==='recover'&&response.status===404)return null;
@@ -32,19 +35,41 @@ export function createCloudinary({ config, fetchImpl = fetch, wait=delay }) {
     if(result?.public_id!==publicId||result.resource_type!==kind||result.placeholder||result.type&&result.type!=='upload'||!url||url.protocol!=='https:'||url.hostname!=='res.cloudinary.com'||url.username||url.password||url.port||!url.pathname.startsWith(`/${config.cloudName}/${kind}/upload/`)||result.secure_url.length>2048)throw mediaFailure('INVALID_MEDIA_RESPONSE');
     return {url:result.secure_url,publicId,kind};
   }
+  async function sendUpload({kind,publicId,bytes,mime}) {
+    const url=`${endpoint(kind)}/upload`;
+    const signal=AbortSignal.timeout(kind==='video'?(config.videoUploadTimeoutMs||300000):config.uploadTimeoutMs);
+    const formFor=part=>{
+      const form=new FormData();
+      form.set('file',new Blob([part],{type:mime}),'upload');
+      form.set('public_id',publicId);form.set('overwrite','false');
+      return form;
+    };
+    if(kind!=='video'||bytes.length<=VIDEO_CHUNK_BYTES)return call(url,formFor(bytes),{operation:'upload',signal});
+    const uploadId=randomUUID();
+    for(let start=0;start<bytes.length;start+=VIDEO_CHUNK_BYTES){
+      const end=Math.min(start+VIDEO_CHUNK_BYTES,bytes.length);
+      const response=await call(url,formFor(bytes.subarray(start,end)),{operation:'upload',signal,extraHeaders:{
+        'X-Unique-Upload-Id':uploadId,'Content-Range':`bytes ${start}-${end-1}/${bytes.length}`
+      }});
+      if(response?.existing)return response;
+      const last=end===bytes.length;
+      if(response?.done!==last)throw mediaFailure('MEDIA_PROVIDER_ERROR',{operation:'upload'});
+      if(last)return response;
+    }
+  }
   return {
     async upload({kind,publicId,bytes,mime}) {
-      const form=new FormData();form.set('file',new Blob([bytes],{type:mime}),'upload');form.set('public_id',publicId);form.set('overwrite','false');
       let original;
       try {
-        const result=await call(`${endpoint(kind)}/upload`,form,{operation:'upload',timeout:kind==='video'?(config.videoUploadTimeoutMs||300000):config.uploadTimeoutMs});
+        const result=await sendUpload({kind,publicId,bytes,mime});
+        if(!result||result.done===false)throw mediaFailure('MEDIA_PROVIDER_ERROR',{operation:'upload'});
         if(!result.existing)return verified(result,kind,publicId);
         if(result.public_id&&result.public_id!==publicId)throw mediaFailure('INVALID_MEDIA_RESPONSE');
         original=mediaFailure('MEDIA_PROVIDER_ERROR',{operation:'upload'});
       }catch(error){if(!recoverableMediaError(error))throw error;original=error;}
       // Read-only recovery of this server-issued UUID; never repeat the upload or guess a delivery URL.
-      for(let attempt=0;attempt<(config.recoveryAttempts||3);attempt++){
-        if(attempt)await wait(config.recoveryDelayMs??1000);
+      for(const pause of mediaRecoveryDelays(kind)){
+        if(pause)await wait(pause);
         try{
           const result=await call(`${root}/resources/${kind}/upload/${encodeURIComponent(publicId)}`,undefined,{operation:'recover',method:'GET',timeout:config.recoveryTimeoutMs||15000});
           if(result)return verified(result,kind,publicId);

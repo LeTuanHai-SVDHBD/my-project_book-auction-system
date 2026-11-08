@@ -2,6 +2,11 @@
 
 # Kiểm chứng và nghiệm thu
 
+## Upload video theo phần và đối soát phản hồi Cloudinary
+
+- `npm run check` và `npm test` đạt: 215 PASS, 12 SKIP, tổng 227 test.
+- Mô phỏng Cloudinary xác nhận byte range nối tiếp, chỉ nhận phản hồi cuối đã xác minh và tra metadata khi phần cuối bị timeout mà không gửi lại tệp. Chưa thử với tài khoản Cloudinary hoặc tệp của người dùng.
+
 ## Giữ trạng thái ổn định sau lần phân tích AI thất bại
 
 - `npm run check`, `npm test` và `npm run build` đều đạt: 212 PASS, 12 SKIP (dịch vụ thật), tổng 224 test.

@@ -41,8 +41,9 @@ Cloudinary. Test fixture không chứng minh mọi codec phát được trên m�
 
 1. Người dùng đã đăng nhập/quyền/CSRF gửi body nhị phân đến `/api/media/image` hoặc `/video`.
 2. API kiểm tra cấu hình, MIME/size/bytes; Redis cấp UUID/public ID riêng trước upload.
-3. Gọi Cloudinary một POST với `overwrite=false`; xác minh public ID, resource type và HTTPS delivery URL
-   đúng cloud/kind, không placeholder/private/credentials/port lạ.
+3. Gọi Cloudinary với `overwrite=false`. Video trên 6 MiB được gửi theo từng phần 6 MiB với cùng mã upload
+   và `Content-Range`; chỉ dùng phản hồi hoàn tất. Ảnh và video nhỏ gửi một POST.
+   Xác minh public ID, resource type và HTTPS delivery URL đúng cloud/kind, không placeholder/private/credentials/port lạ.
 4. Khi ready, trả `{upload_id,url,kind,expires_at}`. Frontend giữ vé và tên tệp, không giữ khóa provider.
 5. Gửi bài bằng vé, service claim nguyên tử theo owner/trạng thái/tuổi; SQL ghi hồ sơ/media/lịch sử cùng transaction.
 6. COMMIT rồi bind/dọn vé. Rollback chắc chắn mới release; commit chưa rõ giữ claim để đối soát.
@@ -57,15 +58,16 @@ Không có distributed transaction SQL–Cloudinary và không cam kết upload 
 | Biến | Mặc định | Khoảng |
 |---|---:|---:|
 | `MEDIA_IMAGE_UPLOAD_TIMEOUT_MS` | 120000 | 1000–300000 ms |
-| `MEDIA_VIDEO_UPLOAD_TIMEOUT_MS` | 300000 | 1000–300000 ms |
+| `MEDIA_VIDEO_UPLOAD_TIMEOUT_MS` | 300000 | 1000–300000 ms cho toàn bộ lượt gửi video |
 | `MEDIA_RECOVERY_TIMEOUT_MS` | 15000 | 1000–30000 ms/lượt tra |
 
 Đọc JSON provider tối đa 1 MiB, có deadline cả headers/body. Nếu timeout/mất mạng/HTTP 408/5xx hoặc
-phản hồi upload chưa dùng được, tra metadata đúng public ID đã cấp tối đa 3 lần, nghỉ 1 giây giữa lượt;
+phản hồi upload chưa dùng được, tra metadata đúng public ID đã cấp tối đa 3 lần. Ảnh nghỉ 1 giây giữa lượt;
+video nghỉ lần lượt 2 và 8 giây để Cloudinary có thời gian cập nhật metadata sau khi nhận phần cuối.
 không POST lại bytes/đổi UUID/đoán delivery URL. `existing=true` cũng cần đối soát. Lỗi upload 4xx/quyền/quota
 không tự đối soát; lookup bị từ chối/hết quota thì dừng. Destroy không dùng cơ chế này.
 
-Web lấy ngân sách từ `/api/media/config`: mặc định 477 giây cho ảnh, 657 giây cho video, gồm nhận body,
+Web lấy ngân sách từ `/api/media/config`: mặc định 477 giây cho ảnh, 665 giây cho video, gồm nhận body,
 provider, recovery và dự phòng. Đây là trần chờ, không là thời gian tải dự đoán; proxy/provider có thể ngắt sớm.
 Lookup cần quyền Cloudinary Admin API và chịu quota. Chưa xác minh được thì không trả vé thành công giả.
 

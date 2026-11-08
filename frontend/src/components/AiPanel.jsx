@@ -33,9 +33,9 @@ function Sources({ value }) {
     </>
   );
 }
-export default function AiPanel({ post, user }) {
-  const admin = user?.vai_tro === "admin",
-    visible = admin || Boolean(currentReview(post));
+export default function AiPanel({ post, user, publicView = false }) {
+  const admin = !publicView && user?.vai_tro === "admin",
+    visible = publicView || admin || Boolean(currentReview(post));
   const [data, setData] = useState(null),
     [selected, setSelected] = useState(""),
     [busy, setBusy] = useState(false),
@@ -64,7 +64,7 @@ export default function AiPanel({ post, user }) {
     [post.bai_dang_id, selected, admin],
   );
   useEffect(() => {
-    if (!visible) return;
+    if (publicView || !visible) return;
     let stopped = false,
       timer;
     async function poll() {
@@ -77,7 +77,7 @@ export default function AiPanel({ post, user }) {
       ++sequence.current;
       clearTimeout(timer);
     };
-  }, [load, visible, admin]);
+  }, [load, visible, admin, publicView]);
   async function request() {
     setBusy(true);
     setError("");
@@ -99,7 +99,7 @@ export default function AiPanel({ post, user }) {
       setBusy(false);
     }
   }
-  const analysis = data?.analysis,
+  const analysis = publicView ? post.ai_cong_khai : data?.analysis,
     pending = ["queued", "running"].includes(data?.job?.state),
     waiting = post.trang_thai_phien === "cho_kiem_duyet",
     quotaPaused = admin && waiting && Boolean(data?.quota_resume_at),
@@ -113,8 +113,11 @@ export default function AiPanel({ post, user }) {
     >
       {admin && <h3>AI hỗ trợ kiểm duyệt</h3>}
       <p className="field-hint">
-        Hệ thống đối chiếu hai điểm độc lập với mức đạt của từng nhóm.
+        {publicView
+          ? "Kết quả tham khảo từ ảnh, video và thông tin của bài đã được phê duyệt."
+          : "Hệ thống đối chiếu hai điểm độc lập với mức đạt của từng nhóm."}
       </p>
+      {publicView && !analysis && <p>Chưa có kết quả AI công khai cho bản sách này.</p>}
       {admin && waiting && data && !data.configured && (
         <p className="notice">AI chưa sẵn sàng. Bài đăng sẽ tiếp tục chờ.</p>
       )}
@@ -167,7 +170,7 @@ export default function AiPanel({ post, user }) {
           </select>
         </label>
       )}
-      {!data && !error && (
+      {!publicView && !data && !error && (
         <p role="status">
           {admin ? "Đang tải trạng thái AI…" : "Đang tải kết quả AI…"}
         </p>
@@ -183,10 +186,12 @@ export default function AiPanel({ post, user }) {
           </p>
         ) : (
           <>
-            <p className="ai-analysis-meta">
-              <StatusBadge state={analysis.trang_thai} /> {" "}
-              {new Date(analysis.ngay_phan_tich).toLocaleString("vi-VN")}
-            </p>
+            {!publicView && (
+              <p className="ai-analysis-meta">
+                <StatusBadge state={analysis.trang_thai} /> {" "}
+                {new Date(analysis.ngay_phan_tich).toLocaleString("vi-VN")}
+              </p>
+            )}
             {analysis.loi_thoi && (
               <p className="notice">
                 Đây là phân tích của dữ liệu cũ hoặc chưa xác định được phiên

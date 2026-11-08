@@ -203,6 +203,12 @@ function Detail({
           <p className="preserve-lines">{bookReviewDescription(post)}</p>
         </div>
       </section>
+      {mode === "catalog" && published && (
+        <section className="panel live-review">
+          <h2>Điểm và bằng chứng AI</h2>
+          <AiPanel post={post} publicView />
+        </section>
+      )}
       {mode !== "catalog" && (
         <section className="panel live-review">
           {admin && ai}

@@ -6,6 +6,7 @@ import {ownerAiResult} from '../src/services/aiPresentation.js';
 import {analysisView,inputHash} from '../src/ai/input.js';
 import {META_CRITERION,RULE_VERSION} from '../src/ai/criteria.js';
 import {createPostModel} from '../src/models/post.model.js';
+import {createPostController} from '../src/controllers/post.controller.js';
 
 function fixture() {
   const post={bai_dang_id:7,nguoi_dung_id:1,trang_thai_bai:'da_duyet',trang_thai_phien:'da_qua_kiem_duyet',row_version:'0000000000000003',mo_ta_tinh_trang:'Bìa sờn',media:[],
@@ -60,4 +61,44 @@ test('private post detail also removes pending AI and seller diagnostics; Admin 
   post.trang_thai_bai='cho_kiem_duyet';post.trang_thai_phien='cho_kiem_duyet';
   assert.equal((await model.detail(7,{owner:1})).ai,null);
   assert.equal((await model.detail(7,{admin:true})).ai.thong_tin.error_code,'AI_TIMEOUT');
+});
+test('public detail shows only evidence from the linked approval for a published auction',async()=>{
+  const {post,raw}=fixture();
+  post.trang_thai_phien='da_kich_hoat';
+  post.kiem_duyet[0].phan_tich_id=10;
+  post.kiem_duyet[0].phan_hoi_admin='private-review';
+  raw.trang_thai='thanh_cong';raw.diem_do_hiem=75;raw.diem_tinh_trang=100;
+  raw.chi_tiet.push({tieu_chi:'Bìa',diem:100,bang_chung:'M1 cho thấy bìa còn nguyên.',
+    canh_bao:'private-warning',nguon_doi_chieu:JSON.stringify({media:['M1'],urls:['https://example.test/private']})});
+  let analysisReads=0;
+  const pool={request:()=>{
+    const params={};
+    return {input(key,_type,value){params[key]=value;return this;},async query(text){
+      if(text.includes('JOIN dbo.Sach s'))return {recordset:[{...post,row_version:Buffer.from(post.row_version,'hex'),gia_toi_thieu:'secret-reserve'}]};
+      if(text.includes('FROM dbo.HinhAnh')||text.includes('FROM dbo.Video'))return {recordset:[]};
+      if(text.includes('FROM dbo.KiemDuyet'))return {recordset:[{...post.kiem_duyet[0]}]};
+      if(text.includes('FROM dbo.PhanTichAI')){
+        analysisReads++;assert.equal(params.analysis,10);
+        const {chi_tiet,...summary}=raw;return {recordset:[summary]};
+      }
+      if(text.includes('FROM dbo.ChiTietPhanTichAI'))return {recordset:raw.chi_tiet};
+      assert.fail(text);
+    }};
+  }};
+  const model=createPostModel({getPool:async()=>pool,sql:{Int:'Int'}});
+  const controller=createPostController({model});
+  const read=()=>controller.publicDetail({params:{id:'7'}},{json:value=>value});
+  const result=await read();
+  assert.equal(result.ai_cong_khai.diem_do_hiem,75);
+  assert.equal(result.ai_cong_khai.diem_tinh_trang,100);
+  assert.equal(result.ai_cong_khai.chi_tiet[0].bang_chung,'M1 cho thấy bìa còn nguyên.');
+  assert.deepEqual(JSON.parse(result.ai_cong_khai.chi_tiet[0].nguon_doi_chieu),{media:['M1']});
+  assert.doesNotMatch(JSON.stringify(result),/gia_toi_thieu|secret-reserve|private-review|private-warning|example\.test|AI_TIMEOUT|row_version|http_status/);
+  post.mo_ta_tinh_trang='Đầu vào đã đổi';
+  assert.equal((await read()).ai_cong_khai,null);
+  post.kiem_duyet[0].phan_tich_id=null;
+  assert.equal((await read()).ai_cong_khai,null);
+  assert.equal(analysisReads,2);
+  post.trang_thai_phien='da_qua_kiem_duyet';
+  await assert.rejects(read(),{status:404});
 });

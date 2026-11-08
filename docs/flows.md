@@ -49,7 +49,7 @@ Không có API hủy giữa phiên, kết thúc thủ công hoặc xóa bài. Ch
 | HTTP | Đường dẫn | Quyền / chức năng |
 |---|---|---|
 | GET | `/posts/catalog` | Công khai; danh mục hoặc tìm kiếm, chỉ đã duyệt và kích hoạt/kết thúc |
-| GET | `/posts/catalog/:id` | Chi tiết công khai, không giá ẩn hoặc AI riêng |
+| GET | `/posts/catalog/:id` | Chi tiết công khai và điểm/bằng chứng của lần phân tích gắn với phê duyệt, nếu có; không giá ẩn hoặc chẩn đoán nội bộ |
 | GET | `/posts/mine` | Người dùng, bài của mình |
 | GET | `/posts/pending` | Admin, chờ và từ chối theo bộ lọc/cursor |
 | GET | `/posts/:id` | Chủ bài hoặc Admin |

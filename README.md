@@ -135,7 +135,7 @@ Khác tài khoản vẫn có thể dùng đồng thời ở các tab. Xem [accou
   giao diện chọn 10/15/20/25/30 giây. Trong thời gian chờ, ẩn thao tác đặt tiếp.
 - `gia_toi_thieu` là **ngưỡng kết thúc sớm**, chỉ chủ sách/Admin thấy; không phải điều kiện bắt buộc
   để có người thắng khi hết hạn. Hết hạn có lượt hợp lệ thì giá cao nhất thắng dù chưa đạt ngưỡng.
-- Tiền VND nguyên là chuỗi tối đa 18 chữ số; ô nhập không chèn dấu khi gõ, dòng xem trước có dấu nhóm nghìn.
+- Tiền VND nguyên là chuỗi tối đa 18 chữ số; dấu chấm phân cách hàng nghìn hiện ngay trong ô nhập.
 - Chỉ cho đăng lại khi phiên mới nhất đã kết thúc và có kết quả xác nhận không có người thắng.
   Không có chức năng kết thúc thủ công, hủy giữa phiên hoặc xóa bài đăng.
 

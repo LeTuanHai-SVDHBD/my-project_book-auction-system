@@ -22,3 +22,8 @@ test('chèn/xóa ở giữa tiền giữ vị trí con trỏ theo chữ số tha
   assert.equal(positionAfterDigits('1.500.000',1),1);assert.equal(positionAfterDigits('1.500.000',4),5);
   assert.equal(positionAfterDigits('1.500.000',0),0);assert.equal(editMoneyInput('000123',6).digits,'123');
 });
+test('xóa cạnh dấu phân cách xóa đúng chữ số, không kẹt ở dấu chấm',()=>{
+  assert.deepEqual(editMoneyInput('1500',1,'1.500','deleteContentBackward'),{digits:'500',caret:0});
+  assert.deepEqual(editMoneyInput('1500',1,'1.500','deleteContentForward'),{digits:'100',caret:1});
+  assert.deepEqual(editMoneyInput('1500',4,'150','insertText'),{digits:'1500',caret:5});
+});

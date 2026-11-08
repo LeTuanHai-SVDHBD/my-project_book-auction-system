@@ -5,7 +5,7 @@ import {ISBN_MAX_LENGTH} from '../../../shared/bookIdentifiers.js';
 import {searchPattern,catalogOrders} from '../services/catalogSearch.js';
 import { HttpError } from '../middlewares/errorHandler.js';
 import {analysisView} from '../ai/input.js';
-import {ownerAiResult} from '../services/aiPresentation.js';
+import {ownerAiResult,publicAiResult} from '../services/aiPresentation.js';
 import {createReviewSnapshot,readReviewSnapshot} from '../services/reviewExport.js';
 import {currentReview} from '../../../shared/aiVisibility.js';
 import {withRowVersion} from '../utils/rowVersion.js';
@@ -173,13 +173,22 @@ export function createPostModel({ getPool, sql }) {
       const row=withRowVersion(result.recordset[0]);
       if (!row || publicOnly && (row.trang_thai_bai!=='da_duyet'||!['da_kich_hoat','da_ket_thuc'].includes(row.trang_thai_phien)) || !publicOnly && !admin && row.nguoi_dung_id!==owner) notFound();
       row.media=(await media(pool,postId)).map(({publicId,...item})=>item);
-      if (publicOnly) return row;
-      row.kiem_duyet=(await request(pool).input('id',sql.Int,postId).query('SELECT kiem_duyet_id,phan_tich_id,ket_qua,phan_hoi_admin,ngay_kiem_duyet,CAST(CASE WHEN ket_qua_snapshot IS NULL THEN 0 ELSE 1 END AS BIT) AS co_the_xuat FROM dbo.KiemDuyet WHERE bai_dang_id=@id ORDER BY kiem_duyet_id DESC')).recordset;
+      row.kiem_duyet=(await request(pool).input('id',sql.Int,postId).query(publicOnly
+        ? 'SELECT TOP(1) phan_tich_id,ket_qua,ngay_kiem_duyet FROM dbo.KiemDuyet WHERE bai_dang_id=@id ORDER BY kiem_duyet_id DESC'
+        : 'SELECT kiem_duyet_id,phan_tich_id,ket_qua,phan_hoi_admin,ngay_kiem_duyet,CAST(CASE WHEN ket_qua_snapshot IS NULL THEN 0 ELSE 1 END AS BIT) AS co_the_xuat FROM dbo.KiemDuyet WHERE bai_dang_id=@id ORDER BY kiem_duyet_id DESC')).recordset;
       const decision=currentReview(row);
-      if(decision)decision.co_the_xuat=true; // Legacy current round can be captured safely under the export lock.
+      if(publicOnly&&decision?.phan_tich_id==null){
+        const {kiem_duyet,...details}=row;
+        return {...details,ai_cong_khai:null};
+      }
+      if(decision&&!publicOnly)decision.co_the_xuat=true; // Legacy current round can be captured safely under the export lock.
       row.ai=(await request(pool).input('id',sql.Int,postId).input('analysis',sql.Int,decision?.phan_tich_id??null).query('SELECT TOP(1) phan_tich_id,diem_do_hiem,diem_tinh_trang,trang_thai,ngay_phan_tich FROM dbo.PhanTichAI WHERE bai_dang_id=@id AND (@analysis IS NULL OR phan_tich_id=@analysis) ORDER BY phan_tich_id DESC')).recordset[0]||null;
       if (row.ai) row.ai.chi_tiet=(await request(pool).input('id',sql.Int,row.ai.phan_tich_id).query('SELECT tieu_chi,diem,bang_chung,do_tin_cay,canh_bao,nhom_tieu_chi,trang_thai_danh_gia,trong_so,nguon_doi_chieu FROM dbo.ChiTietPhanTichAI WHERE phan_tich_id=@id ORDER BY chi_tiet_id')).recordset;
       row.ai=analysisView(row.ai,row);
+      if(publicOnly){
+        const {ai,kiem_duyet,...details}=row;
+        return {...details,ai_cong_khai:publicAiResult(ai,row)};
+      }
       if(!admin)row.ai=ownerAiResult(row.ai,row);
       row.co_the_dang_lai=(await request(pool).input('id',sql.Int,postId).query(`SELECT CASE WHEN p.trang_thai='da_ket_thuc' AND k.trang_thai='khong_co_nguoi_thang' AND k.nguoi_thang_dau_id IS NULL
         AND NOT EXISTS(SELECT 1 FROM dbo.BaiDang newer WHERE newer.sach_id=b.sach_id AND newer.bai_dang_id>b.bai_dang_id) THEN 1 ELSE 0 END AS allowed

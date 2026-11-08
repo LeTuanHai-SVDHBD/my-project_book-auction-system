@@ -554,8 +554,8 @@ export default function PostForm({
               </label>
             </div>
             <p className="field-hint">
-              Nhập số tiền VND nguyên; ô nhập chỉ chứa chữ số; dòng Giá trị bên
-              dưới hiển thị dấu chấm phân cách hàng nghìn. Chỉ đặt lịch sau khi
+              Nhập số tiền VND nguyên; dấu chấm phân cách hàng nghìn tự hiện khi
+              gõ. Chỉ đặt lịch sau khi
               bài đăng được duyệt.
             </p>
           </div>

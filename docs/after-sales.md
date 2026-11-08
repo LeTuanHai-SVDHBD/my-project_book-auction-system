@@ -94,6 +94,9 @@ theo đồng hồ SQL. Model khóa dòng phiên trước khi kiểm tra và ghi;
 Khách/Admin được đọc; Admin không gửi bình luận. Nội dung tối đa 2.000 ký tự, hiển thị công khai với tên tác giả và thời gian.
 Sau kết thúc giữ lịch sử chỉ đọc, 50 bình luận/trang; chưa có sửa/xóa bình luận hoặc xử lý kiểm duyệt nội dung tự động.
 
+Chi tiết phiên tách uy tín và nhận xét người bán ở cột trái, bình luận và ô gửi ở cột phải; trên màn hình hẹp hai khung xếp dọc.
+Danh sách bình luận có vùng cuộn riêng. Trang mới nhất đi theo nội dung mới khi đang ở gần cuối; người đang đọc phía trên không bị kéo xuống khi có cập nhật.
+
 ## Hợp đồng HTTP
 
 Prefix `/api/community`. GET công khai chỉ có bình luận/uy tín của phiên đã công bố.

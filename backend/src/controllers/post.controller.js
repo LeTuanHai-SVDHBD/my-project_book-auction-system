@@ -10,7 +10,10 @@ export function createPostController({model,service,limits,aiConfig}) {
   const listResponse=(res,items)=>res.json({items,nextBefore:items.length===30?items.at(-1).bai_dang_id:null});
   return {
     catalog:async(req,res)=>{if(Object.keys(req.query).some(key=>key!=='before')){const result=await model.search(catalogSearch(req.query));return res.json({...result,items:result.items.map(publicPost)});}return listResponse(res,(await model.list({publicOnly:true,after:page(req)})).map(publicPost));},
-    publicDetail:async(req,res)=>res.json(publicPost(await model.detail(id(req.params.id),{publicOnly:true}))),
+    publicDetail:async(req,res)=>{
+      const row=await model.detail(id(req.params.id),{publicOnly:true});
+      return res.json({...publicPost(row),ai_cong_khai:row.ai_cong_khai??null});
+    },
     mine:async(req,res)=>listResponse(res,await model.list({owner:req.user.nguoi_dung_id,after:page(req)})),
     pending:async(req,res)=>res.json(moderationPage(await model.list(moderationQuery(req.query)))),
     detail:async(req,res)=>res.json({...await model.detail(id(req.params.id),options(req)),kiem_duyet_tu_dong:Boolean(aiConfig?.autoModeration),ai_san_sang:Boolean(aiConfig?.configured)}),

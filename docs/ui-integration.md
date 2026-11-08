@@ -43,7 +43,8 @@ không có Elasticsearch/full-text index hoặc tự truy cập Google.
 | `sort` | `newest`, `price` tăng dần, `ending` |
 | `page` | Từ 1; 30 mục, `nextPage` |
 
-Chỉ bài đã duyệt và phiên kích hoạt/kết thúc được công khai; ẩn ngưỡng giá, email và AI nội bộ.
+Chỉ bài đã duyệt và phiên kích hoạt/kết thúc được công khai; ẩn ngưỡng giá, email và dữ liệu AI nội bộ.
+Trang chi tiết có **Điểm và bằng chứng AI** khi có kết quả gắn với quyết định phê duyệt. Bộ đếm dùng ngày và giờ lẻ cho phiên dài.
 Bốn nhóm lấy từ `shared/bookGenres.js`: **Văn học và hư cấu**, **Kiến thức và phi hư cấu**,
 **Tư liệu và sách cổ**, **Đối tượng độc giả**. Chọn nhóm lọc tập thể loại con, không thay bằng nhóm tên tự đặt.
 
@@ -54,8 +55,8 @@ Chọn thể loại bằng combobox; gõ để tìm, phải chọn mục hợp l
 không ép 10/13. Một ô bắt buộc tình trạng/quý hiếm/bằng chứng; Giới thiệu sách vẫn riêng.
 Backend giữ tương thích trường tình trạng cũ, lấy preview tối đa 1000 ký tự khi không gửi trường đó.
 
-Ba ô tiền nhận chữ số, không chèn dấu khi đang gõ/IME/focus/blur, giữ chuỗi tối đa 18 chữ số;
-dòng Giá trị có nhóm nghìn. Cooldown chọn 10/15/20/25/30 giây; API chấp nhận nguyên 10–30.
+Ba ô tiền và ô đặt giá hiển thị dấu chấm phân cách hàng nghìn khi gõ, giữ vị trí con trỏ theo chữ số.
+Dữ liệu gửi API vẫn là chuỗi tối đa 18 chữ số. Cooldown chọn 10/15/20/25/30 giây; API chấp nhận nguyên 10–30.
 Không tự thêm lịch khi đăng, chỉ đặt lịch sau phê duyệt.
 
 Nháp theo tài khoản/chế độ/bài, nằm trên trình duyệt hiện tại, giữ trường/bước/vé media và dự kiến gỡ media cũ.

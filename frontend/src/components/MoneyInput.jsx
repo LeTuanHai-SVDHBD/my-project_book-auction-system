@@ -1,6 +1,6 @@
 /** Tiền VND hiển thị theo nhóm nghìn trong lúc nhập; trường gửi đi vẫn là chuỗi chữ số. */
 import {useLayoutEffect,useRef,useState} from 'react';
-import {editMoneyInput,formatMoneyInput,moneyDigits,positionAfterDigits} from '../utils/moneyInput.js';
+import {editMoneyInput,formatMoneyInput,moneyDigits,moneyPreview,positionAfterDigits} from '../utils/moneyInput.js';
 const fieldValue=digits=>({digits,display:formatMoneyInput(digits)});
 export default function MoneyInput({name,label,initialValue='',required=true,followSuggestion=false}){
   const [field,setField]=useState(()=>fieldValue(moneyDigits(initialValue)));
@@ -21,15 +21,18 @@ export default function MoneyInput({name,label,initialValue='',required=true,fol
   }
   function update(event){
     edited.current=true;
-    if(composing.current||event.nativeEvent.isComposing){setField({digits:accepted.current,display:event.target.value});return;}
-    accept(event.target,event.nativeEvent.inputType);
+    // Native input also fires before composition ends; the preview follows the visible draft.
+    const element=event.currentTarget;
+    if(composing.current||event.nativeEvent.isComposing){setField({digits:accepted.current,display:element.value});return;}
+    accept(element,event.nativeEvent.inputType);
   }
   return <label>{label}<input ref={input} type="text" aria-label={label} inputMode="numeric" autoComplete="off" required={required}
-    value={field.display} onChange={update}
+    value={field.display} onInput={update}
     onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={event=>{composing.current=false;edited.current=true;accept(event.target);}}
     onBlur={event=>{if(composing.current){composing.current=false;accept(event.target);}selection.current=null;}}
-    aria-describedby={[field.digits&&`${name}-value`,error&&`${name}-hint`].filter(Boolean).join(' ')||undefined}/>
-    <input type="hidden" name={name} value={field.digits}/>{field.digits&&<small id={`${name}-value`} className="field-hint">Giá trị: {formatMoneyInput(field.digits)} đ</small>}
+    aria-describedby={error?`${name}-value ${name}-hint`:`${name}-value`}/>
+    <input type="hidden" name={name} value={field.digits}/>
+    <small id={`${name}-value`} className="field-hint">Giá trị: {moneyPreview(field.display,field.digits)} đ</small>
     {error&&<span id={`${name}-hint`} className="error" role="status">{error}</span>}
   </label>;
 }

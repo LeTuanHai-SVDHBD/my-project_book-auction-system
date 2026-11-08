@@ -56,6 +56,7 @@ không ép 10/13. Một ô bắt buộc tình trạng/quý hiếm/bằng chứng
 Backend giữ tương thích trường tình trạng cũ, lấy preview tối đa 1000 ký tự khi không gửi trường đó.
 
 Ba ô tiền và ô đặt giá hiển thị dấu chấm phân cách hàng nghìn khi gõ, giữ vị trí con trỏ theo chữ số.
+Dòng **Giá trị** luôn hiện và đi theo số đang gõ, kể cả trong lúc IME chưa chốt; khi ô trống hiển thị 0 đ nhưng không gửi 0 thay cho ô trống.
 Dữ liệu gửi API vẫn là chuỗi tối đa 18 chữ số. Cooldown chọn 10/15/20/25/30 giây; API chấp nhận nguyên 10–30.
 Không tự thêm lịch khi đăng, chỉ đặt lịch sau phê duyệt.
 

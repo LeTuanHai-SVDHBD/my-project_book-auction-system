@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createTabIdentity,TAB_STORAGE_KEY} from '../../frontend/src/services/tabIdentity.js';
-import {editMoneyInput,moneyDigits,formatMoneyInput,positionAfterDigits} from '../../frontend/src/utils/moneyInput.js';
+import {editMoneyInput,moneyDigits,formatMoneyInput,moneyPreview,positionAfterDigits} from '../../frontend/src/utils/moneyInput.js';
 test('tab mới xoay selector cả khi storage được sao chép, F5 dùng lại selector, không lưu thông tin xác thực',()=>{
   const map=new Map();const storage={getItem:key=>map.get(key)??null,setItem:(key,value)=>map.set(key,value)};
   const first=createTabIdentity({storage,navigationType:'navigate',randomUUID:()=> '11111111-1111-4111-8111-111111111111'});
@@ -26,4 +26,12 @@ test('xóa cạnh dấu phân cách xóa đúng chữ số, không kẹt ở d�
   assert.deepEqual(editMoneyInput('1500',1,'1.500','deleteContentBackward'),{digits:'500',caret:0});
   assert.deepEqual(editMoneyInput('1500',1,'1.500','deleteContentForward'),{digits:'100',caret:1});
   assert.deepEqual(editMoneyInput('1500',4,'150','insertText'),{digits:'1500',caret:5});
+});
+test('dòng giá trị đi theo nội dung đang gõ kể cả sau khi xóa hết, không chờ giá được chốt',()=>{
+  const accepted='10500000';
+  assert.equal(moneyPreview('',accepted),'0');
+  assert.equal(moneyPreview('2',accepted),'2');
+  assert.equal(moneyPreview('2500',accepted),'2.500');
+  assert.equal(moneyPreview('2500000',''),'2.500.000');
+  assert.equal(moneyPreview('9'.repeat(19),accepted),'10.500.000');
 });

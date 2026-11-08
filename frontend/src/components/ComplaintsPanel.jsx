@@ -1,14 +1,16 @@
 import StatusBadge from "./StatusBadge.jsx";
 /** Admin xem bằng chứng, tiếp nhận và phản hồi; chat chỉ mở cho Admin phụ trách khiếu nại đang xử lý. */
 import {useCallback,useEffect,useRef,useState} from 'react';
+import {useSuccessFeedback} from './SuccessFeedback.jsx';
 import {navigate} from '../services/navigation.js';
 import {communityGet,communityPost} from '../services/communityApi.js';
 import {ChatFeed,FeedButtons,useCommunityPage,money,when} from './CommunityFeed.jsx';
 function ComplaintDetail({id,user,onClose}){
-  const [row,setRow]=useState(null),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);const sequence=useRef(0);
+  const [row,setRow]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);const sequence=useRef(0);
+  const notify=useSuccessFeedback();
   const load=useCallback(async()=>{const current=++sequence.current;try{const value=await communityGet(`/complaints/${id}`);if(current===sequence.current)setRow(value);}catch(failure){if(current===sequence.current)setError(failure.message);}},[id]);
   useEffect(()=>{let active=true,timer;async function poll(){await load();if(active)timer=setTimeout(poll,3000);}void poll();return()=>{active=false;++sequence.current;clearTimeout(timer);};},[load]);
-  async function act(action,body={}){setBusy(true);setError('');setMessage('');try{await communityPost(`/complaints/${id}/${action}`,body);setMessage(action==='claim'?'Đã tiếp nhận khiếu nại.':'Đã lưu kết quả xử lý khiếu nại.');await load();}catch(failure){setError(failure.message);}finally{setBusy(false);}}
+  async function act(action,body={}){setBusy(true);setError('');try{await communityPost(`/complaints/${id}/${action}`,body);notify({message:action==='claim'?'Đã tiếp nhận khiếu nại.':'Đã lưu kết quả xử lý khiếu nại.'});await load();}catch(failure){setError(failure.message);}finally{setBusy(false);}}
   return <article className="post-sheet"><button onClick={onClose}>Về danh sách khiếu nại</button><h2>Khiếu nại #{id}</h2>{row&&<><StatusBadge state={row.trang_thai}/><h3>{row.ly_do}</h3><p className="preserve-lines">{row.noi_dung}</p><p>Người gửi #{row.nguoi_khieu_nai_id} · {when(row.ngay_khieu_nai)}</p>
     <p>{row.giao_dich.ten_sach} · {row.giao_dich.ma_giao_dich} · {money(row.giao_dich.so_tien)}</p><p className="field-hint">Sách #{row.giao_dich.sach_id} → Bài #{row.giao_dich.bai_dang_id} → Phiên #{row.giao_dich.phien_dau_gia_id} → Kết quả #{row.giao_dich.ket_qua_id} → Giao dịch #{row.giao_dich_id} → Khiếu nại #{id}</p>
     <div className="media-grid">{row.bang_chung.map(item=><figure key={item.bang_chung_id}><a href={item.duong_dan_anh_khieu_nai} target="_blank" rel="noreferrer"><img src={item.duong_dan_anh_khieu_nai} alt={item.mo_ta_anh_khieu_nai||'Bằng chứng khiếu nại'}/></a><figcaption>{item.mo_ta_anh_khieu_nai}</figcaption></figure>)}</div>
@@ -17,7 +19,7 @@ function ComplaintDetail({id,user,onClose}){
     {user.vai_tro==='admin'&&row.trang_thai==='dang_xu_ly'&&row.admin_id===user.nguoi_dung_id&&<><ChatFeed key={id} complaintId={id} user={user} readOnly/>
       <form onSubmit={event=>{event.preventDefault();void act('resolve',{phan_hoi_admin:new FormData(event.currentTarget).get('phan_hoi_admin')});}}><label>Phản hồi xử lý khiếu nại<textarea name="phan_hoi_admin" required maxLength={8000} rows={5}/></label><p className="field-hint">Phản hồi được lưu trong hồ sơ khiếu nại; kết quả đấu giá và xác nhận giao dịch được giữ theo lịch sử.</p><button className="primary" disabled={busy}>Lưu kết quả xử lý</button></form></>}
     {row.phan_hoi_admin&&<blockquote><strong>Kết quả xử lý · {when(row.ngay_xu_ly)}</strong><p className="preserve-lines">{row.phan_hoi_admin}</p></blockquote>}
-  </>}{message&&<p className="account-success" role="status">{message}</p>}{error&&<p className="error" role="alert">{error}</p>}</article>;
+  </>}{error&&<p className="error" role="alert">{error}</p>}</article>;
 }
 export default function ComplaintsPanel({user,selectedId}){const feed=useCommunityPage('/complaints'),[selected,setSelected]=[selectedId,value=>navigate('complaints',value)];
   return <main className="posts-page"><header className="posts-heading"><div><span className="eyebrow">BOOKBID</span><h1>{user.vai_tro==='admin'?'Xử lý khiếu nại':'Khiếu nại của tôi'}</h1><p>{user.vai_tro==='admin'?'Xem bằng chứng và tiếp nhận hồ sơ để đối chiếu trao đổi liên quan.':'Theo dõi hồ sơ đã gửi và phản hồi của Admin.'}</p></div></header>{selected?<ComplaintDetail key={selected} id={selected} user={user} onClose={()=>{setSelected(null);feed.latest();}}/>:<><div className="post-list">{feed.data?.items.map(row=><article className="post-card" key={row.khieu_nai_id}><StatusBadge state={row.trang_thai}/><h2>{row.ly_do}</h2><p>Khiếu nại #{row.khieu_nai_id} · Giao dịch #{row.giao_dich_id}</p><p>{when(row.ngay_khieu_nai)}</p><button className="secondary" onClick={()=>setSelected(row.khieu_nai_id)}>Xem khiếu nại</button></article>)}</div>{feed.data&&!feed.data.items.length&&<p className="empty-state">Chưa có khiếu nại ở trang này.</p>}<FeedButtons feed={feed}/>{feed.error&&<p className="error" role="alert">{feed.error}</p>}</>}</main>;

@@ -1,6 +1,7 @@
 import StatusBadge from "./StatusBadge.jsx";
 /** Giao dịch của hai bên: truy vết kết quả, chat riêng, xác nhận độc lập, đánh giá và khiếu nại. */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSuccessFeedback } from "./SuccessFeedback.jsx";
 import { navigate } from "../services/navigation.js";
 import { communityGet, communityPost } from "../services/communityApi.js";
 import {
@@ -99,10 +100,10 @@ function OwnComplaint({ id, onClose }) {
 function TradeDetail({ id, user, onClose }) {
   const [row, setRow] = useState(null),
     [error, setError] = useState(""),
-    [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
     [form, setForm] = useState(false),
     [complaint, setComplaint] = useState(null);
+  const notify = useSuccessFeedback();
   const sequence = useRef(0);
   const load = useCallback(async () => {
     const current = ++sequence.current;
@@ -132,10 +133,9 @@ function TradeDetail({ id, user, onClose }) {
   async function act(action, body = {}, success = "Đã lưu thao tác.") {
     setBusy(true);
     setError("");
-    setMessage("");
     try {
       await communityPost(`/trades/${id}/${action}`, body);
-      setMessage(success);
+      notify({ message: success });
       await load();
     } catch (failure) {
       setError(failure.message);
@@ -343,7 +343,7 @@ function TradeDetail({ id, user, onClose }) {
                   onSaved={(caseId) => {
                     setForm(false);
                     setComplaint(caseId);
-                    setMessage("Đã gửi khiếu nại.");
+                    notify({ message: "Đã gửi khiếu nại." });
                     void load();
                   }}
                 />
@@ -352,11 +352,6 @@ function TradeDetail({ id, user, onClose }) {
           </section>
         </div>
       </div>
-      {message && (
-        <p className="account-success" role="status">
-          {message}
-        </p>
-      )}
       {error && (
         <p className="error" role="alert">
           {error}

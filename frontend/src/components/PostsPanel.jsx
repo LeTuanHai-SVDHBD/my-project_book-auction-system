@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BOOK_GENRE_GROUPS } from "../../../shared/bookGenres.js";
 import { bookReviewDescription } from "../../../shared/bookCondition.js";
 import { currentReview } from "../../../shared/aiVisibility.js";
+import { useSuccessFeedback } from "./SuccessFeedback.jsx";
 import { navigate } from "../services/navigation.js";
 import BookCard from "./BookCard.jsx";
 import BookGallery from "./BookGallery.jsx";
@@ -59,13 +60,12 @@ function Detail({
   onAuctionChange,
 }) {
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [message, setMessage] = useState("");
+    [error, setError] = useState("");
+  const notify = useSuccessFeedback();
   async function activate(event) {
     event.preventDefault();
     setBusy(true);
     setError("");
-    setMessage("");
     const data = Object.fromEntries(new FormData(event.currentTarget));
     try {
       await postApi.activate(post.bai_dang_id, {
@@ -73,7 +73,7 @@ function Detail({
         thoi_gian_ket_thuc: new Date(data.end).toISOString(),
         row_version: post.row_version,
       });
-      setMessage("Đã đặt lịch và kích hoạt phiên.");
+      notify({ message: "Đã đặt lịch và kích hoạt phiên." });
       await onRefresh();
     } catch (failure) {
       setError(failure.message);
@@ -258,11 +258,6 @@ function Detail({
           <CommentsPanel auctionId={post.phien_dau_gia_id} user={user} />
         </section>
       )}
-      {message && (
-        <p className="account-success" role="status">
-          {message}
-        </p>
-      )}
       {error && (
         <p role="alert" className="error">
           {error}
@@ -288,8 +283,8 @@ export default function PostsPanel({
     [form, setForm] = useState(initialCreate ? "create" : null);
   const [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
-    [message, setMessage] = useState(""),
     [q, setQ] = useState(filters.get("q") || "");
+  const notify = useSuccessFeedback();
   const listSequence = useRef(0),
     detailSequence = useRef(0);
   const auctionChanged = useCallback((snapshot) => {
@@ -397,9 +392,7 @@ export default function PostsPanel({
   }
   async function saved(id) {
     setForm(null);
-    setMessage(
-      "Đã gửi kiểm duyệt. Bạn có thể đặt lịch cho phiên khi bài được duyệt.",
-    );
+    notify({ message: "Đã gửi kiểm duyệt. Bạn có thể đặt lịch cho phiên khi bài được duyệt." });
     navigate("mine", id);
     await load();
     await open(id);
@@ -467,11 +460,6 @@ export default function PostsPanel({
       {error && (
         <p className="error" role="alert">
           {error}
-        </p>
-      )}
-      {message && (
-        <p className="account-success" role="status">
-          {message}
         </p>
       )}
       {loading && <p role="status">Đang tải…</p>}

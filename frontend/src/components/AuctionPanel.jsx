@@ -98,7 +98,7 @@ export default function AuctionPanel({auctionId,user,onSnapshot}) {
       {isBidder&&snapshot.trang_thai==='da_kich_hoat'&&<>
         {!availability&&!loadError&&(!attempt||terminal(receipt))&&<p role="status">Đang kiểm tra điều kiện đặt giá…</p>}
         {availability&&!availability.la_chu_sach&&remaining>0&&<p className="notice" role="status">Bạn có thể đặt giá tiếp sau {remaining} giây.</p>}
-        {canBid&&availability.duoc_dat_lai_luc!==null&&<p className="account-success" role="status">Đã hết thời gian chờ. Bạn có thể nhập mức giá tiếp theo.</p>}
+        {canBid&&availability.duoc_dat_lai_luc!==null&&<p className="field-hint" role="status">Đã hết thời gian chờ. Bạn có thể nhập mức giá tiếp theo.</p>}
       </>}
       {!attempt&&showBidForm&&<form onSubmit={submit}><fieldset disabled={busy||refreshing}>
         <MoneyInput name="muc_gia" label="Mức giá đặt (VND)" initialValue={suggested(snapshot)} followSuggestion/>
@@ -108,7 +108,7 @@ export default function AuctionPanel({auctionId,user,onSnapshot}) {
       {!isBidder&&snapshot.trang_thai==='da_kich_hoat'&&<p className="notice">{user?'Tài khoản Admin xem phiên và kết quả.':'Đăng nhập tài khoản người dùng để đặt giá.'}</p>}</>}
     {snapshot&&<BidHistory auctionId={auctionId} items={snapshot.lich_su} nextBefore={snapshot.lich_su_truoc}/>}
     {attempt&&!availability?.la_chu_sach&&receipt?.ly_do!=='SELLER_CANNOT_BID'&&<div aria-live="polite"><p>Mức giá đã gửi: <strong>{money(attempt.muc_gia)}</strong></p>
-      {receipt?.trang_thai==='da_chap_nhan'?<p className="account-success" role="status"><StatusBadge state="da_chap_nhan"/></p>:
+      {receipt?.trang_thai==='da_chap_nhan'?<p role="status"><StatusBadge state="da_chap_nhan"/></p>:
         receipt?.trang_thai==='bi_tu_choi'?(receipt.ly_do==='BID_COOLDOWN'?null:<p className="error" role="status"><StatusBadge state="bi_tu_choi"/> · {reasons[receipt.ly_do]||receipt.ly_do}</p>):
         <p role="status"><StatusBadge state="bid_pending"/> {busy?'Đang gửi yêu cầu…':checking?'Đang kiểm tra kết quả…':'Đang chờ xác nhận kết quả.'}</p>}
       {!terminal(receipt)&&!busy&&<button type="button" disabled={checking} onClick={()=>send(attempt)}>Thử lại cùng yêu cầu</button>}

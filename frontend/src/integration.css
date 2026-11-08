@@ -153,12 +153,35 @@ button,
   color: #9a3830;
   overflow-wrap: anywhere;
 }
-.account-success {
-  padding: 16px 20px;
-  background: #edf7ef;
-  border: 1px solid #b7d9be;
+.success-feedback {
+  position: fixed;
+  z-index: 210;
+  inset: max(14px, env(safe-area-inset-top)) 0 auto;
+  width: fit-content;
+  max-width: min(480px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 10px 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #c6ddd0;
   border-radius: 12px;
-  color: #256443;
+  color: #1e4e38;
+  box-shadow: 0 6px 22px #182b3926;
+  font-size: 16px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+.success-feedback > span {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  background: #edf7ef;
+  border-radius: 50%;
 }
 .notice {
   padding: 16px 20px;

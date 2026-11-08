@@ -28,6 +28,7 @@ Admin chỉ có sidebar, chứa avatar/tài khoản và thông báo, không có 
 Người dùng dùng header/menu responsive. Khách không thấy avatar/hộp thông báo của người dùng.
 Login mới cùng tài khoản thu hồi phiên cũ, tab cũ về đăng nhập, không dùng lớp phủ F5 để giành quyền.
 CSRF chỉ giữ trong bộ nhớ; lỗi INVALID_CSRF được lấy token mới/thử lại tối đa một lần, không tự retry lỗi mạng.
+Xác nhận thao tác thành công hiện ở đầu màn hình trong khoảng 4 giây. Lỗi và trạng thái nghiệp vụ vẫn hiển thị tại nơi thao tác; hộp thông báo tài khoản lưu các cập nhật riêng.
 
 ## Danh mục và tìm kiếm
 

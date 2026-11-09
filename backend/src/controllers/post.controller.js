@@ -1,7 +1,9 @@
 /** HTTP bài đăng: đầu vào hợp đồng chặt chẽ, dữ liệu công khai dùng danh sách trường cho phép. */
+import {OWNER_POST_FILTERS} from '../../../shared/ownerPostFilters.js';
+import {HttpError} from '../middlewares/errorHandler.js';
 import {moderationQuery,moderationPage} from '../services/moderationList.js';
 import {catalogSearch} from '../services/catalogSearch.js';
-import { id, validatePost, validateReview, validateActivation } from '../services/postValidation.js';
+import { id, object, validatePost, validateReview, validateActivation } from '../services/postValidation.js';
 const publicFields=['bai_dang_id','sach_id','ma_san_pham','tieu_de','mo_ta_tinh_trang','ten_sach','tac_gia','the_loai','nha_xuat_ban','nam_xuat_ban','isbn','tinh_trang_sach','mo_ta','phien_dau_gia_id','trang_thai_phien','thoi_gian_bat_dau','thoi_gian_ket_thuc','gia_khoi_diem','gia_hien_tai','buoc_gia','thoi_gian_cho_dat_lai','media','anh_bia'];
 export function publicPost(row) { return Object.fromEntries(publicFields.filter(key=>key in row).map(key=>[key,row[key]])); }
 export function createPostController({model,service,limits,aiConfig}) {
@@ -14,7 +16,13 @@ export function createPostController({model,service,limits,aiConfig}) {
       const row=await model.detail(id(req.params.id),{publicOnly:true});
       return res.json({...publicPost(row),ai_cong_khai:row.ai_cong_khai??null});
     },
-    mine:async(req,res)=>listResponse(res,await model.list({owner:req.user.nguoi_dung_id,after:page(req)})),
+    mine:async(req,res)=>{
+      object(req.query,['status','before'],'Danh sách bài của tôi');
+      const ownerStatus=req.query.status??'all';
+      if(!OWNER_POST_FILTERS.includes(ownerStatus))
+        throw new HttpError(400,'INVALID_OWNER_POST_FILTER','Trạng thái lọc bài đăng không hợp lệ.');
+      return listResponse(res,await model.list({owner:req.user.nguoi_dung_id,after:page(req),ownerStatus}));
+    },
     pending:async(req,res)=>res.json(moderationPage(await model.list(moderationQuery(req.query)))),
     detail:async(req,res)=>res.json({...await model.detail(id(req.params.id),options(req)),kiem_duyet_tu_dong:Boolean(aiConfig?.autoModeration),ai_san_sang:Boolean(aiConfig?.configured)}),
     exportReview:async(req,res)=>res.json(await model.exportReview(req.user.nguoi_dung_id,id(req.params.id),id(req.params.reviewId))),

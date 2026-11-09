@@ -1,6 +1,8 @@
 import StatusBadge from "./StatusBadge.jsx";
 /** Danh mục, bài của tôi, kiểm duyệt tự động và luồng đặt giá/kết quả phiên. */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { OWNER_POST_FILTERS } from "../../../shared/ownerPostFilters.js";
+import { STATUS, postStatus } from "../utils/statusPresentation.js";
 import { BOOK_GENRE_GROUPS } from "../../../shared/bookGenres.js";
 import { bookReviewDescription } from "../../../shared/bookCondition.js";
 import { currentReview } from "../../../shared/aiVisibility.js";
@@ -20,6 +22,22 @@ const money = (value) =>
   value == null ? "Chưa có" : `${BigInt(value).toLocaleString("vi-VN")} đ`;
 const date = (value) =>
   value ? new Date(value).toLocaleString("vi-VN") : "Chưa đặt lịch";
+function PostStatusFilters({ mode, value, options, label }) {
+  return (
+    <div className="moderation-filters" role="group" aria-label={label}>
+      {options.map(([key, text]) => (
+        <button key={key} type="button" className="secondary" aria-pressed={value === key}
+          onClick={() => navigate(mode, null, key === "all" ? "" : `status=${key}`)}>
+          {text}
+        </button>
+      ))}
+    </div>
+  );
+}
+const ownerFilterOptions = OWNER_POST_FILTERS.map(key => [key, key === "all" ? "Tất cả" : STATUS[key].label]);
+const moderationFilterOptions = [
+  ["all", "Tất cả"], ["pending", "Chờ kiểm duyệt"], ["rejected", "Đã từ chối"],
+];
 function ReviewDecision({ review, postId, canExport }) {
   return (
     <blockquote className="review-decision">
@@ -277,6 +295,9 @@ export default function PostsPanel({
   query = "",
 }) {
   const filters = new URLSearchParams(query);
+  const status = filters.get("status") || "all";
+  const ownerFiltered = mode === "mine" && status !== "all";
+  const postQuery = query ? `?${query}` : "";
   const [items, setItems] = useState([]),
     [next, setNext] = useState(null),
     [post, setPost] = useState(null),
@@ -320,7 +341,7 @@ export default function PostsPanel({
           : await postApi.list(
               mode,
               append ? next : null,
-              filters.get("status") || "all",
+              status,
             );
       if (seq === listSequence.current) {
         setItems((old) =>
@@ -393,7 +414,7 @@ export default function PostsPanel({
   async function saved(id) {
     setForm(null);
     notify({ message: "Đã gửi kiểm duyệt. Bạn có thể đặt lịch cho phiên khi bài được duyệt." });
-    navigate("mine", id);
+    navigate("mine", id, query);
     await load();
     await open(id);
   }
@@ -472,7 +493,7 @@ export default function PostsPanel({
           onSaved={saved}
           onCancel={() => {
             setForm(null);
-            navigate("mine", post?.bai_dang_id);
+            navigate("mine", post?.bai_dang_id, query);
           }}
         />
       ) : mode === "pending" ? (
@@ -484,33 +505,8 @@ export default function PostsPanel({
               <h2>Bài đăng cần theo dõi</h2>
               <span>{items.length} bài đang hiển thị</span>
             </div>
-            <div
-              className="moderation-filters"
-              role="group"
-              aria-label="Lọc trạng thái kiểm duyệt"
-            >
-              {[
-                ["all", "Tất cả"],
-                ["pending", "Chờ kiểm duyệt"],
-                ["rejected", "Đã từ chối"],
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className="secondary"
-                  aria-pressed={(filters.get("status") || "all") === value}
-                  onClick={() =>
-                    navigate(
-                      "pending",
-                      null,
-                      value === "all" ? "" : `status=${value}`,
-                    )
-                  }
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <PostStatusFilters mode="pending" value={status} options={moderationFilterOptions}
+              label="Lọc trạng thái kiểm duyệt" />
             <p className="field-hint">
               Bài chờ kiểm duyệt được ưu tiên trước. Bài đã từ chối giữ lại để
               xem kết quả; khi người bán gửi lại sẽ chuyển về chờ kiểm duyệt.
@@ -630,21 +626,25 @@ export default function PostsPanel({
               </div>
             </>
           )}
+          {mode === "mine" && (
+            <PostStatusFilters mode="mine" value={status} options={ownerFilterOptions}
+              label="Lọc trạng thái bài đăng của tôi" />
+          )}
           {!items.length && !loading && !error && (
             <div className="empty-state panel">
               <Icon name="book" size={48} />
               <h2>
                 {mode === "catalog"
                   ? "Chưa tìm thấy ấn bản phù hợp"
-                  : "Chưa có bài đăng"}
+                  : ownerFiltered ? "Không có bài đăng ở trạng thái này" : "Chưa có bài đăng"}
               </h2>
               <p>
                 {mode === "catalog"
                   ? "Thử từ khóa khác hoặc bỏ bớt bộ lọc."
-                  : "Các bài đăng của bạn sẽ xuất hiện tại đây."}
+                  : ownerFiltered ? "Chọn trạng thái khác để xem bài đăng của bạn." : "Các bài đăng của bạn sẽ xuất hiện tại đây."}
               </p>
-              {mode === "catalog" && (
-                <a href="#/catalog" className="btn btn-outline">
+              {(mode === "catalog" || ownerFiltered) && (
+                <a href={mode === "catalog" ? "#/catalog" : "#/mine"} className="btn btn-outline">
                   Xóa bộ lọc
                 </a>
               )}
@@ -665,7 +665,7 @@ export default function PostsPanel({
                   {items.map((item) => (
                     <tr key={item.bai_dang_id}>
                       <td>
-                        <a href={`#/mine/${item.bai_dang_id}`}>
+                        <a href={`#/mine/${item.bai_dang_id}${postQuery}`}>
                           <b>{item.ten_sach}</b>
                           <small>
                             {item.tac_gia} · Bài #{item.bai_dang_id}
@@ -674,12 +674,12 @@ export default function PostsPanel({
                       </td>
                       <td data-label="Giá khởi điểm">{money(item.gia_khoi_diem)}</td>
                       <td data-label="Trạng thái">
-                        <StatusBadge post={item} />
+                        <StatusBadge state={item.owner_status ?? postStatus(item)} />
                       </td>
                       <td>
                         <a
                           className="text-link"
-                          href={`#/mine/${item.bai_dang_id}`}
+                          href={`#/mine/${item.bai_dang_id}${postQuery}`}
                         >
                           {item.trang_thai_phien === "khong_dat_kiem_duyet"
                             ? "Bổ sung và gửi duyệt lại"

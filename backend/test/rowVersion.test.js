@@ -32,6 +32,7 @@ function databaseFixture(){
     values={};
     input(name,type,value){this.values[name]=value;return this;}
     async query(text){
+      text=text.trimStart().replace(/^DECLARE [^;]+;\s*/,'');
       if(text.startsWith('SELECT')&&text.includes('FROM dbo.BaiDang b'))return {recordset:text.includes(' AS allowed')?[{allowed:0}]:[copy(state.row)]};
       if(text.startsWith('SELECT')&&text.includes('FROM dbo.KiemDuyet'))return {recordset:state.reviews.map(x=>({...x}))};
       if(text.startsWith('SELECT'))return {recordset:[]};

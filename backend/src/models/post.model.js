@@ -145,7 +145,7 @@ export function createPostModel({ getPool, sql }) {
           ORDER BY ${catalogOrders[sort]} OFFSET @skip ROWS FETCH NEXT 31 ROWS ONLY`);
       const items=result.recordset.slice(0,30);return {items,nextPage:result.recordset.length>30?page+1:null};
     },
-    async list({owner=null,pending=false,publicOnly=false,after=2147483647,reviewStatus='all',reviewCursorRank=null}) {
+    async list({owner=null,pending=false,publicOnly=false,after=2147483647,reviewStatus='all',reviewCursorRank=null,ownerStatus='all'}) {
       if(pending){
         const rank="CASE WHEN b.trang_thai='cho_kiem_duyet' THEN 0 ELSE 1 END";
         const rows=await request(await getPool()).input('status',sql.VarChar(10),reviewStatus).input('rank',sql.Int,reviewCursorRank).input('after',sql.Int,after)
@@ -161,9 +161,26 @@ export function createPostModel({ getPool, sql }) {
             ORDER BY ${rank},b.bai_dang_id DESC`);
         return rows.recordset.map(withRowVersion);
       }
-      const result=await request(await getPool()).input('owner',sql.Int,owner).input('pending',sql.Bit,pending).input('public',sql.Bit,publicOnly).input('after',sql.Int,after)
-        .query(`SELECT TOP(30) ${projection},(SELECT TOP(1) duong_dan_img FROM dbo.HinhAnh WHERE bai_dang_id=b.bai_dang_id AND dang_su_dung=1 ORDER BY thu_tu_img) AS anh_bia ${joins} WHERE b.bai_dang_id<@after AND (@owner IS NULL OR b.nguoi_dung_id=@owner)
-          AND (@pending=0 OR (b.trang_thai='cho_kiem_duyet' AND p.trang_thai='cho_kiem_duyet'))
+      const owned=owner!==null;
+      const ownerPhase=`CROSS APPLY (SELECT CASE p.trang_thai
+        WHEN 'cho_kiem_duyet' THEN 'pending'
+        WHEN 'khong_dat_kiem_duyet' THEN 'rejected'
+        WHEN 'da_qua_kiem_duyet' THEN 'approved'
+        WHEN 'da_ket_thuc' THEN 'ended'
+        WHEN 'da_kich_hoat' THEN CASE
+          WHEN p.thoi_gian_bat_dau IS NULL OR p.thoi_gian_ket_thuc IS NULL THEN 'syncing'
+          WHEN @now<p.thoi_gian_bat_dau THEN 'scheduled'
+          WHEN @now>=p.thoi_gian_ket_thuc THEN 'closing'
+          ELSE 'live' END
+        ELSE 'unknown' END AS owner_status) phase`;
+      const req=request(await getPool()).input('owner',sql.Int,owner).input('public',sql.Bit,publicOnly).input('after',sql.Int,after);
+      if(owned)req.input('ownerStatus',sql.VarChar(10),ownerStatus);
+      const result=await req.query(`${owned?'DECLARE @now DATETIME2(7)=SYSUTCDATETIME();':''}
+        SELECT TOP(30) ${projection}${owned?',phase.owner_status':''},
+          (SELECT TOP(1) duong_dan_img FROM dbo.HinhAnh WHERE bai_dang_id=b.bai_dang_id AND dang_su_dung=1 ORDER BY thu_tu_img) AS anh_bia
+          ${joins} ${owned?ownerPhase:''}
+        WHERE b.bai_dang_id<@after AND (@owner IS NULL OR b.nguoi_dung_id=@owner)
+          ${owned?"AND (@ownerStatus='all' OR phase.owner_status=@ownerStatus)":''}
           AND (@public=0 OR (b.trang_thai='da_duyet' AND p.trang_thai IN ('da_kich_hoat','da_ket_thuc'))) ORDER BY b.bai_dang_id DESC`);
       return result.recordset.map(withRowVersion);
     },

@@ -14,7 +14,7 @@ Cài đặt/cập nhật tại [setup-guide.md](setup-guide.md); tài nguyên fo
 | `#/home` | Trang chủ, phiên công khai và bốn nhóm thể loại chung |
 | `#/catalog`, `#/catalog/:postId` | Danh mục/tìm kiếm, chi tiết bản sách/ảnh/video, phiên/giá/kết quả |
 | `#/create` | Người dùng: đăng sách bốn bước, có nháp |
-| `#/mine`, `#/mine/:postId` | Bài của mình, bổ sung/kích hoạt/đăng lại, quyết định và PDF |
+| `#/mine`, `#/mine/:postId` | Bài của mình, lọc trạng thái, bổ sung/kích hoạt/đăng lại, quyết định và PDF |
 | `#/pending`, `#/pending/:postId` | Admin: bài chờ/từ chối, bằng chứng/AI và quyết định |
 | `#/trades`, `#/trades/:tradeId` | Hai bên giao dịch/chat/xác nhận/đánh giá/khiếu nại |
 | `#/complaints`, `#/complaints/:complaintId` | Hai bên giao dịch hoặc Admin (hồ sơ mới); chat Admin chỉ đọc theo quyền phân công |
@@ -30,6 +30,11 @@ Mục **Khiếu nại** nằm cạnh **Giao dịch**; số cạnh mục này ch�
 Login mới cùng tài khoản thu hồi phiên cũ, tab cũ về đăng nhập, không dùng lớp phủ F5 để giành quyền.
 CSRF chỉ giữ trong bộ nhớ; lỗi INVALID_CSRF được lấy token mới/thử lại tối đa một lần, không tự retry lỗi mạng.
 Xác nhận thao tác thành công hiện ở đầu màn hình trong khoảng 4 giây. Lỗi và trạng thái nghiệp vụ vẫn hiển thị tại nơi thao tác; hộp thông báo tài khoản lưu các cập nhật riêng.
+
+Trang **Bài đăng của tôi** lọc toàn bộ bài của chủ sách trước khi phân trang. Các trạng thái gồm chờ kiểm duyệt,
+bị từ chối, đã duyệt chờ kích hoạt, sắp bắt đầu, đang đấu giá, chờ chốt kết quả và đã kết thúc.
+Các pha của phiên đã kích hoạt tính theo giờ SQL; chỉ phiên đã chốt mới thuộc **Đã kết thúc**.
+Khi mở chi tiết từ danh sách đã lọc rồi quay lại, giao diện giữ bộ lọc.
 
 ## Danh mục và tìm kiếm
 

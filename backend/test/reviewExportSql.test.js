@@ -39,10 +39,13 @@ test('SQL xuất kết quả: quyết định và snapshot cùng COMMIT, hai vò
     const input=validatePost({ma_yeu_cau:run,sach:{ten_sach:'Sách kiểm thử xuất PDF',isbn:'ISBN 000–123–456–789–012–345–678–X'},bai_dang:{tieu_de:'Bản thứ nhất',mo_ta_tinh_trang:'Chỉ kiểm thử phần mềm'},phien:{gia_khoi_diem:'100000',gia_toi_thieu:'200000',buoc_gia:'1000'},media:[]});
     ({id:postId}=await model.create({owner,input,items:[{kind:'image',url:'https://res.cloudinary.com/demo/image/upload/first.jpg'}],limits:{maxVideos:3},code:'EX'+run.replaceAll('-','')}));
     let detail=await model.detail(postId,{owner});bookId=detail.sach_id;auctionId=detail.phien_dau_gia_id;assert.equal(detail.isbn,input.book.isbn);
+    const ownerPhase=async (phase,viewer=owner)=>(await model.list({owner:viewer,ownerStatus:phase})).find(p=>p.bai_dang_id===postId)?.owner_status;
+    assert.equal(await ownerPhase('pending'),'pending');assert.equal(await ownerPhase('pending',other),undefined);
     const review=async decision=>model.review({admin,postId,input:validateReview({quyet_dinh:decision,ly_do:'Quyết định kiểm thử',xac_nhan_quy_hiem:true,row_version:(await model.detail(postId,{owner})).row_version})});
     assert((await model.list({...moderationQuery({status:'pending'}),owner})).some(p=>p.bai_dang_id===postId));
     await review('tu_choi');detail=await model.detail(postId,{owner});const firstId=detail.kiem_duyet[0].kiem_duyet_id;
     assert(detail.kiem_duyet[0].co_the_xuat);
+    assert.equal(await ownerPhase('rejected'),'rejected');assert.equal(await ownerPhase('pending'),undefined);
     const rejected=await model.list(moderationQuery({status:'rejected'}));const card=rejected.find(p=>p.bai_dang_id===postId);assert(card);assert.equal(card.ly_do_tu_choi,'Quyết định kiểm thử');assert(card.ngay_tu_choi);
     assert(!(await model.list(moderationQuery({status:'pending'}))).some(p=>p.bai_dang_id===postId));
     assert(!(await model.list(moderationQuery({before:`rejected:${postId}`}))).some(p=>p.bai_dang_id===postId));
@@ -62,7 +65,14 @@ test('SQL xuất kết quả: quyết định và snapshot cùng COMMIT, hai vò
     assert((await model.list(moderationQuery({status:'pending'}))).some(p=>p.bai_dang_id===postId));
     await review('phe_duyet');assert(!(await model.list(moderationQuery({}))).some(p=>p.bai_dang_id===postId));const secondId=(await model.detail(postId,{owner})).kiem_duyet[0].kiem_duyet_id;
     const second=await model.exportReview(owner,postId,secondId);assert.equal(second.media.length,1);assert.equal(second.review.ket_qua,'Phê duyệt');assert.equal(second.post.tieu_de,'Đã bổ sung');
+    assert.equal(await ownerPhase('approved'),'approved');
+    for(const [phase,start,end] of [['scheduled',1,2],['live',-1,1],['closing',-2,-1]]){
+      await pool.request().input('id',sql.Int,auctionId).input('start',sql.Int,start).input('end',sql.Int,end)
+        .query("UPDATE dbo.PhienDauGia SET trang_thai='da_kich_hoat',thoi_gian_bat_dau=DATEADD(HOUR,@start,SYSUTCDATETIME()),thoi_gian_ket_thuc=DATEADD(HOUR,@end,SYSUTCDATETIME()) WHERE phien_dau_gia_id=@id");
+      assert.equal(await ownerPhase(phase),phase);assert.equal(await ownerPhase('ended'),undefined);
+    }
     await pool.request().input('id',sql.Int,auctionId).query("UPDATE dbo.PhienDauGia SET trang_thai='da_ket_thuc',thoi_gian_bat_dau=DATEADD(HOUR,-2,SYSUTCDATETIME()),thoi_gian_ket_thuc=DATEADD(HOUR,-1,SYSUTCDATETIME()) WHERE phien_dau_gia_id=@id;INSERT dbo.KetQuaDauGia(phien_dau_gia_id,trang_thai,thoi_gian_ket_thuc) VALUES(@id,'khong_co_nguoi_thang',SYSUTCDATETIME());");
+    assert.equal(await ownerPhase('ended'),'ended');assert.equal(await ownerPhase('closing'),undefined);
     const searchable=await model.search({q:'Sách đã sửa',genre:'',group:'',phase:'ended',sort:'newest',page:1});const publicCard=searchable.items.find(x=>x.bai_dang_id===postId);assert(publicCard);assert.equal(publicCard.anh_bia,null);assert.equal((await model.detail(postId,{publicOnly:true})).media.length,1);
     const relistInput={...input,book:undefined,requestId:randomUUID(),reuseMedia:true};
     ({id:relistedId}=await model.create({owner,input:relistInput,sourceId:postId,items:[],limits:{maxVideos:3},code:'EX'+randomUUID().replaceAll('-','')}));

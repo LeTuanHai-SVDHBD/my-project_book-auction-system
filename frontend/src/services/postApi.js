@@ -3,7 +3,7 @@ import {detectMedia} from '../../../shared/mediaFormats.js';
 import {apiRequest,apiPost,ensureCsrf,getSessionRevision} from './authApi.js';
 export const postApi={
   search:filters=>apiRequest(`/posts/catalog?${new URLSearchParams(filters)}`),
-  list:(mode,before,status)=>{const params=new URLSearchParams();if(before)params.set('before',before);if(mode==='pending')params.set('status',status||'all');return apiRequest(`/posts/${mode}${params.size?'?'+params:''}`);},
+  list:(mode,before,status)=>{const params=new URLSearchParams();if(before)params.set('before',before);if(mode==='pending'||(mode==='mine'&&status&&status!=='all'))params.set('status',status||'all');return apiRequest(`/posts/${mode}${params.size?'?'+params:''}`);},
   detail:(id,publicOnly=false)=>apiRequest(`/posts/${publicOnly?'catalog/':''}${id}`),
   save:(body,id,mode)=>apiPost(id?`/posts/${id}/${mode}`:'/posts',body),
   exportReview:(id,reviewId)=>apiPost(`/posts/${id}/reviews/${reviewId}/export`),

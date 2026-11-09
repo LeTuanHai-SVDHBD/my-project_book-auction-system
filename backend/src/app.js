@@ -2,6 +2,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import { fileURLToPath } from 'node:url';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { readiness } from './controllers/health.controller.js';
 import { HttpError, errorHandler } from './middlewares/errorHandler.js';
@@ -12,7 +13,13 @@ function sameToken(received, expected) {
 }
 export function createApp({ config, deps, probes, authRouter, postRouter, mediaRouter, auctionRouter, aiRouter, communityRouter, notificationRouter, log = () => {} }) {
   const app = express();
-  app.disable('x-powered-by'); app.use(helmet());
+  if (config.trustProxy) app.set('trust proxy', 1);
+  app.disable('x-powered-by');
+  app.use(config.serveWeb ? helmet({ contentSecurityPolicy: { directives: {
+    imgSrc: ["'self'", 'data:', 'blob:', 'https://res.cloudinary.com'],
+    mediaSrc: ["'self'", 'blob:', 'https://res.cloudinary.com'],
+    connectSrc: ["'self'", ...config.origins.filter(x => x.startsWith('https://')).map(x => new URL(x).origin.replace('https:', 'wss:'))],
+  } } }) : helmet());
   app.use((req, res, next) => { req.requestId = randomUUID(); res.setHeader('X-Request-ID', req.requestId); next(); });
   app.use(cors({ origin(origin, done) {
     if (!origin || config.origins.includes(origin)) done(null, true);
@@ -45,6 +52,8 @@ export function createApp({ config, deps, probes, authRouter, postRouter, mediaR
   if (aiRouter) app.use('/api/ai', aiRouter);
   if (notificationRouter) app.use('/api/notifications',notificationRouter);
   if (communityRouter) app.use('/api/community',communityRouter);
+  // BookBid routes use URL hashes. Serving only dist keeps unknown API paths as JSON 404s.
+  if (config.serveWeb) app.use(express.static(fileURLToPath(new URL('../../frontend/dist', import.meta.url))));
   app.use((req, res, next) => next(new HttpError(404, 'NOT_FOUND', 'Không tìm thấy API.')));
   app.use(errorHandler(log));
   return app;

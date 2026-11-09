@@ -25,6 +25,8 @@ export function parseConfig(e) {
   return {
     mode: e.NODE_ENV || 'development', host: e.API_HOST || '127.0.0.1',
     port: integer(e.API_PORT, 5000, 1, 65535, 'API_PORT'), origins,
+    serveWeb: boolean(e.SERVE_WEB, false, 'SERVE_WEB'),
+    trustProxy: boolean(e.API_TRUST_ONE_PROXY, false, 'API_TRUST_ONE_PROXY'),
     sql: { server: e.DB_SERVER || '127.0.0.1', port: integer(e.DB_PORT, 14330, 1, 65535, 'DB_PORT'),
       database, user: e.DB_USER || 'sa', password: e.DB_PASSWORD,
       connectionTimeout: integer(e.DB_TIMEOUT_MS, 5000, 500, 60000, 'DB_TIMEOUT_MS'),

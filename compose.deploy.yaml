@@ -1,0 +1,100 @@
+# Luôn gọi với --env-file .env.deploy -f compose.deploy.yaml.
+name: bookbid-deploy
+
+x-node: &node
+  image: bookbid:local
+  build: .
+  pull_policy: never
+  init: true
+
+x-sql: &sql-env
+  DB_SERVER: sqlserver
+  DB_PORT: '1433'
+  DB_DATABASE: ${SQL_DATABASE:-BookAuctionDeploy}
+  DB_ENCRYPT: 'true'
+  # SQL Server dùng chứng chỉ tự ký trong mạng Docker riêng.
+  DB_TRUST_SERVER_CERTIFICATE: 'true'
+  DB_TIMEOUT_MS: '15000'
+  DEV_PROBE_TOKEN: ${DEV_PROBE_TOKEN:?Run node scripts/setupDeployment.mjs}
+
+x-runtime: &runtime
+  <<: *node
+  environment: &runtime-env
+    <<: *sql-env
+    DB_USER: bookbid_app
+    DB_PASSWORD: ${SQL_APP_PASSWORD:?Run node scripts/setupDeployment.mjs}
+    REDIS_URL: redis://redis:6379
+    CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+    CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+    CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+    AI_ENABLED: ${AI_ENABLED:-false}
+    GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+  depends_on:
+    db-init:
+      condition: service_completed_successfully
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: 'Y'
+      MSSQL_PID: Express
+      MSSQL_SA_PASSWORD: ${SQL_SA_PASSWORD:?Run node scripts/setupDeployment.mjs}
+      MSSQL_MEMORY_LIMIT_MB: '2048'
+    volumes:
+      - sqlserver:/var/opt/mssql
+    healthcheck:
+      test: ['CMD-SHELL', '/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" -b -o /dev/null']
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    command: ['redis-server', '--appendonly', 'yes', '--appendfsync', 'everysec']
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  db-init:
+    <<: *node
+    environment:
+      <<: *sql-env
+      DB_USER: sa
+      DB_PASSWORD: ${SQL_SA_PASSWORD:?Run node scripts/setupDeployment.mjs}
+      SQL_APP_PASSWORD: ${SQL_APP_PASSWORD:?Run node scripts/setupDeployment.mjs}
+    command: ['sh', '-c', 'node backend/scripts/initDatabase.js && node backend/scripts/provisionDeployDb.js']
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+  api:
+    <<: *runtime
+    environment:
+      <<: *runtime-env
+      API_HOST: 0.0.0.0
+      SERVE_WEB: 'true'
+      API_TRUST_ONE_PROXY: 'true'
+      CLIENT_ORIGINS: ${BOOKBID_ORIGIN:?Set BOOKBID_ORIGIN in .env.deploy}
+      SESSION_SECRET: ${SESSION_SECRET:?Run node scripts/setupDeployment.mjs}
+    ports:
+      - '127.0.0.1:${BOOKBID_PORT:-8080}:5000'
+
+  worker:
+    <<: *runtime
+    command: ['node', 'backend/src/worker.js']
+
+volumes:
+  sqlserver:
+  redis:

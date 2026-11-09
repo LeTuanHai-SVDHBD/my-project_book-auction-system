@@ -197,6 +197,7 @@ Cách bật test SQL/Redis riêng và checklist nghiệm thu: [VALIDATION.md](VA
 | Tệp | Nội dung |
 |---|---|
 | [setup-guide.md](docs/setup-guide.md) | Cài mới, cập nhật, cấu hình, địa chỉ và chẩn đoán trên Windows |
+| [deployment.md](docs/deployment.md) | Đóng gói bằng Docker Compose, chạy demo qua HTTPS hoặc triển khai trên VM |
 | [architecture.md](docs/architecture.md) | Thành phần, ranh giới trách nhiệm, SQL và các luồng sự kiện |
 | [flows.md](docs/flows.md) | Vòng đời, trạng thái và danh mục HTTP API |
 | [auction-processing.md](docs/auction-processing.md) | Giá, khóa, transaction, retry/reclaim và kết thúc |

@@ -10,3 +10,8 @@ test('local API follows the browser loopback alias without changing port or cred
   assert.equal(resolveApiBase('http://127.0.0.1:5000','http://192.168.1.5:5173'),'http://127.0.0.1:5000');
   assert.equal(resolveApiBase('http://127.0.0.1:5000','https://localhost:5173'),'http://127.0.0.1:5000');
 });
+
+test('the packaged app sends API and Socket.IO traffic to the public page origin',()=>{
+  assert.equal(resolveApiBase('same-origin','https://bookbid.example.test/#/catalog'),'https://bookbid.example.test');
+  assert.equal(resolveApiBase('same-origin','https://temporary.example.test:8443/#/account'),'https://temporary.example.test:8443');
+});

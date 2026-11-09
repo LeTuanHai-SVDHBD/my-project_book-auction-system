@@ -1,6 +1,7 @@
 /** Keep local browser/API hostnames aligned so SameSite cookies remain in the same site. */
 const loopback=new Set(['localhost','127.0.0.1']);
 export function resolveApiBase(configured,pageUrl){
+  if(configured==='same-origin')return new URL(pageUrl).origin;
   const api=new URL(configured||'http://127.0.0.1:5000');
   if(pageUrl){
     const page=new URL(pageUrl);

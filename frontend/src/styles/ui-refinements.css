@@ -55,6 +55,7 @@ button, input, select, textarea { scroll-margin-block: 110px; }
 .breadcrumb > span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .auction-panel { border-top: 1px solid var(--line); padding-top: 24px; }
 .auction-panel .field-hint .status-badge { margin: 0 8px 8px 0; }
+.auction-next-bid-action,
 .auction-trade-action { display: flex; justify-content: center; margin: 18px 0 0; }
 .auction-timer { font-variant-numeric: tabular-nums; border: 1px solid #d3dfed; border-radius: 12px; padding: 16px; background: #f2f6fc; color: var(--navy); }
 .ai-score-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }

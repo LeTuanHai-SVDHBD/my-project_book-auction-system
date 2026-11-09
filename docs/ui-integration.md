@@ -127,6 +127,7 @@ URL Cloudinary gốc trong hồ sơ.
 
 Chủ sách không có thao tác đặt giá. Người mua chờ cooldown chỉ thấy thời gian còn lại;
 đang chờ xử lý không được báo thành công trước quyết định SQL. Giá đang gõ không bị snapshot nền thay.
+Khi đã có kết quả lượt giá và được phép đặt lại, nút **Nhập mức giá tiếp theo** nằm giữa bên dưới kết quả.
 Đồng hồ dựa giờ SQL; hết giờ chờ kết quả từ server. Snapshot sau tín hiệu/reconnect và mỗi 5 giây
 bù thông báo lỡ, xem [realtime.md](realtime.md).
 

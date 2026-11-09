@@ -117,7 +117,9 @@ export default function AuctionPanel({auctionId,user,onSnapshot,ownerView=false}
         receipt?.trang_thai==='bi_tu_choi'?(receipt.ly_do==='BID_COOLDOWN'?null:<p className="error" role="status"><StatusBadge state="bi_tu_choi"/> · {reasons[receipt.ly_do]||receipt.ly_do}</p>):
         <p role="status"><StatusBadge state="bid_pending"/> {busy?'Đang gửi yêu cầu…':checking?'Đang kiểm tra kết quả…':'Đang chờ xác nhận kết quả.'}</p>}
       {!terminal(receipt)&&!busy&&<button type="button" disabled={checking} onClick={()=>send(attempt)}>Thử lại cùng yêu cầu</button>}
-      {terminal(receipt)&&canBid&&!busy&&<button type="button" onClick={()=>{setAttempt(null);setReceipt(null);latestReceipt.current=null;setError('');}}>Nhập mức giá tiếp theo</button>}
+      {terminal(receipt)&&canBid&&!busy&&<div className="auction-next-bid-action">
+        <button type="button" className="btn btn-primary" onClick={()=>{setAttempt(null);setReceipt(null);latestReceipt.current=null;setError('');}}>Nhập mức giá tiếp theo</button>
+      </div>}
     </div>}
     {loadError&&<p className="error" role="alert">{loadError}</p>}{error&&<p className="error" role="alert">{error}</p>}<button type="button" className="text-button" disabled={busy} onClick={()=>refresh()}>Tải lại phiên và kết quả</button>
     {showTradeLink&&<div className="auction-trade-action">

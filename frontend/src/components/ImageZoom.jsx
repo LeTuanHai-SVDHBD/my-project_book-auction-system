@@ -1,9 +1,9 @@
-/** Kính lúp ảnh ở desktop; chạm/Enter vẫn mở đúng ảnh gốc để xem trên mọi thiết bị. */
+/** Kính lúp ảnh ở desktop; nhấn hoặc Enter mở ảnh trong bộ xem của gallery. */
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "./DesignUi.jsx";
 import { containedImage, imageZoomView } from "../utils/imageZoom.js";
-export default function ImageZoom({ src, originalSrc = src, alt }) {
+export default function ImageZoom({ src, alt, onOpen }) {
   const target = useRef(null),
     image = useRef(null),
     position = useRef({ x: 0.5, y: 0.5 });
@@ -61,7 +61,7 @@ export default function ImageZoom({ src, originalSrc = src, alt }) {
     show({ x: event.clientX, y: event.clientY });
   }
   function keyDown(event) {
-    if (event.key === "Escape") {
+    if (event.key === "Escape" && view) {
       setView(null);
       event.preventDefault();
       return;
@@ -82,13 +82,12 @@ export default function ImageZoom({ src, originalSrc = src, alt }) {
   }
   return (
     <div className="image-zoom">
-      <a
+      <button
         ref={target}
+        type="button"
         className="image-zoom-target"
-        href={originalSrc}
-        target="_blank"
-        rel="noreferrer"
-        aria-label={`Phóng to ảnh: ${alt} (mở ảnh gốc)`}
+        aria-haspopup="dialog"
+        aria-label={`Phóng to ảnh: ${alt}`}
         aria-describedby={hint}
         onPointerMove={move}
         onPointerLeave={() => setView(null)}
@@ -99,13 +98,13 @@ export default function ImageZoom({ src, originalSrc = src, alt }) {
         }}
         onBlur={() => setView(null)}
         onKeyDown={keyDown}
-        onClick={() => setView(null)}
+        onClick={() => { setView(null); onOpen(); }}
       >
         {failed ? (
-          <div className="image-zoom-unavailable">
+          <span className="image-zoom-unavailable">
             <Icon name="image" size={48} />
-            <span>Không tải được bản xem trước. Bạn có thể mở ảnh gốc.</span>
-          </div>
+            <span>Không tải được bản xem trước.</span>
+          </span>
         ) : (
           <img
             ref={image}
@@ -121,13 +120,13 @@ export default function ImageZoom({ src, originalSrc = src, alt }) {
         <span className="image-zoom-action">
           <Icon name="search" size={18} /> Phóng to ảnh
         </span>
-      </a>
+      </button>
       <p id={hint} className="image-zoom-hint">
         <span className="image-zoom-desktop-hint">
           Rê chuột lên ảnh để soi chi tiết; dùng phím mũi tên khi chọn ảnh bằng
           Tab.{" "}
         </span>
-        Nhấn ảnh để mở ảnh gốc và phóng to.
+        Nhấn ảnh để xem lớn; dùng ← / → để đổi ảnh.
       </p>
       {view &&
         createPortal(

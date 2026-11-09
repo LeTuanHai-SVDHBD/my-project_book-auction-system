@@ -8,6 +8,7 @@ export function analysisInput(row) {
   return {book:Object.fromEntries(names.map(key=>[key,row[key]??null])),media:(row.media||[]).map((x,index)=>({id:`M${index+1}`,kind:x.kind,url:x.url,title:x.title||''}))};
 }
 export const inputHash=row=>createHash('sha256').update(JSON.stringify(analysisInput(row))).digest('hex');
+export const currentAnalysisId=row=>row.ai?.thong_tin?.source_version===row.row_version?row.ai?.phan_tich_id??null:null;
 export function analysisView(raw,row) {
   if(!raw)return null;
   const details=raw.chi_tiet||[],metadata=details.find(x=>x.tieu_chi===META_CRITERION);

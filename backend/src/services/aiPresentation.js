@@ -18,3 +18,28 @@ export function ownerAiResult(analysis, post) {
       : {rule_version:analysis.thong_tin?.rule_version, moderation:analysis.thong_tin?.moderation, media:analysis.thong_tin?.media, warnings:analysis.thong_tin?.warnings}
   };
 }
+
+export function publicAiResult(analysis, post) {
+  const review = currentReview(post);
+  if (!['da_kich_hoat', 'da_ket_thuc'].includes(post.trang_thai_phien)
+    || review?.ket_qua !== 'Phê duyệt' || review.phan_tich_id == null) return null;
+  const current = ownerAiResult(analysis, post);
+  if (!current || !['thanh_cong', 'chua_day_du'].includes(current.trang_thai)) return null;
+  return {
+    diem_do_hiem: current.diem_do_hiem,
+    diem_tinh_trang: current.diem_tinh_trang,
+    ngay_phan_tich: current.ngay_phan_tich,
+    chi_tiet: (current.chi_tiet || []).map(row => {
+      let media = [];
+      try {
+        const refs = JSON.parse(row.nguon_doi_chieu)?.media;
+        if (Array.isArray(refs)) media = refs.filter(ref => typeof ref === 'string' && /^M[1-9]\d{0,4}$/.test(ref));
+      } catch { /* Legacy evidence may not have structured references. */ }
+      return {
+        tieu_chi: row.tieu_chi, trang_thai_danh_gia: row.trang_thai_danh_gia,
+        diem: row.diem, trong_so: row.trong_so, bang_chung: row.bang_chung,
+        nguon_doi_chieu: JSON.stringify({ media }),
+      };
+    }),
+  };
+}

@@ -1,4 +1,5 @@
 /** Materialize committed, durable domain records into a per-account inbox. No public Socket or chat body. */
+import {responseDueSql} from "./community.model.js";
 import { HttpError } from "../middlewares/errorHandler.js";
 // The existing history/decision/result rows are durable event sources. Reading on reconnect
 // repairs a missed refresh without changing the auction transaction or SQL OUTPUT contracts.
@@ -30,7 +31,16 @@ export const notificationSources = `
  UNION ALL
  SELECT CONCAT('complaint:',k.khieu_nai_id),'complaints',k.khieu_nai_id,N'Có khiếu nại mới',N'Mở hồ sơ để xem bằng chứng và tiếp nhận xử lý.',k.ngay_khieu_nai FROM dbo.KhieuNai k WHERE @admin=1
  UNION ALL
- SELECT CONCAT('resolved:',k.khieu_nai_id),'complaints',k.khieu_nai_id,N'Khiếu nại đã có phản hồi',N'Mở hồ sơ để đọc kết quả xử lý của Admin.',k.ngay_xu_ly FROM dbo.KhieuNai k WHERE k.nguoi_khieu_nai_id=@user AND k.trang_thai='da_xu_ly'`;
+ SELECT CONCAT('complaint-reply-due:',k.khieu_nai_id),'complaints',k.khieu_nai_id,N'Có khiếu nại về giao dịch của bạn',N'Mở hồ sơ để xem nội dung và hạn phản hồi.',k.ngay_khieu_nai
+ FROM dbo.KhieuNai k JOIN dbo.GiaoDich g ON g.giao_dich_id=k.giao_dich_id
+ WHERE k.han_giai_trinh IS NOT NULL AND @user IN(g.nguoi_mua_id,g.nguoi_ban_id) AND k.nguoi_khieu_nai_id<>@user
+ UNION ALL
+ SELECT CONCAT('complaint-response:',k.khieu_nai_id),'complaints',k.khieu_nai_id,N'Đã có giải trình khiếu nại',N'Mở hồ sơ để xem giải trình và bằng chứng.',k.ngay_giai_trinh
+ FROM dbo.KhieuNai k WHERE k.ngay_giai_trinh IS NOT NULL AND (k.nguoi_khieu_nai_id=@user OR (@admin=1 AND k.admin_id=@user))
+ UNION ALL
+ SELECT CONCAT('resolved:',k.khieu_nai_id),'complaints',k.khieu_nai_id,N'Khiếu nại đã có phản hồi',N'Mở hồ sơ để đọc kết quả xử lý của Admin.',k.ngay_xu_ly
+ FROM dbo.KhieuNai k JOIN dbo.GiaoDich g ON g.giao_dich_id=k.giao_dich_id
+ WHERE k.trang_thai='da_xu_ly' AND (k.nguoi_khieu_nai_id=@user OR (k.han_giai_trinh IS NOT NULL AND @user IN(g.nguoi_mua_id,g.nguoi_ban_id)))`;
 export function createNotificationModel({ getPool, sql }) {
   const request = (target) =>
     target.request ? target.request() : new sql.Request(target);
@@ -78,11 +88,14 @@ export function createNotificationModel({ getPool, sql }) {
         .input("user", sql.Int, user.nguoi_dung_id)
         .input("before", sql.Int, before).query(`
         SELECT TOP(30) thong_bao_id,loai,doi_tuong_id,tieu_de,noi_dung,ngay_tao,ngay_doc FROM dbo.ThongBao WHERE nguoi_dung_id=@user AND thong_bao_id<@before ORDER BY thong_bao_id DESC;
-        SELECT COUNT(*) AS unread FROM dbo.ThongBao WHERE nguoi_dung_id=@user AND ngay_doc IS NULL;`);
+        SELECT COUNT(*) AS unread FROM dbo.ThongBao WHERE nguoi_dung_id=@user AND ngay_doc IS NULL;
+        SELECT COUNT(*) AS due_count FROM dbo.KhieuNai k JOIN dbo.GiaoDich g ON g.giao_dich_id=k.giao_dich_id
+        WHERE @user IN(g.nguoi_mua_id,g.nguoi_ban_id) AND k.nguoi_khieu_nai_id<>@user AND ${responseDueSql};`);
       const items = result.recordsets[0];
       return {
         items,
         unread: result.recordsets[1][0].unread,
+        complaintsToReply: result.recordsets[2][0].due_count,
         nextBefore: items.length === 30 ? items.at(-1).thong_bao_id : null,
       };
     },

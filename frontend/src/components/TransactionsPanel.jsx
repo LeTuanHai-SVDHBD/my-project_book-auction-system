@@ -1,6 +1,7 @@
 import StatusBadge from "./StatusBadge.jsx";
 /** Giao dịch của hai bên: truy vết kết quả, chat riêng, xác nhận độc lập, đánh giá và khiếu nại. */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSuccessFeedback } from "./SuccessFeedback.jsx";
 import { navigate } from "../services/navigation.js";
 import { communityGet, communityPost } from "../services/communityApi.js";
 import {
@@ -12,97 +13,12 @@ import {
 } from "./CommunityFeed.jsx";
 import { Dialog, Icon } from "./DesignUi.jsx";
 import ComplaintForm from "./ComplaintForm.jsx";
-function OwnComplaint({ id, onClose }) {
-  const { data: row, error } = useCommunityPage(`/complaints/${id}`);
-  return (
-    <Dialog
-      title={`Khiếu nại #${id}`}
-      className="complaint-dialog"
-      onClose={onClose}
-    >
-      {!row && !error && <p role="status">Đang tải hồ sơ…</p>}
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      {row && (
-        <>
-          <div className="case-overview">
-            <StatusBadge state={row.trang_thai} />
-            <p>Gửi lúc {when(row.ngay_khieu_nai)}</p>
-          </div>
-          <section className="case-section">
-            <span className="eyebrow">Vấn đề cần đối chiếu</span>
-            <h3>{row.ly_do}</h3>
-            <h4>Nội dung khiếu nại</h4>
-            <p className="case-description preserve-lines">{row.noi_dung}</p>
-          </section>
-          <section className="case-section">
-            <h4>
-              Ảnh bằng chứng <span>({row.bang_chung.length})</span>
-            </h4>
-            {row.bang_chung.length ? (
-              <div className="media-grid case-evidence">
-                {row.bang_chung.map((item) => (
-                  <figure key={item.bang_chung_id}>
-                    <a
-                      href={item.duong_dan_anh_khieu_nai}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <img
-                        src={item.duong_dan_anh_khieu_nai}
-                        alt={item.mo_ta_anh_khieu_nai || "Bằng chứng khiếu nại"}
-                      />
-                    </a>
-                    <figcaption>{item.mo_ta_anh_khieu_nai}</figcaption>
-                  </figure>
-                ))}
-              </div>
-            ) : (
-              <p className="case-muted">
-                Hồ sơ này chưa đính kèm ảnh bằng chứng.
-              </p>
-            )}
-          </section>
-          <section
-            className={`case-admin-response ${row.phan_hoi_admin ? "has-response" : ""}`}
-          >
-            <div>
-              <Icon name="shield" size={24} />
-              <h4>Phản hồi của Admin</h4>
-            </div>
-            {row.phan_hoi_admin ? (
-              <>
-                <p className="preserve-lines">{row.phan_hoi_admin}</p>
-                <small>Phản hồi lúc {when(row.ngay_xu_ly)}</small>
-              </>
-            ) : (
-              <p>
-                Chưa có phản hồi. Bạn có thể theo dõi trạng thái xử lý tại hồ sơ
-                này.
-              </p>
-            )}
-          </section>
-          <div className="case-dialog-actions">
-            <button type="button" className="secondary" onClick={onClose}>
-              Đóng hồ sơ
-            </button>
-          </div>
-        </>
-      )}
-    </Dialog>
-  );
-}
-
 function TradeDetail({ id, user, onClose }) {
   const [row, setRow] = useState(null),
     [error, setError] = useState(""),
-    [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
-    [form, setForm] = useState(false),
-    [complaint, setComplaint] = useState(null);
+    [form, setForm] = useState(false);
+  const notify = useSuccessFeedback();
   const sequence = useRef(0);
   const load = useCallback(async () => {
     const current = ++sequence.current;
@@ -132,10 +48,9 @@ function TradeDetail({ id, user, onClose }) {
   async function act(action, body = {}, success = "Đã lưu thao tác.") {
     setBusy(true);
     setError("");
-    setMessage("");
     try {
       await communityPost(`/trades/${id}/${action}`, body);
-      setMessage(success);
+      notify({ message: success });
       await load();
     } catch (failure) {
       setError(failure.message);
@@ -283,7 +198,7 @@ function TradeDetail({ id, user, onClose }) {
               </span>
               <div>
                 <h3>Khiếu nại giao dịch</h3>
-                <p>Hồ sơ bạn đã gửi và phản hồi từ Admin.</p>
+                <p>Hồ sơ của hai bên và kết luận từ Admin.</p>
               </div>
             </div>
             {row.khieu_nai.length ? (
@@ -301,35 +216,26 @@ function TradeDetail({ id, user, onClose }) {
                     <button
                       type="button"
                       className="case-open"
-                      onClick={() => setComplaint(item.khieu_nai_id)}
+                      onClick={() => navigate("complaints", item.khieu_nai_id)}
                     >
-                      Xem hồ sơ và phản hồi <Icon name="arrow" size={18} />
+                      {item.can_toi_phan_hoi ? "Xem và giải trình" : "Xem khiếu nại"} <Icon name="arrow" size={18} />
                     </button>
                   </li>
                 ))}
               </ul>
             ) : (
               <div className="trade-cases-empty">
-                <p>Bạn chưa gửi khiếu nại cho giao dịch này.</p>
+                <p>{row.co_khieu_nai_dang_mo ? "Giao dịch có hồ sơ cũ đang được Admin xử lý." : "Chưa có hồ sơ khiếu nại nào để xem."}</p>
                 <small>
                   Nếu thông tin bản sách hoặc thỏa thuận chưa khớp, hãy gửi nội
                   dung và bằng chứng để Admin đối chiếu.
                 </small>
               </div>
             )}
-            <button
-              type="button"
-              className="secondary create-complaint"
-              onClick={() => setForm(true)}
-            >
-              <Icon name="plus" size={18} /> Gửi khiếu nại mới
-            </button>
-            {complaint && (
-              <OwnComplaint
-                key={`complaint-${complaint}`}
-                id={complaint}
-                onClose={() => setComplaint(null)}
-              />
+            {!row.co_khieu_nai_dang_mo && (
+              <button type="button" className="secondary create-complaint" onClick={() => setForm(true)}>
+                <Icon name="plus" size={18} /> Gửi khiếu nại mới
+              </button>
             )}
             {form && (
               <Dialog
@@ -342,9 +248,8 @@ function TradeDetail({ id, user, onClose }) {
                   onCancel={() => setForm(false)}
                   onSaved={(caseId) => {
                     setForm(false);
-                    setComplaint(caseId);
-                    setMessage("Đã gửi khiếu nại.");
-                    void load();
+                    navigate("complaints", caseId);
+                    notify({ message: "Đã gửi khiếu nại." });
                   }}
                 />
               </Dialog>
@@ -352,11 +257,6 @@ function TradeDetail({ id, user, onClose }) {
           </section>
         </div>
       </div>
-      {message && (
-        <p className="account-success" role="status">
-          {message}
-        </p>
-      )}
       {error && (
         <p className="error" role="alert">
           {error}

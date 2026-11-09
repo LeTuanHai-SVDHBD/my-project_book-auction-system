@@ -13,5 +13,6 @@ export function auctionTime(clock,state,now) {
   return {phase:'open',seconds:Math.ceil((clock.end-current)/1000)};
 }
 export function duration(seconds) {
-  return `${Math.floor(seconds/3600)} giờ ${Math.floor(seconds%3600/60)} phút ${seconds%60} giây`;
+  const days=Math.floor(seconds/86400),hours=Math.floor(seconds%86400/3600);
+  return `${days>0?`${days} ngày `:''}${hours} giờ ${Math.floor(seconds%3600/60)} phút ${seconds%60} giây`;
 }

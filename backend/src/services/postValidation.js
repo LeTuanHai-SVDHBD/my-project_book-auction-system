@@ -31,7 +31,7 @@ function money(value, name) {
   return value;
 }
 export function validatePost(body, { mode = 'create' } = {}) {
-  object(body, ['ma_yeu_cau', 'sach', 'bai_dang', 'phien', 'media', 'reuse_media', 'row_version', 'remove_media'], 'Bài đăng');
+  object(body, ['ma_yeu_cau', 'sach', 'bai_dang', 'phien', 'media', 'reuse_media', 'row_version', 'remove_media', 'cover_image'], 'Bài đăng');
   if (body.reuse_media !== undefined && typeof body.reuse_media !== 'boolean') bad('reuse_media không hợp lệ.');
   const book = mode !== 'relist' && body.sach !== undefined ? object(body.sach, ['ten_sach','tac_gia','the_loai','nha_xuat_ban','nam_xuat_ban','isbn','tinh_trang_sach','mo_ta'], 'Sách') : null;
   if (mode === 'create' && !book) bad('Thiếu thông tin Sách.');
@@ -56,6 +56,21 @@ export function validatePost(body, { mode = 'create' } = {}) {
     return { upload_id: uuid(item.upload_id), tieu_de: text(item.tieu_de, 500, 'Tiêu đề media') };
   });
   if (new Set(media.map(item => item.upload_id)).size !== media.length) bad('Không lặp mã upload trong cùng bài đăng.');
+  let coverImage=null;
+  if(body.cover_image!==undefined){
+    const choice=object(body.cover_image,['id','upload_id'],'Ảnh chính');
+    if(Object.keys(choice).length!==1)bad('Chọn đúng một ảnh chính.');
+    if(Object.hasOwn(choice,'upload_id')){
+      const uploadId=uuid(choice.upload_id);
+      if(!media.some(item=>item.upload_id===uploadId))bad('Ảnh chính phải nằm trong danh sách tệp gửi lên.');
+      coverImage={uploadId};
+    }else{
+      if(mode==='create'||mode==='relist'&&body.reuse_media!==true)bad('Ảnh chính phải thuộc media được giữ lại.');
+      const imageId=id(choice.id);
+      if(removeMedia.some(item=>item.kind==='image'&&item.id===imageId))bad('Không thể chọn ảnh đã gỡ làm ảnh chính.');
+      coverImage={id:imageId};
+    }
+  }
   let normalizedBook;
   if (book) {
     if(mode==='create'&&book.the_loai!==undefined&&book.the_loai!==null&&book.the_loai!==''&&!BOOK_GENRES.includes(book.the_loai))bad('Hãy chọn thể loại trong danh mục.');
@@ -67,7 +82,7 @@ export function validatePost(body, { mode = 'create' } = {}) {
   }
   return { requestId: mode === 'resubmit' ? null : uuid(body.ma_yeu_cau), book: normalizedBook,
     post: normalizedPost,
-    prices, media, removeMedia, reuseMedia: mode !== 'create' && body.reuse_media === true,
+    prices, media, coverImage, removeMedia, reuseMedia: mode !== 'create' && body.reuse_media === true,
     rowVersion: mode === 'resubmit' ? version(body.row_version) : null };
 }
 export function validateReview(body) {

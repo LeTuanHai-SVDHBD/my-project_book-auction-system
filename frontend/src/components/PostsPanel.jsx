@@ -1,9 +1,13 @@
 import StatusBadge from "./StatusBadge.jsx";
 /** Danh mục, bài của tôi, kiểm duyệt tự động và luồng đặt giá/kết quả phiên. */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { OWNER_POST_FILTERS, normalizeOwnerPostStatus } from "../../../shared/ownerPostFilters.js";
+import { STATUS, postStatus } from "../utils/statusPresentation.js";
 import { BOOK_GENRE_GROUPS } from "../../../shared/bookGenres.js";
 import { bookReviewDescription } from "../../../shared/bookCondition.js";
+import { mediaDisplayUrl } from "../../../shared/mediaDelivery.js";
 import { currentReview } from "../../../shared/aiVisibility.js";
+import { useSuccessFeedback } from "./SuccessFeedback.jsx";
 import { navigate } from "../services/navigation.js";
 import BookCard from "./BookCard.jsx";
 import BookGallery from "./BookGallery.jsx";
@@ -19,6 +23,35 @@ const money = (value) =>
   value == null ? "Chưa có" : `${BigInt(value).toLocaleString("vi-VN")} đ`;
 const date = (value) =>
   value ? new Date(value).toLocaleString("vi-VN") : "Chưa đặt lịch";
+function PostStatusFilters({ mode, value, options, label }) {
+  return (
+    <div className="moderation-filters" role="group" aria-label={label}>
+      {options.map(([key, text]) => (
+        <button key={key} type="button" className="secondary" aria-pressed={value === key}
+          onClick={() => navigate(mode, null, key === "all" ? "" : `status=${key}`)}>
+          {text}
+        </button>
+      ))}
+    </div>
+  );
+}
+const ownerFilterOptions = OWNER_POST_FILTERS.map(key => [key, key === "all" ? "Tất cả" : STATUS[key].label]);
+const moderationFilterOptions = [
+  ["all", "Tất cả"], ["pending", "Chờ kiểm duyệt"], ["rejected", "Đã từ chối"],
+];
+function OwnerBookThumbnail({ cover }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className="owner-book-thumbnail" aria-hidden="true">
+      {cover && !failed ? (
+        <img src={mediaDisplayUrl(cover, "image")} alt="" loading="lazy" decoding="async"
+          onError={() => setFailed(true)} />
+      ) : (
+        <Icon name="book" size={24} />
+      )}
+    </span>
+  );
+}
 function ReviewDecision({ review, postId, canExport }) {
   return (
     <blockquote className="review-decision">
@@ -59,13 +92,12 @@ function Detail({
   onAuctionChange,
 }) {
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [message, setMessage] = useState("");
+    [error, setError] = useState("");
+  const notify = useSuccessFeedback();
   async function activate(event) {
     event.preventDefault();
     setBusy(true);
     setError("");
-    setMessage("");
     const data = Object.fromEntries(new FormData(event.currentTarget));
     try {
       await postApi.activate(post.bai_dang_id, {
@@ -73,7 +105,7 @@ function Detail({
         thoi_gian_ket_thuc: new Date(data.end).toISOString(),
         row_version: post.row_version,
       });
-      setMessage("Đã đặt lịch và kích hoạt phiên.");
+      notify({ message: "Đã đặt lịch và kích hoạt phiên." });
       await onRefresh();
     } catch (failure) {
       setError(failure.message);
@@ -109,7 +141,7 @@ function Detail({
         </div>
         <div>
           <section className="panel live-auction-summary">
-            <StatusBadge post={post} />
+            {!(mode === "mine" && published) && <StatusBadge post={post} />}
             <h1>{post.ten_sach}</h1>
             <p>{post.tieu_de}</p>
             <p className="field-hint">
@@ -152,14 +184,9 @@ function Detail({
                 auctionId={post.phien_dau_gia_id}
                 user={user}
                 onSnapshot={onAuctionChange}
+                ownerView={mode === "mine"}
               />
             )}
-            {post.trang_thai_phien === "da_ket_thuc" &&
-              user?.vai_tro === "nguoi_dung" && (
-                <a href="#/trades" className="btn btn-outline">
-                  Giao dịch của tôi
-                </a>
-              )}
             {mode === "mine" &&
               post.trang_thai_phien === "da_qua_kiem_duyet" && (
                 <form onSubmit={activate}>
@@ -203,6 +230,12 @@ function Detail({
           <p className="preserve-lines">{bookReviewDescription(post)}</p>
         </div>
       </section>
+      {mode === "catalog" && published && (
+        <section className="panel live-review">
+          <h2>Điểm và bằng chứng AI</h2>
+          <AiPanel post={post} publicView />
+        </section>
+      )}
       {mode !== "catalog" && (
         <section className="panel live-review">
           {admin && ai}
@@ -252,11 +285,6 @@ function Detail({
           <CommentsPanel auctionId={post.phien_dau_gia_id} user={user} />
         </section>
       )}
-      {message && (
-        <p className="account-success" role="status">
-          {message}
-        </p>
-      )}
       {error && (
         <p role="alert" className="error">
           {error}
@@ -276,14 +304,18 @@ export default function PostsPanel({
   query = "",
 }) {
   const filters = new URLSearchParams(query);
+  const requestedStatus = filters.get("status") || "all";
+  const status = mode === "mine" ? normalizeOwnerPostStatus(requestedStatus) : requestedStatus;
+  const ownerFiltered = mode === "mine" && status !== "all";
+  const postQuery = query ? `?${query}` : "";
   const [items, setItems] = useState([]),
     [next, setNext] = useState(null),
     [post, setPost] = useState(null),
     [form, setForm] = useState(initialCreate ? "create" : null);
   const [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
-    [message, setMessage] = useState(""),
     [q, setQ] = useState(filters.get("q") || "");
+  const notify = useSuccessFeedback();
   const listSequence = useRef(0),
     detailSequence = useRef(0);
   const auctionChanged = useCallback((snapshot) => {
@@ -319,7 +351,7 @@ export default function PostsPanel({
           : await postApi.list(
               mode,
               append ? next : null,
-              filters.get("status") || "all",
+              status,
             );
       if (seq === listSequence.current) {
         setItems((old) =>
@@ -391,10 +423,8 @@ export default function PostsPanel({
   }
   async function saved(id) {
     setForm(null);
-    setMessage(
-      "Đã gửi kiểm duyệt. Bạn có thể đặt lịch cho phiên khi bài được duyệt.",
-    );
-    navigate("mine", id);
+    notify({ message: "Đã gửi kiểm duyệt. Bạn có thể đặt lịch cho phiên khi bài được duyệt." });
+    navigate("mine", id, query);
     await load();
     await open(id);
   }
@@ -427,7 +457,7 @@ export default function PostsPanel({
     />
   );
   return (
-    <main className="posts-page page-container">
+    <main className={`posts-page page-container${mode === "catalog" ? " catalog-page" : ""}`}>
       {!post && (
         <header className="posts-heading">
           <div>
@@ -463,11 +493,6 @@ export default function PostsPanel({
           {error}
         </p>
       )}
-      {message && (
-        <p className="account-success" role="status">
-          {message}
-        </p>
-      )}
       {loading && <p role="status">Đang tải…</p>}
       {form ? (
         <PostForm
@@ -478,7 +503,7 @@ export default function PostsPanel({
           onSaved={saved}
           onCancel={() => {
             setForm(null);
-            navigate("mine", post?.bai_dang_id);
+            navigate("mine", post?.bai_dang_id, query);
           }}
         />
       ) : mode === "pending" ? (
@@ -490,33 +515,8 @@ export default function PostsPanel({
               <h2>Bài đăng cần theo dõi</h2>
               <span>{items.length} bài đang hiển thị</span>
             </div>
-            <div
-              className="moderation-filters"
-              role="group"
-              aria-label="Lọc trạng thái kiểm duyệt"
-            >
-              {[
-                ["all", "Tất cả"],
-                ["pending", "Chờ kiểm duyệt"],
-                ["rejected", "Đã từ chối"],
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className="secondary"
-                  aria-pressed={(filters.get("status") || "all") === value}
-                  onClick={() =>
-                    navigate(
-                      "pending",
-                      null,
-                      value === "all" ? "" : `status=${value}`,
-                    )
-                  }
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <PostStatusFilters mode="pending" value={status} options={moderationFilterOptions}
+              label="Lọc trạng thái kiểm duyệt" />
             <p className="field-hint">
               Bài chờ kiểm duyệt được ưu tiên trước. Bài đã từ chối giữ lại để
               xem kết quả; khi người bán gửi lại sẽ chuyển về chờ kiểm duyệt.
@@ -636,21 +636,25 @@ export default function PostsPanel({
               </div>
             </>
           )}
+          {mode === "mine" && (
+            <PostStatusFilters mode="mine" value={status} options={ownerFilterOptions}
+              label="Lọc trạng thái bài đăng của tôi" />
+          )}
           {!items.length && !loading && !error && (
             <div className="empty-state panel">
               <Icon name="book" size={48} />
               <h2>
                 {mode === "catalog"
                   ? "Chưa tìm thấy ấn bản phù hợp"
-                  : "Chưa có bài đăng"}
+                  : ownerFiltered ? "Không có bài đăng ở trạng thái này" : "Chưa có bài đăng"}
               </h2>
               <p>
                 {mode === "catalog"
                   ? "Thử từ khóa khác hoặc bỏ bớt bộ lọc."
-                  : "Các bài đăng của bạn sẽ xuất hiện tại đây."}
+                  : ownerFiltered ? "Chọn trạng thái khác để xem bài đăng của bạn." : "Các bài đăng của bạn sẽ xuất hiện tại đây."}
               </p>
-              {mode === "catalog" && (
-                <a href="#/catalog" className="btn btn-outline">
+              {(mode === "catalog" || ownerFiltered) && (
+                <a href={mode === "catalog" ? "#/catalog" : "#/mine"} className="btn btn-outline">
                   Xóa bộ lọc
                 </a>
               )}
@@ -671,21 +675,24 @@ export default function PostsPanel({
                   {items.map((item) => (
                     <tr key={item.bai_dang_id}>
                       <td>
-                        <a href={`#/mine/${item.bai_dang_id}`}>
-                          <b>{item.ten_sach}</b>
-                          <small>
-                            {item.tac_gia} · Bài #{item.bai_dang_id}
-                          </small>
+                        <a className="owner-book-link" href={`#/mine/${item.bai_dang_id}${postQuery}`}>
+                          <OwnerBookThumbnail key={item.anh_bia || "placeholder"} cover={item.anh_bia} />
+                          <span className="owner-book-text">
+                            <b>{item.ten_sach}</b>
+                            <small>
+                              {item.tac_gia || "Chưa rõ tác giả"} · Bài #{item.bai_dang_id}
+                            </small>
+                          </span>
                         </a>
                       </td>
                       <td data-label="Giá khởi điểm">{money(item.gia_khoi_diem)}</td>
                       <td data-label="Trạng thái">
-                        <StatusBadge post={item} />
+                        <StatusBadge state={normalizeOwnerPostStatus(item.owner_status ?? postStatus(item))} />
                       </td>
                       <td>
                         <a
                           className="text-link"
-                          href={`#/mine/${item.bai_dang_id}`}
+                          href={`#/mine/${item.bai_dang_id}${postQuery}`}
                         >
                           {item.trang_thai_phien === "khong_dat_kiem_duyet"
                             ? "Bổ sung và gửi duyệt lại"

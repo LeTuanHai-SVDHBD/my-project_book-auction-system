@@ -18,7 +18,7 @@ npm.cmd run setup:ai
 
 Script chỉ bổ sung biến thiếu, giữ key/cờ bật/timeout đang có; AI tắt mặc định.
 Tự duyệt dùng các bảng đã có. Migration 008 thêm liên kết quyết định với lần phân tích; không thêm SDK.
-Toàn hệ thống hiện có 21 bảng/166 cột sau migration 008; không dùng số schema của phiên bản trước.
+Toàn hệ thống hiện có 21 bảng/172 cột sau migration 009; không dùng số schema của phiên bản trước.
 
 Mở `.env` ở thư mục gốc trên máy phát triển:
 
@@ -71,9 +71,9 @@ Giữ Gemini key hiện có và chạy lại `npm.cmd run dev:all` để API và
 | Lỗi Gemini, tải/xử lý media tạm thời hoặc chưa có cấu hình | Bài tiếp tục chờ; không sinh quyết định từ lỗi kỹ thuật |
 
 Sau khi SQL lưu bài mới, gửi lại hoặc đăng lại, API xếp hàng AI mà không chờ kết quả phân tích.
-Worker quét tối đa 12 bài chờ mỗi lượt 10 giây để phục hồi khi Redis lỗi và xử lý bài chờ từ trước.
-Redis gom job theo bài/phiên bản; khi mất Redis, worker tìm lại bài còn chờ trong SQL.
-Lỗi kỹ thuật có thể thử lại cách ít nhất 5 phút, tối đa 3 lần phân tích đã lưu cho mỗi phiên bản trong cửa sổ 24 giờ. Lỗi 429 dùng quy tắc riêng bên dưới.
+Worker quét tối đa 12 bài chờ mỗi lượt 10 giây để khôi phục lần phân tích đầu tiên khi Redis lỗi hoặc bài chưa được xếp hàng.
+Sau khi SQL đã lưu một lần phân tích cho phiên bản hiện tại, worker không tự chạy lần phân tích mới, kể cả khi lần trước thất bại do timeout, 503 hoặc 429.
+Nếu bài còn chờ, Admin bấm **Phân tích lại bằng AI** để gửi yêu cầu cho đúng lần phân tích mới nhất. Các lượt gọi lại giới hạn bên trong cùng một lần phân tích và thời gian tạm dừng do lỗi 429 vẫn áp dụng.
 Bài đã quyết định không tự chấm lại. Mỗi vòng gửi lại dùng phiên bản mới.
 
 Migration 008 cho phép `KiemDuyet.admin_id` NULL khi có `phan_tich_id`; quyết định cũ giữ Admin và dữ liệu lịch sử.
@@ -97,7 +97,14 @@ Duyệt tay trả 409 `AUTO_MODERATION_ENABLED`; POST phân tích lại được
 Khi đã có căn cứ quan sát phù hợp: đáp ứng → 100, không đáp ứng → 0.
 Chưa xác minh/không đủ căn cứ → NULL, không tự suy thành 0.
 Không khẳng định số bản còn lại toàn cầu; không suy từ vẻ cũ ra niên đại, hoặc từ nét ký ra chữ ký thật.
-Các nguồn đầu vào chỉ giúp Admin đối chiếu; bản triển khai không tìm kiếm hay xác thực website bên ngoài.
+Nhãn sở hữu đọc được là dấu hiệu quan sát được, không tự xác nhận chuỗi sở hữu hay tính xác thực.
+URL do người đăng cung cấp được ghi là chưa đối chiếu độc lập; hệ thống không truy cập hay xác thực website bên ngoài.
+
+**Lai lịch và dấu ấn riêng** vẫn chiếm 25%, không dùng **Không áp dụng**.
+Nếu hồ sơ không khai dấu ấn hay lai lịch đặc biệt và ảnh chụp đủ rõ các vị trí liên quan nhưng không ghi nhận dấu ấn,
+Gemini trả **Đã đánh giá / không đáp ứng** kèm mã ảnh; Backend chấm 0 riêng tiêu chí này.
+Thiếu ảnh thì giữ **Chưa đủ dữ liệu**; có dấu hiệu hoặc lời khai chưa xác thực thì giữ **Cần xác minh**.
+Ba tiêu chí độ hiếm đạt 100 và tiêu chí này được chấm 0 cho tổng độ hiếm 75/100.
 
 ### Tình trạng vật lý
 
@@ -129,6 +136,10 @@ Backend dùng phép chia số nguyên chính xác ở bước làm tròn. Không
 - **Chưa đủ dữ liệu / Cần xác minh:** điểm thành phần NULL. Nếu tiêu chí áp dụng chưa được đánh giá, tổng nhóm NULL.
 - **Không áp dụng:** phải có bằng chứng/media; loại trọng số khỏi mẫu số. Không dùng thay cho thiếu ảnh.
 - Không còn tiêu chí áp dụng thì tổng NULL. Không chuyển NULL thành 0 và không bỏ tiêu chí thiếu để làm tăng điểm.
+
+Khi hồ sơ chưa đạt, lý do nêu tiêu chí còn thiếu hoặc cần xác minh, quan sát hiện có và ảnh/tài liệu nên bổ sung.
+Chẳng hạn, tiêu chí mép giấy cần ảnh mép trên, mép dưới và mép ngoài khi đóng sách.
+Luồng tự duyệt hiện tại cho người bán bổ sung rồi gửi lại, không chuyển hồ sơ sang hàng đợi xác minh thủ công.
 
 Đầu ra có trường ngoài hợp đồng, điểm/trọng số do mô hình tự chèn, mã media hoặc nguồn lạ được chặn/hạ về cần xác minh.
 Độ tin cậy chỉ là mô hình tự báo cáo, không dùng làm trọng số hoặc bằng chứng xác thực.
@@ -188,7 +199,7 @@ gửi toàn tệp không có nghĩa mô hình kiểm tra mọi frame hoặc mọ
 khi quan sát được; không tự sinh timestamp hay gán điểm 0 khi không quan sát được. Không đặt FPS thấp,
 không lặng lẽ trích vài frame thay thế video. Quota/token/context/model vẫn do tài khoản Gemini quyết định;
 Files API không làm video dài miễn phí. Luồng này dùng video đã upload, chưa thêm ô YouTube;
-link YouTube trong mô tả vẫn chỉ là nguồn văn bản cần Admin xác minh.
+link YouTube trong mô tả vẫn chỉ là nguồn văn bản do người đăng cung cấp, chưa được đối chiếu độc lập.
 
 Tham chiếu protocol Google đã dùng khi triển khai ngày 01/11/2026 (quyền/quota/giới hạn dịch vụ do nhà cung cấp quản lý):
 [Video/Files với Interactions](https://ai.google.dev/gemini-api/docs/video-understanding),
@@ -283,7 +294,8 @@ Phiên bản bài có lần phân tích mới nhất lỗi 429 vẫn chờ kiể
 - `GET /api/ai/:id?analysis=<id>`: chủ bài hoặc Admin; lần phân tích phải thuộc đúng bài. Admin nhận `can_retry` theo phiên bản bài hiện tại.
 - `POST /api/ai/:id`: Admin + CSRF gửi `row_version` của bài đang chờ và đã có lần phân tích hợp lệ cho phiên bản này; trả 202 khi xếp hàng.
 - Admin xem tiến độ, lịch sử, chẩn đoán và kết quả tại **Kiểm duyệt**; không có nút từ chối hoặc phê duyệt tay.
-- Chủ bài đang chờ duyệt chỉ thấy tiến độ và lịch sử quyết định trước đó (nếu có), không hiện/gọi panel AI. Sau phê duyệt hoặc từ chối, quyết định/lý do hiện trước, phần **Kết quả AI tham khảo** thu gọn bên dưới. Gửi duyệt lại sẽ ẩn AI cho tới quyết định mới. Người mua/khách không có API phân tích riêng.
+- Chủ bài đang chờ duyệt chỉ thấy tiến độ và lịch sử quyết định trước đó (nếu có), không hiện/gọi panel AI. Sau phê duyệt hoặc từ chối, quyết định/lý do hiện trước, phần **Kết quả AI tham khảo** thu gọn bên dưới. Gửi duyệt lại sẽ ẩn AI cho tới quyết định mới.
+- Người mua và khách xem **Điểm và bằng chứng AI** trên chi tiết bài đã công bố (`GET /api/posts/catalog/:id`). Dữ liệu công khai chỉ lấy lần phân tích đúng đầu vào và được liên kết với quyết định phê duyệt; không đưa lịch sử, chẩn đoán, đường dẫn đối chiếu hoặc ghi chú kiểm duyệt riêng vào phản hồi công khai.
 - Backend cũng lọc `ai` trong chi tiết riêng và `GET /api/ai/:id`: người bán không nhận job/lịch sử phân tích chưa công bố hoặc mã lỗi provider. Chỉ công bố kết quả có hash đầu vào hiện tại và đúng `phan_tich_id` của quyết định tự duyệt. Quyết định thủ công cũ đối chiếu theo thời gian. Không đủ metadata/mốc thời gian thì báo chưa có kết quả phù hợp, không gán kết quả cũ vào lần mới. Query `analysis` của người bán chỉ nhận ID đã công bố hiện tại; Admin vẫn xem lịch sử riêng.
 - Người bán thấy hai điểm, lý do NULL, tiêu chí, bằng chứng, nguồn và phép tính của kết quả phù hợp. Nếu phân tích thất bại, hiện **AI chưa phân tích thành công. Vui lòng xem quyết định và lý do kiểm duyệt của Admin.**, không hiện `AI_TIMEOUT` hoặc hướng dẫn cấu hình. Không đổi cách tính điểm hay dữ liệu phân tích đã lưu.
 

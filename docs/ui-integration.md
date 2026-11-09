@@ -14,10 +14,10 @@ Cài đặt/cập nhật tại [setup-guide.md](setup-guide.md); tài nguyên fo
 | `#/home` | Trang chủ, phiên công khai và bốn nhóm thể loại chung |
 | `#/catalog`, `#/catalog/:postId` | Danh mục/tìm kiếm, chi tiết bản sách/ảnh/video, phiên/giá/kết quả |
 | `#/create` | Người dùng: đăng sách bốn bước, có nháp |
-| `#/mine`, `#/mine/:postId` | Bài của mình, bổ sung/kích hoạt/đăng lại, quyết định và PDF |
+| `#/mine`, `#/mine/:postId` | Bài của mình, lọc trạng thái, bổ sung/kích hoạt/đăng lại, quyết định và PDF |
 | `#/pending`, `#/pending/:postId` | Admin: bài chờ/từ chối, bằng chứng/AI và quyết định |
 | `#/trades`, `#/trades/:tradeId` | Hai bên giao dịch/chat/xác nhận/đánh giá/khiếu nại |
-| `#/complaints`, `#/complaints/:complaintId` | Người gửi hoặc Admin; chat chỉ đọc theo quyền phân công |
+| `#/complaints`, `#/complaints/:complaintId` | Hai bên giao dịch hoặc Admin (hồ sơ mới); chat Admin chỉ đọc theo quyền phân công |
 | `#/account` | Đăng ký/đăng nhập/tài khoản/đăng xuất |
 | `#/infra` | Công cụ health/probe của môi trường phát triển |
 
@@ -25,9 +25,21 @@ Cài đặt/cập nhật tại [setup-guide.md](setup-guide.md); tài nguyên fo
 không giả định bằng mã bài. Hash route giữ được Back/F5; Backend vẫn quyết định quyền mỗi request.
 
 Admin chỉ có sidebar, chứa avatar/tài khoản và thông báo, không có header ngang hoặc nút đăng sách.
-Người dùng dùng header/menu responsive. Khách không thấy avatar/hộp thông báo của người dùng.
+Trên desktop, các liên kết chính nằm ngang. Từ 1.100 px trở xuống, menu mở dưới thanh đầu trang,
+đánh dấu trang hiện tại và đóng khi chọn mục, tìm kiếm hoặc nhấn Escape. Trên điện thoại, ô tìm kiếm
+nằm ở hàng riêng. Trang đấu giá dùng bộ lọc có thể xuống hàng và lưới thẻ tự co theo chiều rộng.
+Khách không thấy avatar/hộp thông báo của người dùng.
+Mục **Khiếu nại** nằm cạnh **Giao dịch**; số cạnh mục này chỉ đếm hồ sơ còn hạn cần người dùng phản hồi.
 Login mới cùng tài khoản thu hồi phiên cũ, tab cũ về đăng nhập, không dùng lớp phủ F5 để giành quyền.
 CSRF chỉ giữ trong bộ nhớ; lỗi INVALID_CSRF được lấy token mới/thử lại tối đa một lần, không tự retry lỗi mạng.
+Xác nhận thao tác thành công hiện ở đầu màn hình trong khoảng 4 giây. Lỗi và trạng thái nghiệp vụ vẫn hiển thị tại nơi thao tác; hộp thông báo tài khoản lưu các cập nhật riêng.
+
+Trang **Bài đăng của tôi** lọc toàn bộ bài của chủ sách trước khi phân trang. Các trạng thái gồm chờ kiểm duyệt,
+bị từ chối, đã duyệt chờ kích hoạt, sắp bắt đầu, đang đấu giá và đã kết thúc.
+Bộ lọc **Đã kết thúc** gồm phiên đã hết giờ theo SQL và phiên đã chốt (kể cả kết thúc sớm).
+Nếu chưa chốt, chi tiết cho chủ sách hiện **Đang xác nhận kết quả**; kết quả chỉ hiện sau khi đã lưu.
+Khi mở chi tiết từ danh sách đã lọc rồi quay lại, giao diện giữ bộ lọc.
+Cột **Bản sách** hiển thị ảnh chính cạnh tên sách; nếu thiếu ảnh hoặc ảnh không tải được, dùng biểu tượng sách.
 
 ## Danh mục và tìm kiếm
 
@@ -43,19 +55,22 @@ không có Elasticsearch/full-text index hoặc tự truy cập Google.
 | `sort` | `newest`, `price` tăng dần, `ending` |
 | `page` | Từ 1; 30 mục, `nextPage` |
 
-Chỉ bài đã duyệt và phiên kích hoạt/kết thúc được công khai; ẩn ngưỡng giá, email và AI nội bộ.
+Chỉ bài đã duyệt và phiên kích hoạt/kết thúc được công khai; ẩn ngưỡng giá, email và dữ liệu AI nội bộ.
+Trang chi tiết có **Điểm và bằng chứng AI** khi có kết quả gắn với quyết định phê duyệt. Bộ đếm dùng ngày và giờ lẻ cho phiên dài.
 Bốn nhóm lấy từ `shared/bookGenres.js`: **Văn học và hư cấu**, **Kiến thức và phi hư cấu**,
 **Tư liệu và sách cổ**, **Đối tượng độc giả**. Chọn nhóm lọc tập thể loại con, không thay bằng nhóm tên tự đặt.
 
 ## Đăng sách và nháp
 
 Bốn bước: **Thông tin sách → Ảnh và video → Thông số đấu giá → Kiểm tra và gửi**.
-Chọn thể loại bằng combobox; gõ để tìm, phải chọn mục hợp lệ. ISBN có/không, tối đa 100 ký tự nếu nhập,
+Thể loại và năm xuất bản dùng danh sách có tìm kiếm. Năm xuất bản ưu tiên các năm gần đây khi mở danh sách;
+gõ để tìm năm cụ thể (1–9999) hoặc để trống nếu chưa rõ. ISBN có/không, tối đa 100 ký tự nếu nhập,
 không ép 10/13. Một ô bắt buộc tình trạng/quý hiếm/bằng chứng; Giới thiệu sách vẫn riêng.
 Backend giữ tương thích trường tình trạng cũ, lấy preview tối đa 1000 ký tự khi không gửi trường đó.
 
-Ba ô tiền nhận chữ số, không chèn dấu khi đang gõ/IME/focus/blur, giữ chuỗi tối đa 18 chữ số;
-dòng Giá trị có nhóm nghìn. Cooldown chọn 10/15/20/25/30 giây; API chấp nhận nguyên 10–30.
+Ba ô tiền và ô đặt giá hiển thị dấu chấm phân cách hàng nghìn khi gõ, giữ vị trí con trỏ theo chữ số.
+Dòng **Giá trị** luôn hiện và đi theo số đang gõ, kể cả trong lúc IME chưa chốt; khi ô trống hiển thị 0 đ nhưng không gửi 0 thay cho ô trống.
+Dữ liệu gửi API vẫn là chuỗi tối đa 18 chữ số. Cooldown chọn 10/15/20/25/30 giây; API chấp nhận nguyên 10–30.
 Không tự thêm lịch khi đăng, chỉ đặt lịch sau phê duyệt.
 
 Nháp theo tài khoản/chế độ/bài, nằm trên trình duyệt hiện tại, giữ trường/bước/vé media và dự kiến gỡ media cũ.
@@ -74,7 +89,7 @@ Mặc định chờ trước, từ chối sau; lọc Tất cả/Chờ/Đã từ 
 Bài từ chối có lý do/ngày gần nhất, mở để xem chi tiết; muốn duyệt lượt mới phải do chủ sách gửi lại.
 Bài đã phê duyệt rời danh sách này, quyết định/lịch sử vẫn giữ. Nút Về danh sách đưa về lưới thẻ.
 
-Bài mới tự phân tích sau khi lưu. Admin thấy tiến độ, kết quả hoặc lỗi; nút **Phân tích lại bằng AI** chỉ xuất hiện khi bài còn chờ, đã có lượt phân tích cùng phiên bản và không có job đang chạy.
+Bài mới tự phân tích sau khi lưu. Admin thấy tiến độ, kết quả hoặc lỗi; nút **Phân tích lại bằng AI** chỉ xuất hiện khi bài còn chờ, đã có lượt phân tích cùng phiên bản và không có job hợp lệ đang chạy. Khi lần phân tích kết thúc với lỗi kỹ thuật, màn hình giữ kết quả lỗi và chờ Admin bấm thử lại.
 Khi Gemini trả 429, Admin thấy **Tạm dừng vì hạn mức** và giờ có thể thử lại. Trong thời gian chờ, giao diện ẩn nút thử lại và thông báo chuẩn bị media; bài vẫn ở danh sách chờ kiểm duyệt.
 Bài chờ ở màn hình chi tiết tự lấy lại kết quả mỗi 5 giây. AI tự ghi quyết định và điền ô chỉ đọc **Căn cứ và lý do kiểm duyệt** nếu từ chối. Chỉ kết quả phân tích không thất bại
 mới có hai ô điểm; NULL là thiếu bằng chứng, lỗi provider là thất bại/chẩn đoán riêng. Điểm `100.00` hiển thị `100/100`.
@@ -96,18 +111,23 @@ không gọi lại AI; xem [ai-analysis.md](ai-analysis.md) và [review-exports.
 | AI | Chưa phân tích xám; chờ vàng; đang phân tích xanh dương; xong xanh lá; thiếu dữ liệu cam; lỗi đỏ |
 
 Nhãn luôn có chữ và biểu tượng; không dùng màu làm tín hiệu duy nhất. Bài của tôi chuyển từ bảng sang thẻ
-ở màn hình hẹp. Chi tiết, nút tìm kiếm, bộ lọc, ngăn thông báo, hộp thoại, bảng điểm và media co theo chiều rộng.
-Giao diện dùng thương hiệu BookBid. Xem [kiểm chứng](../VALIDATION.md) để biết phạm vi QA thực tế.
+ở màn hình hẹp. Chi tiết sách và giao dịch xếp thành một cột khi vùng nội dung hẹp, kể cả bên cạnh thanh
+quản trị. Bốn bước đăng sách chuyển thành lưới 2 × 2, còn biểu mẫu xếp một cột trên điện thoại. Menu, bộ lọc,
+hộp thông báo và khung ảnh giữ các nút chính dễ chạm. Giao diện dùng thương hiệu BookBid.
+Xem [kiểm chứng](../VALIDATION.md) để biết phạm vi QA thực tế.
 
 ## Gallery và đấu giá
 
 Ảnh/video thuộc cùng một bản sách, giữ tỷ lệ/contain, không giả lập bìa nghiêng. Thumbnails có nút trước/sau,
 Home/End chọn đầu/cuối; trong dải thumbnails, ←/→ đổi mục và đưa mục chọn vào vùng nhìn.
-Phím điều khiển video native được giữ. Kính lúp desktop phóng đúng vùng ảnh, không phóng nền trống;
-chạm/Enter mở ảnh gốc. Bản chuyển JPEG/MP4 để xem không ghi đè URL Cloudinary gốc trong hồ sơ.
+Kính lúp desktop phóng đúng vùng ảnh. Nhấn ảnh, nút **Phóng to ảnh** hoặc Enter để mở khung xem ngay
+trên trang. Bấm nút mũi tên hoặc dùng ←/→ để đổi ảnh, Home/End đến ảnh đầu/cuối. Khung chỉ duyệt ảnh;
+video vẫn phát trong gallery. Đóng bằng ×, Esc hoặc bấm nền tối. Bản chuyển JPEG/MP4 để xem không ghi đè
+URL Cloudinary gốc trong hồ sơ.
 
 Chủ sách không có thao tác đặt giá. Người mua chờ cooldown chỉ thấy thời gian còn lại;
 đang chờ xử lý không được báo thành công trước quyết định SQL. Giá đang gõ không bị snapshot nền thay.
+Khi đã có kết quả lượt giá và được phép đặt lại, nút **Nhập mức giá tiếp theo** nằm giữa bên dưới kết quả.
 Đồng hồ dựa giờ SQL; hết giờ chờ kết quả từ server. Snapshot sau tín hiệu/reconnect và mỗi 5 giây
 bù thông báo lỡ, xem [realtime.md](realtime.md).
 
@@ -116,7 +136,7 @@ bù thông báo lỡ, xem [realtime.md](realtime.md).
 Migration 004 thêm **ThongBao**, không thêm bảng tìm kiếm. Mỗi tài khoản chỉ đọc hộp của mình;
 30 mục/trang, số chưa đọc, đánh dấu từng thông báo bằng POST có CSRF và giữ thời điểm đọc đầu.
 Nguồn gồm gửi duyệt → Admin; quyết định → chủ bài; kết quả → chủ/người thắng; tin nhắn → người nhận;
-xác nhận → bên còn lại; khiếu nại mới → Admin; phản hồi → người gửi.
+xác nhận → bên còn lại; khiếu nại mới → Admin và bên cần giải trình; giải trình → người gửi và Admin phụ trách; kết luận hồ sơ mới → cả hai bên.
 
 Hộp được **đồng bộ khi đọc** từ các bản ghi nguồn đã COMMIT, trong transaction riêng với khóa người nhận
 và UNIQUE `(nguoi_dung_id,nguon)`. Lỗi đồng bộ không rollback nghiệp vụ đã xong; lần đọc sau bổ sung nguồn còn lưu.
@@ -129,6 +149,7 @@ Backend đích luôn kiểm tra quyền lại, kể cả thông báo cũ vẫn h
 
 Giao dịch hiển thị hai xác nhận riêng; đánh giá chỉ phía người mua sau hoàn tất, không hiện lời mời
 đánh giá người bán ở phía người bán. Khiếu nại tách lý do/nội dung, trạng thái, bằng chứng và phản hồi Admin.
+Trong chi tiết phiên, nút **Giao dịch của tôi** chỉ hiện cho chủ sách và người thắng sau khi có kết quả đã lưu với người thắng.
 Chỉ Admin được phân công/hồ sơ đang xử lý mới mở chat chỉ đọc. Chi tiết tại [after-sales.md](after-sales.md).
 
 Checklist bàn giao: khách/role, tìm kiếm rỗng/lọc/phân trang, nhập tiền/IME, nháp/upload,
@@ -141,3 +162,30 @@ Nguồn kiểm chứng và thành phần thật/fixture: [VALIDATION.md](../VALI
 lưu tại `frontend/public/assets/library.jpg`. Đây là ảnh trang trí, không thay cho ảnh/video hoặc bằng chứng của sách.
 Font local Inter và Playfair Display có các tệp giấy phép [Inter OFL](../frontend/public/assets/fonts/inter-OFL.txt)
 và [Playfair Display OFL](../frontend/public/assets/fonts/playfairdisplay-OFL.txt); giữ chúng khi phân phối tài nguyên.
+
+## Responsive và nghiệm thu giao diện
+
+Lớp CSS responsive cuối cùng là `frontend/src/styles/ui-refinements.css` (nạp cuối trong `main.jsx`).
+Các quy tắc mới chỉ thay bố cục: khung Admin có sidebar, trang chủ,
+chi tiết đấu giá/gallery, đăng sách bốn bước và media, bảng **Bài của tôi**,
+giao dịch/chat, khiếu nại, hộp thông báo và các dialog. Không thay API hoặc trạng thái.
+Với bảng nhiều cột, chỉ bảng có vùng cuộn ngang mới được cuộn riêng; không ẩn
+nội dung vượt màn hình bằng `overflow-x: hidden` ở `body`.
+
+Checklist kiểm tra thủ công với dữ liệu thật, ở **320 / 360 / 390 / 520 / 768 /
+900 / 1024 / 1280 / 1440 / 1920 px**:
+- Khách: trang chủ, ô tìm kiếm, bộ lọc đấu giá, danh sách/chi tiết sách,
+  ảnh-video và nút điều hướng; thử menu mở/đóng.
+- Người bán: đăng sách 4 bước (có/không ISBN), nhiều ảnh/video, chọn ảnh chính,
+  lưu nháp, giá tiền; danh sách Bài của tôi và gửi duyệt lại.
+- Người mua: đặt giá/chờ cooldown, bình luận dài, uy tín người bán,
+  giao dịch/chat dài, xem và phản hồi khiếu nại.
+- Admin: thanh điều hướng hoặc drawer, thẻ kiểm duyệt, AI nhiều bằng chứng,
+  khiếu nại, hộp thông báo và modal khi bàn phím đang mở.
+- Kiểm tra `document.documentElement.scrollWidth <= innerWidth`, mục tiêu
+  chạm >=44px, bàn phím/focus, phóng chữ 200%, bật reduced motion và
+  xoay điện thoại. Trường hợp cố tình cuộn riêng: ảnh thumbnail, chat,
+  bình luận và bảng dữ liệu rộng.
+
+**Phạm vi đã kiểm tra:** xem [kiểm chứng](../VALIDATION.md) cho các khung Chromium dùng dữ liệu mẫu.
+Dùng checklist này để nghiệm thu thêm trên thiết bị, trình duyệt và dữ liệu thực tế.

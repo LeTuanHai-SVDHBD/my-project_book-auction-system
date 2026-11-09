@@ -14,8 +14,14 @@ export async function runAfterSalesChecks({createAuction,submit,moneyInput,selle
   assert.equal(check(await seller.call(path+'/confirm','POST',{}),200).trang_thai,'hoan_tat');check(await seller.call(path+'/review','POST',{so_sao:5}),403);const review={so_sao:5,noi_dung:'Nhận xét fixture smoke'};const rating=check(await buyer.call(path+'/review','POST',review),200);assert.equal(check(await buyer.call(path+'/review','POST',review),200).danh_gia_id,rating.danh_gia_id);check(await buyer.call(path+'/review','POST',{so_sao:1}),409);
   assert.equal(check(await other.call(`${base}/auctions/${auctionId}/reputation`),200).so_danh_gia,1);
   progress('khiếu nại, phân công Admin và giới hạn xem chat');const complaint=check(await buyer.call(path+'/complaints','POST',{ly_do:'Fixture đối chiếu',noi_dung:'Chỉ kiểm thử quyền và xử lý',media:[]}),201),casePath=`${base}/complaints/${complaint.khieu_nai_id}`;
-  check(await other.call(casePath),404);check(await seller.call(casePath),404);check(await admin.call(casePath+'/messages'),403);check(await admin.call(casePath+'/claim','POST',{}),200);assert.equal(check(await admin.call(casePath+'/messages'),200).items[0].noi_dung,'Tin riêng smoke, chỉ hai bên');
-  check(await admin.call(casePath+'/resolve','POST',{phan_hoi_admin:'Đã đối chiếu dữ liệu fixture.'}),200);check(await admin.call(casePath+'/messages'),409);assert.equal(check(await buyer.call(casePath),200).trang_thai,'da_xu_ly');assert.equal(check(await buyer.call(path),200).trang_thai,'hoan_tat');
+  check(await other.call(casePath),404);assert.equal(check(await seller.call(casePath),200).can_toi_phan_hoi,true);check(await admin.call(casePath+'/messages'),403);check(await admin.call(casePath+'/claim','POST',{}),200);assert.equal(check(await admin.call(casePath+'/messages'),200).items[0].noi_dung,'Tin riêng smoke, chỉ hai bên');
+  const decision={ket_luan:'co_can_cu',phan_hoi_admin:'Đã đối chiếu dữ liệu fixture.',ghi_chu_noi_bo:'Nội bộ fixture'};
+  check(await admin.call(casePath+'/resolve','POST',decision),409);
+  const response={noi_dung:'Giải trình fixture của người bán',media:[]};
+  check(await seller.call(casePath+'/response','POST',response),201);
+  check(await seller.call(casePath+'/response','POST',response),409);
+  check(await admin.call(casePath+'/resolve','POST',decision),200);
+  const sellerCase=check(await seller.call(casePath),200);assert.equal(sellerCase.ket_luan,'co_can_cu');assert.equal(sellerCase.ghi_chu_noi_bo,undefined);check(await admin.call(casePath+'/messages'),409);assert.equal(check(await buyer.call(casePath),200).trang_thai,'da_xu_ly');assert.equal(check(await buyer.call(path),200).trang_thai,'hoan_tat');
   progress('tìm kiếm công khai và hộp thông báo lưu SQL');
   const found=check(await other.call('/posts/catalog?'+new URLSearchParams({q:trade.ten_sach,phase:'ended',sort:'newest',page:'1'})),200);
   assert(found.items.some(row=>row.bai_dang_id===trade.bai_dang_id));assert(!JSON.stringify(found).includes('gia_toi_thieu'));

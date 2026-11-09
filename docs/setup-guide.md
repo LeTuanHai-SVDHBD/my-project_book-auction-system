@@ -121,8 +121,8 @@ npm.cmd run dev:all
 
 `db:migrate` áp dụng 002–008, giữ dữ liệu và có thể chạy lại. Không tự chạy 001 lên database đang có dữ liệu.
 Nếu schema lạ, dừng và đối chiếu; không xóa database/volume để ép lệnh chạy.
-Schema đích đối chiếu [manifest](../backend/schema-manifest.json): 21 bảng, 166 cột, 100 CHECK, 15 UNIQUE.
-Migration 007 giữ hồ sơ theo bài và media lịch sử. Migration 008 liên kết quyết định tự duyệt với đúng lần phân tích; giữ các quyết định Admin đã lưu.
+Schema đích đối chiếu [manifest](../backend/schema-manifest.json): 21 bảng, 172 cột, 102 CHECK, 15 UNIQUE.
+Migration 007 giữ hồ sơ theo bài và media lịch sử. Migration 008 liên kết quyết định tự duyệt với đúng lần phân tích; giữ các quyết định Admin đã lưu. Migration 009 thêm hạn phản hồi, giải trình, kết luận và ghi chú nội bộ cho khiếu nại; hồ sơ cũ giữ quyền xem ban đầu.
 Ctrl+F5 để lấy frontend mới. Khi Gemini đã bật, bài mới và hồ sơ gửi lại tự được xếp hàng.
 Với bài vẫn chờ vì lỗi kỹ thuật, Admin có thể yêu cầu phân tích lại.
 

@@ -41,8 +41,9 @@ Cloudinary. Test fixture không chứng minh mọi codec phát được trên m�
 
 1. Người dùng đã đăng nhập/quyền/CSRF gửi body nhị phân đến `/api/media/image` hoặc `/video`.
 2. API kiểm tra cấu hình, MIME/size/bytes; Redis cấp UUID/public ID riêng trước upload.
-3. Gọi Cloudinary một POST với `overwrite=false`; xác minh public ID, resource type và HTTPS delivery URL
-   đúng cloud/kind, không placeholder/private/credentials/port lạ.
+3. Gọi Cloudinary với `overwrite=false`. Video trên 6 MiB được gửi theo từng phần 6 MiB với cùng mã upload
+   và `Content-Range`; chỉ dùng phản hồi hoàn tất. Ảnh và video nhỏ gửi một POST.
+   Xác minh public ID, resource type và HTTPS delivery URL đúng cloud/kind, không placeholder/private/credentials/port lạ.
 4. Khi ready, trả `{upload_id,url,kind,expires_at}`. Frontend giữ vé và tên tệp, không giữ khóa provider.
 5. Gửi bài bằng vé, service claim nguyên tử theo owner/trạng thái/tuổi; SQL ghi hồ sơ/media/lịch sử cùng transaction.
 6. COMMIT rồi bind/dọn vé. Rollback chắc chắn mới release; commit chưa rõ giữ claim để đối soát.
@@ -57,15 +58,16 @@ Không có distributed transaction SQL–Cloudinary và không cam kết upload 
 | Biến | Mặc định | Khoảng |
 |---|---:|---:|
 | `MEDIA_IMAGE_UPLOAD_TIMEOUT_MS` | 120000 | 1000–300000 ms |
-| `MEDIA_VIDEO_UPLOAD_TIMEOUT_MS` | 300000 | 1000–300000 ms |
+| `MEDIA_VIDEO_UPLOAD_TIMEOUT_MS` | 300000 | 1000–300000 ms cho toàn bộ lượt gửi video |
 | `MEDIA_RECOVERY_TIMEOUT_MS` | 15000 | 1000–30000 ms/lượt tra |
 
 Đọc JSON provider tối đa 1 MiB, có deadline cả headers/body. Nếu timeout/mất mạng/HTTP 408/5xx hoặc
-phản hồi upload chưa dùng được, tra metadata đúng public ID đã cấp tối đa 3 lần, nghỉ 1 giây giữa lượt;
+phản hồi upload chưa dùng được, tra metadata đúng public ID đã cấp tối đa 3 lần. Ảnh nghỉ 1 giây giữa lượt;
+video nghỉ lần lượt 2 và 8 giây để Cloudinary có thời gian cập nhật metadata sau khi nhận phần cuối.
 không POST lại bytes/đổi UUID/đoán delivery URL. `existing=true` cũng cần đối soát. Lỗi upload 4xx/quyền/quota
 không tự đối soát; lookup bị từ chối/hết quota thì dừng. Destroy không dùng cơ chế này.
 
-Web lấy ngân sách từ `/api/media/config`: mặc định 477 giây cho ảnh, 657 giây cho video, gồm nhận body,
+Web lấy ngân sách từ `/api/media/config`: mặc định 477 giây cho ảnh, 665 giây cho video, gồm nhận body,
 provider, recovery và dự phòng. Đây là trần chờ, không là thời gian tải dự đoán; proxy/provider có thể ngắt sớm.
 Lookup cần quyền Cloudinary Admin API và chịu quota. Chưa xác minh được thì không trả vé thành công giả.
 
@@ -77,11 +79,17 @@ Lookup cần quyền Cloudinary Admin API và chịu quota. Chưa xác minh đư
 | `MEDIA_PROVIDER_REJECTED` | Nội dung/codec hoặc cấu hình upload bị từ chối |
 | `MEDIA_PROVIDER_ERROR`, `INVALID_MEDIA_RESPONSE` | Lỗi provider hoặc metadata không khớp/chưa sẵn sàng |
 
-Log chỉ có operation, HTTP status, transport allowlist; không có Authorization/key/body thô.
+Log chỉ giữ thông tin chẩn đoán an toàn, không có Authorization/key/body thô. Lỗi upload ghi
+`part/parts`, dung lượng, thời gian và giai đoạn: `awaiting_headers` là chưa có phản hồi HTTP (có thể còn đang gửi);
+`response_body` là đã có header nhưng chưa đọc xong nội dung. `deadline_reached` cho biết deadline cục bộ đã hết.
+Nếu đối soát trả `404`, Cloudinary chưa tìm thấy asset theo đúng public ID tại lúc kiểm tra; không kết luận video hỏng.
 Web nêu tên tệp lỗi; lỗi một tệp không bỏ các tệp tốt trong batch, đổi phiên đăng nhập dừng các tệp chưa gửi.
 Không tự tải lặp liên tục khi kết quả còn chưa rõ. Nếu SQL bị xóa thủ công thì không có trigger tự destroy Cloudinary.
 
 ## Bổ sung media và nháp
+
+Ở bước **Ảnh và video**, chủ sách có thể chọn **Đặt làm ảnh chính** trên một ảnh đã tải hoặc ảnh được giữ lại. Bước kiểm tra trước khi gửi có ảnh xem trước. Lựa chọn được giữ trong nháp; nếu gỡ ảnh chính hoặc vé ảnh hết hạn thì dùng ảnh còn lại đầu tiên, nếu có.
+API kiểm tra ảnh thuộc đúng hồ sơ hoặc vé của chủ sách, rồi đặt ảnh đó ở đầu thứ tự ảnh trong SQL. Khi bài đủ điều kiện hiển thị công khai, thẻ sách và ảnh mở đầu trang chi tiết lấy cùng thứ tự này. Không cần migration; bản kết quả kiểm duyệt cũ giữ nguyên.
 
 Bài bị từ chối cho sửa đầy đủ hồ sơ, gỡ media cũ bằng × và hoàn tác bằng **Giữ lại**.
 Đây mới là thay đổi nháp; chỉ gửi thành công mới cập nhật SQL. Gỡ media cũ đặt dang_su_dung=0,

@@ -12,7 +12,7 @@ import {createSessionMiddleware} from '../src/middlewares/session.js';
 import {parseAuthConfig} from '../src/config/auth.js';
 import {parseMediaConfig} from '../src/config/media.js';
 import {validatePost,validateReview,validateActivation} from '../src/services/postValidation.js';
-import {canRelist,assertStatePair,assertVersion,assertVideoLimit} from '../src/services/postPolicy.js';
+import {canRelist,assertStatePair,assertVersion,assertVideoLimit,resolveCoverImage} from '../src/services/postPolicy.js';
 import {createPostService} from '../src/services/post.service.js';
 import {publicPost} from '../src/controllers/post.controller.js';
 import {createCloudinary,verifyMedia} from '../src/services/cloudinary.service.js';
@@ -37,6 +37,20 @@ test('không sửa sách dùng trong lịch sử khi đăng lại; reject vé me
   const body=payload();const upload_id=randomUUID();body.media=[{upload_id},{upload_id}];assert.throws(()=>validatePost(body),/lặp/);
   body.media=[];body.sach.ten_sach='x'.repeat(301);assert.throws(()=>validatePost(body));
   const relist=payload();delete relist.sach;relist.reuse_media=true;assert.equal(validatePost(relist,{mode:'relist'}).reuseMedia,true);
+});
+test('ảnh chính chỉ tham chiếu một ảnh đã giữ lại hoặc vé ảnh trong cùng bài',()=>{
+ const upload_id=randomUUID(),data={...payload(),media:[{upload_id}],cover_image:{upload_id}};
+ const image={kind:'image',uploadId:upload_id};
+ const {coverImage}=validatePost(data);
+ assert.equal(resolveCoverImage(coverImage,[],[image]),image);
+ assert.throws(()=>resolveCoverImage(coverImage,[],[{...image,kind:'video'}]),{status:400});
+ for(const value of [{url:'https://example.test/x.jpg'},{id:1},{upload_id,id:1},{upload_id:randomUUID()}]){
+   assert.throws(()=>validatePost({...data,cover_image:value}),{status:400});
+ }
+ const update={...data,row_version:version,cover_image:{id:42},remove_media:[{kind:'image',id:42}]};
+ assert.throws(()=>validatePost(update,{mode:'resubmit'}),{status:400});
+ delete update.remove_media;
+ assert.throws(()=>resolveCoverImage(validatePost(update,{mode:'resubmit'}).coverImage,[{kind:'video',id:42}],[]),{status:400});
 });
 test('một mô tả chung đủ để đăng sách; giữ toàn văn và tương thích tình trạng sách cũ',()=>{
   const body=payload();delete body.sach.tinh_trang_sach;
@@ -112,13 +126,15 @@ test('nhận diện ảnh/video theo magic bytes; Cloudinary REST không lộ se
   const unavailable=createCloudinary({config:mediaConfig,fetchImpl:async()=>{throw Error('testsecret');}});
   await assert.rejects(unavailable.destroy({kind:'image',publicId}),error=>!error.message.includes('testsecret'));
 });
-async function serverFixture(t,{providerUpload,mediaOverrides={},moderationRows}={}){
+async function serverFixture(t,{providerUpload,mediaOverrides={},moderationRows,ownerRows}={}){
   const authConfig=parseAuthConfig({SESSION_SECRET:'tests-only-'.repeat(8)});
   const sessionMiddleware=createSessionMiddleware(authConfig,new session.MemoryStore());
   const rows=[{nguoi_dung_id:1,ho_ten:'A',email:'a@example.test',vai_tro:'nguoi_dung'},{nguoi_dung_id:2,ho_ten:'Admin',email:'admin@example.test',vai_tro:'admin'}];
   const users={findById:async id=>rows.find(x=>x.nguoi_dung_id===id),findByEmail:async email=>rows.find(x=>x.email===email)};
   let writes=0,uploads=0,createdInput=null;
   const model={list:async options=>{
+    if(ownerRows&&options.owner!==undefined)return ownerRows.filter(row=>row.nguoi_dung_id===options.owner&&row.bai_dang_id<options.after&&
+      (options.ownerStatus==='all'||row.owner_status===options.ownerStatus)).sort((a,b)=>b.bai_dang_id-a.bai_dang_id).slice(0,30);
     if(!moderationRows)return [{bai_dang_id:7,gia_toi_thieu:'secret',gia_khoi_diem:'10'}];
     const rank=row=>row.trang_thai_phien==='cho_kiem_duyet'?0:1;
     return moderationRows.filter(row=>options.pending&&(
@@ -239,6 +255,24 @@ test('HTTP Admin: tất cả/chờ/từ chối, phân trang qua hai nhóm và b�
   moderationRows[34].trang_thai_bai='cho_kiem_duyet';moderationRows[34].trang_thai_phien='cho_kiem_duyet';
   assert.equal((await admin.call('/posts/pending?status=pending')).data.items[0].bai_dang_id,35);
   for(const suffix of ['?status=approved','?before=invalid','?status=rejected&before=pending:10'])assert.equal((await admin.call('/posts/pending'+suffix)).status,400);
+});
+
+test('HTTP Bài của tôi: lọc theo chủ sách và giữ trạng thái khi lấy trang sau',async t=>{
+ const ownerRows=Array.from({length:35},(_,index)=>({bai_dang_id:index+1,nguoi_dung_id:1,owner_status:'rejected'}));
+ ownerRows.push({bai_dang_id:50,nguoi_dung_id:1,owner_status:'approved'},{bai_dang_id:55,nguoi_dung_id:1,owner_status:'ended'},{bai_dang_id:60,nguoi_dung_id:2,owner_status:'rejected'});
+ const fixture=await serverFixture(t,{ownerRows}),owner=fixture.client();
+ assert.equal((await owner.call('/posts/mine?status=rejected')).status,401);
+ await owner.login('a@example.test');
+ const first=await owner.call('/posts/mine?status=rejected');
+ assert.equal(first.status,200);assert.deepEqual(first.data.items.map(row=>row.bai_dang_id),Array.from({length:30},(_,index)=>35-index));
+ const older=await owner.call(`/posts/mine?status=rejected&before=${first.data.nextBefore}`);
+ assert.deepEqual(older.data.items.map(row=>row.bai_dang_id),[5,4,3,2,1]);assert.equal(older.data.nextBefore,null);
+ assert.equal((await owner.call('/posts/mine')).data.items[0].bai_dang_id,55);
+ const ended=await owner.call('/posts/mine?status=ended');
+ assert.deepEqual(ended.data.items.map(row=>row.bai_dang_id),[55]);
+ assert.deepEqual((await owner.call('/posts/mine?status=closing')).data,ended.data);
+ for(const suffix of ['?status=unknown','?status=approved&status=ended','?status=live&owner=2','?before=invalid'])
+   assert.equal((await owner.call('/posts/mine'+suffix)).status,400);
 });
 
 test('HTTP video: Cloudinary đã nhận nhưng timeout vẫn trả vé sau đối soát; lỗi provider không báo Docker',async t=>{

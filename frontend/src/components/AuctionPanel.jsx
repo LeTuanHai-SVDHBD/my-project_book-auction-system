@@ -18,7 +18,7 @@ function suggested(snapshot) {
   const value=snapshot.gia_hien_tai===null?BigInt(snapshot.gia_khoi_diem):BigInt(snapshot.gia_hien_tai)+BigInt(snapshot.buoc_gia);
   return value.toString().length<=18?value.toString():'';
 }
-export default function AuctionPanel({auctionId,user,onSnapshot}) {
+export default function AuctionPanel({auctionId,user,onSnapshot,ownerView=false}) {
   const [snapshot,setSnapshot]=useState(null),[attempt,setAttempt]=useState(null),[receipt,setReceipt]=useState(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[checking,setChecking]=useState(false);
   const [availability,setAvailability]=useState(null),[remaining,setRemaining]=useState(0),[loadError,setLoadError]=useState('');
@@ -26,7 +26,12 @@ export default function AuctionPanel({auctionId,user,onSnapshot}) {
   const [clock,setClock]=useState(null),[,tickClock]=useState(0);
   const sending=useRef(false),latestReceipt=useRef(null),refreshSequence=useRef(0);
   const isBidder=user?.vai_tro==='nguoi_dung';
+  const result=snapshot?.ket_qua;
+  const showTradeLink=isBidder&&snapshot?.trang_thai==='da_ket_thuc'&&result?.trang_thai==='co_nguoi_thang'
+    &&(ownerView||availability?.la_chu_sach||result.nguoi_thang_dau_id===user.nguoi_dung_id);
   const time=auctionTime(clock,snapshot?.trang_thai,performance.now());
+  const awaitingOwnerResult=ownerView&&time.phase==='closing';
+  const phaseBadge=awaitingOwnerResult?'ended':phaseBadges[time.phase]||'syncing';
   const showBidForm=isBidder&&availability&&!availability.la_chu_sach&&remaining===0&&time.phase==='open';
   const canBid=showBidForm&&!refreshing;
   function acceptReceipt(result){
@@ -90,15 +95,15 @@ export default function AuctionPanel({auctionId,user,onSnapshot}) {
   function submit(event){event.preventDefault();if(!canBid)return;const data=new FormData(event.currentTarget);void send({ma_yeu_cau:crypto.randomUUID(),muc_gia:data.get('muc_gia')});}
   return <section className="auction-panel" aria-label="Đặt giá và kết quả phiên"><h3>Phiên đấu giá và kết quả</h3>
     <p className="field-hint" role="status"><StatusBadge state={realtime==='live'?'connected':realtime==='syncing'?'syncing':'reconnecting'}/> {realtime==='live'?'Đã kết nối cập nhật trực tiếp.':realtime==='syncing'?'Đang lấy trạng thái mới nhất…':'Đang kết nối lại. Hệ thống sẽ tự cập nhật dữ liệu.'}</p>
-    {snapshot&&<><dl className="post-info"><dt>Giá mới nhất</dt><dd>{money(snapshot.gia_hien_tai)}</dd><dt>Trạng thái phiên</dt><dd><StatusBadge state={phaseBadges[time.phase]||'syncing'}/></dd></dl>
-      <p className="auction-timer">{time.phase==='scheduled'?`Bắt đầu sau ${duration(time.seconds)}`:time.phase==='open'?`Còn ${duration(time.seconds)}`:time.phase==='closing'?'Đã hết giờ, đang chờ máy chủ xác nhận kết quả.':time.phase==='closed'?'Phiên đã kết thúc.':'Đang đồng bộ thời gian phiên…'}</p>
+    {snapshot&&<><dl className="post-info"><dt>Giá mới nhất</dt><dd>{money(snapshot.gia_hien_tai)}</dd><dt>Trạng thái phiên</dt><dd><StatusBadge state={phaseBadge}/></dd></dl>
+      {awaitingOwnerResult?<p className="field-hint" role="status">Đang xác nhận kết quả.</p>:<p className="auction-timer">{time.phase==='scheduled'?`Bắt đầu sau ${duration(time.seconds)}`:time.phase==='open'?`Còn ${duration(time.seconds)}`:time.phase==='closing'?'Đã hết giờ, đang chờ máy chủ xác nhận kết quả.':time.phase==='closed'?'Phiên đã kết thúc.':'Đang đồng bộ thời gian phiên…'}</p>}
       {snapshot.ket_qua&&<div className="notice" role="status"><StatusBadge state={snapshot.ket_qua.trang_thai}/>
         {snapshot.ket_qua.muc_gia_thang!==null&&<p>Giá thắng: {money(snapshot.ket_qua.muc_gia_thang)}{snapshot.ket_qua.nguoi_thang_dau_id===user?.nguoi_dung_id?' · Bạn là người thắng.':''}</p>}
         <p>{snapshot.ket_qua.ly_do_ket_thuc==='dat_gia_toi_thieu'?'Đã đạt điều kiện kết thúc sớm.':snapshot.ket_qua.ly_do_ket_thuc==='het_thoi_gian'?'Đã hết thời gian đấu giá.':'Kết quả lịch sử.'}</p></div>}
       {isBidder&&snapshot.trang_thai==='da_kich_hoat'&&<>
         {!availability&&!loadError&&(!attempt||terminal(receipt))&&<p role="status">Đang kiểm tra điều kiện đặt giá…</p>}
         {availability&&!availability.la_chu_sach&&remaining>0&&<p className="notice" role="status">Bạn có thể đặt giá tiếp sau {remaining} giây.</p>}
-        {canBid&&availability.duoc_dat_lai_luc!==null&&<p className="account-success" role="status">Đã hết thời gian chờ. Bạn có thể nhập mức giá tiếp theo.</p>}
+        {canBid&&availability.duoc_dat_lai_luc!==null&&<p className="field-hint" role="status">Đã hết thời gian chờ. Bạn có thể nhập mức giá tiếp theo.</p>}
       </>}
       {!attempt&&showBidForm&&<form onSubmit={submit}><fieldset disabled={busy||refreshing}>
         <MoneyInput name="muc_gia" label="Mức giá đặt (VND)" initialValue={suggested(snapshot)} followSuggestion/>
@@ -108,12 +113,17 @@ export default function AuctionPanel({auctionId,user,onSnapshot}) {
       {!isBidder&&snapshot.trang_thai==='da_kich_hoat'&&<p className="notice">{user?'Tài khoản Admin xem phiên và kết quả.':'Đăng nhập tài khoản người dùng để đặt giá.'}</p>}</>}
     {snapshot&&<BidHistory auctionId={auctionId} items={snapshot.lich_su} nextBefore={snapshot.lich_su_truoc}/>}
     {attempt&&!availability?.la_chu_sach&&receipt?.ly_do!=='SELLER_CANNOT_BID'&&<div aria-live="polite"><p>Mức giá đã gửi: <strong>{money(attempt.muc_gia)}</strong></p>
-      {receipt?.trang_thai==='da_chap_nhan'?<p className="account-success" role="status"><StatusBadge state="da_chap_nhan"/></p>:
+      {receipt?.trang_thai==='da_chap_nhan'?<p role="status"><StatusBadge state="da_chap_nhan"/></p>:
         receipt?.trang_thai==='bi_tu_choi'?(receipt.ly_do==='BID_COOLDOWN'?null:<p className="error" role="status"><StatusBadge state="bi_tu_choi"/> · {reasons[receipt.ly_do]||receipt.ly_do}</p>):
         <p role="status"><StatusBadge state="bid_pending"/> {busy?'Đang gửi yêu cầu…':checking?'Đang kiểm tra kết quả…':'Đang chờ xác nhận kết quả.'}</p>}
       {!terminal(receipt)&&!busy&&<button type="button" disabled={checking} onClick={()=>send(attempt)}>Thử lại cùng yêu cầu</button>}
-      {terminal(receipt)&&canBid&&!busy&&<button type="button" onClick={()=>{setAttempt(null);setReceipt(null);latestReceipt.current=null;setError('');}}>Nhập mức giá tiếp theo</button>}
+      {terminal(receipt)&&canBid&&!busy&&<div className="auction-next-bid-action">
+        <button type="button" className="btn btn-primary" onClick={()=>{setAttempt(null);setReceipt(null);latestReceipt.current=null;setError('');}}>Nhập mức giá tiếp theo</button>
+      </div>}
     </div>}
     {loadError&&<p className="error" role="alert">{loadError}</p>}{error&&<p className="error" role="alert">{error}</p>}<button type="button" className="text-button" disabled={busy} onClick={()=>refresh()}>Tải lại phiên và kết quả</button>
+    {showTradeLink&&<div className="auction-trade-action">
+      <a href="#/trades" className="btn btn-outline">Giao dịch của tôi</a>
+    </div>}
   </section>;
 }

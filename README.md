@@ -24,7 +24,7 @@ Không coi việc hoàn thành mã nguồn là chứng nhận sẵn sàng vận 
 | AI | Gemini Interactions + Files API; Backend tính hai điểm và hỗ trợ tự duyệt theo ngưỡng cấu hình |
 | Quản lý gói | npm workspaces, một `package-lock.json` ở thư mục gốc |
 
-Schema hiện tại: **21 bảng, 166 cột, 100 CHECK, 15 UNIQUE constraints**, theo
+Schema hiện tại: **21 bảng, 172 cột, 102 CHECK, 15 UNIQUE constraints**, theo
 [manifest](backend/schema-manifest.json). Số UNIQUE này không bao gồm việc đếm mọi chỉ mục duy nhất.
 Frontend không truy cập SQL/Redis trực tiếp. Chỉ SQL Server/Redis được Compose khởi động;
 API, worker và web chạy bằng Node trên máy phát triển.
@@ -135,7 +135,7 @@ Khác tài khoản vẫn có thể dùng đồng thời ở các tab. Xem [accou
   giao diện chọn 10/15/20/25/30 giây. Trong thời gian chờ, ẩn thao tác đặt tiếp.
 - `gia_toi_thieu` là **ngưỡng kết thúc sớm**, chỉ chủ sách/Admin thấy; không phải điều kiện bắt buộc
   để có người thắng khi hết hạn. Hết hạn có lượt hợp lệ thì giá cao nhất thắng dù chưa đạt ngưỡng.
-- Tiền VND nguyên là chuỗi tối đa 18 chữ số; ô nhập không chèn dấu khi gõ, dòng xem trước có dấu nhóm nghìn.
+- Tiền VND nguyên là chuỗi tối đa 18 chữ số; dấu chấm phân cách hàng nghìn hiện ngay trong ô nhập.
 - Chỉ cho đăng lại khi phiên mới nhất đã kết thúc và có kết quả xác nhận không có người thắng.
   Không có chức năng kết thúc thủ công, hủy giữa phiên hoặc xóa bài đăng.
 

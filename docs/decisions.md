@@ -3,7 +3,7 @@
 # Quyết định kỹ thuật
 
 Rà soát theo source ngày 03/11/2026. Các ADR ghi lý do và giới hạn đã chọn, không tự chứng nhận mọi
-kiểm thử dịch vụ thật. Các số schema gắn migration cũ là mốc nâng cấp; schema đích hiện tại 21/166/100/15.
+kiểm thử dịch vụ thật. Các số schema gắn migration cũ là mốc nâng cấp; schema đích hiện tại 21/172/102/15.
 Chính sách mới về phiên đăng nhập, AI manual, Files API và nháp bên dưới thay thế các mô tả cũ tương ứng.
 Hướng dẫn chạy hiện tại tại [setup-guide.md](setup-guide.md), bằng chứng tại [VALIDATION](../VALIDATION.md).
 
@@ -187,10 +187,10 @@ Tham khảo: [Microsoft rowversion](https://learn.microsoft.com/en-us/sql/t-sql/
 
 **Trạng thái:** áp dụng.
 
-Ba ô giá khởi điểm/ngưỡng kết thúc sớm/bước giá nhập số thuần; dòng Giá trị bên dưới hiển thị nhóm nghìn.
-Không đổi định dạng trong ô khi gõ/focus/blur để tránh can thiệp IME hoặc làm lặp chữ số.
+Ô đặt giá và ba ô giá khi đăng sách hiển thị dấu phân cách hàng nghìn ngay khi gõ.
+Giữ nguyên văn bản đang tổ hợp bằng IME; định dạng khi IME chốt. Con trỏ được quy đổi theo số chữ số đã nhập.
 Input hiển thị tách khỏi hidden input mang chuỗi nguyên gửi API. Không chuyển tiền sang Number,
-không làm tròn và không âm thầm cắt bớt khi vượt 18 chữ số. Chỉnh sửa/xóa chuỗi số dùng hành vi bàn phím thông thường; chỉ hiệu chỉnh khi lọc ký tự không phải số.
+không làm tròn và không âm thầm cắt bớt khi vượt 18 chữ số. Xóa cạnh dấu phân cách tác động lên chữ số liền kề.
 Giá hiện tại thuộc nghiệp vụ đặt giá, không cho chủ sách tự nhập.
 Backend tiếp tục kiểm tra chuỗi nguyên dương, ngưỡng không nhỏ hơn giá khởi điểm và các ràng buộc SQL.
 
@@ -268,9 +268,8 @@ chỉ kiểm tra, không được khôi phục quyền từ cookie cũ. Namespac
 trở về đăng nhập. Không còn lớp phủ yêu cầu F5 để tiếp tục. Khác tài khoản vẫn độc lập.
 Hợp đồng và giới hạn tại [account-control.md](account-control.md).
 
-Ô tiền luôn nhập số thuần, kể cả khi focus hoặc rời ô; định dạng có dấu chấm chỉ hiện ở dòng Giá trị riêng.
-Không ghi DOM value hoặc đổi mask trong khi gõ. Trong composition giữ draft, chốt và kiểm tra số sau compositionend;
-giữ chuỗi nguyên/18 chữ số, không chuyển Number hoặc tự cắt phần vượt giới hạn.
+Ở lần sửa này, ô tiền dùng số thuần và chỉ hiện dấu chấm ở dòng Giá trị. Cách hiển thị hiện tại đã cập nhật
+tại ADR-015; hợp đồng chuỗi nguyên tối đa 18 chữ số giữ nguyên.
 
 Thể loại là một lựa chọn từ danh mục dùng chung ở shared/bookGenres.js, căn cứ tài liệu thể loại người dùng gửi,
 bổ sung nhóm sách cổ/tư liệu. Gõ có/không dấu chỉ lọc danh sách; API sách mới chặn tên ngoài danh mục.

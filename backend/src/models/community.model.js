@@ -1,11 +1,16 @@
 /** Giao dịch/chat/khiếu nại/đánh giá/bình luận trên schema hiện có; SQL quyết định quyền và chuyển trạng thái. */
+import {COMPLAINT_RESPONSE_HOURS} from '../../../shared/complaints.js';
 import {bookProfileSql} from './bookProfile.js';
 import {setTimeout as delay} from 'node:timers/promises';
-import {participant,assertTrade,assertConversation,assertReview,assertComment,complaintReader,assignedAdmin,missing,conflict,tradeView} from '../services/communityPolicy.js';
+import {participant,assertTrade,assertConversation,assertReview,assertComment,complaintReader,assertComplaintResponse,responsePending,assignedAdmin,missing,conflict,tradeView} from '../services/communityPolicy.js';
 const columns=`g.giao_dich_id,g.ma_giao_dich,g.ket_qua_id,g.nguoi_mua_id,g.nguoi_ban_id,CONVERT(VARCHAR(18),g.so_tien) AS so_tien,g.trang_thai,g.ngay_tao,g.ngay_hoan_tat,g.thoi_gian_xac_nhan_mua,g.thoi_gian_xac_nhan_ban,
  k.phien_dau_gia_id,k.trang_thai AS ket_qua_trang_thai,k.nguoi_thang_dau_id,CONVERT(VARCHAR(18),k.muc_gia_thang) AS gia_thang,p.trang_thai AS trang_thai_phien,b.bai_dang_id,b.sach_id,b.nguoi_dung_id AS chu_bai_id,b.tieu_de,bs.ten_sach,buyer.ho_ten AS ten_nguoi_mua,seller.ho_ten AS ten_nguoi_ban`;
 const joins=`JOIN dbo.KetQuaDauGia k ON k.ket_qua_id=g.ket_qua_id JOIN dbo.PhienDauGia p ON p.phien_dau_gia_id=k.phien_dau_gia_id JOIN dbo.BaiDang b ON b.bai_dang_id=p.bai_dang_id JOIN dbo.Sach s ON s.sach_id=b.sach_id JOIN dbo.NguoiDung buyer ON buyer.nguoi_dung_id=g.nguoi_mua_id JOIN dbo.NguoiDung seller ON seller.nguoi_dung_id=g.nguoi_ban_id ${bookProfileSql}`;
-const complaintColumns='khieu_nai_id,cuoc_tro_chuyen_id,giao_dich_id,nguoi_khieu_nai_id,ly_do,noi_dung,trang_thai,phan_hoi_admin,admin_id,ngay_khieu_nai,ngay_xu_ly';
+const complaintColumns=['khieu_nai_id','cuoc_tro_chuyen_id','giao_dich_id','nguoi_khieu_nai_id','ly_do','noi_dung','trang_thai','phan_hoi_admin','admin_id','ngay_khieu_nai','ngay_xu_ly','han_giai_trinh','giai_trinh','ngay_giai_trinh','ket_luan'].map(key=>`k.${key}`).join(',');
+const visibleComplaint=`(k.nguoi_khieu_nai_id=@user OR (k.han_giai_trinh IS NOT NULL AND @user IN(g.nguoi_mua_id,g.nguoi_ban_id)))`;
+export const responseDueSql=`k.han_giai_trinh>SYSUTCDATETIME() AND k.ngay_giai_trinh IS NULL AND k.trang_thai<>'da_xu_ly'`;
+const caseSummary=`k.khieu_nai_id,k.giao_dich_id,k.nguoi_khieu_nai_id,k.ly_do,k.trang_thai,k.ngay_khieu_nai,k.han_giai_trinh,k.ngay_giai_trinh,k.ket_luan,
+  CAST(CASE WHEN k.nguoi_khieu_nai_id<>@user AND ${responseDueSql} THEN 1 ELSE 0 END AS BIT) AS can_toi_phan_hoi`;
 export function createCommunityModel({getPool,sql,beforeCommit=async()=>{}}){
   const req=target=>target.request?target.request():new sql.Request(target);
   const page=(items,key,size=30)=>({items,nextBefore:items.length===size?items.at(-1)[key]:null});
@@ -16,20 +21,33 @@ export function createCommunityModel({getPool,sql,beforeCommit=async()=>{}}){
     if(!room&&create)room=(await req(target).input('id',sql.Int,row.giao_dich_id).input('buyer',sql.Int,row.nguoi_mua_id).input('seller',sql.Int,row.nguoi_ban_id).query(`INSERT dbo.CuocTroChuyen(giao_dich_id,nguoi_mua_id,nguoi_ban_id) OUTPUT inserted.cuoc_tro_chuyen_id,inserted.giao_dich_id,inserted.nguoi_mua_id,inserted.nguoi_ban_id,inserted.trang_thai VALUES(@id,@buyer,@seller)`)).recordset[0];
     if(room)assertConversation(room,row);return room||null;
   }
-  async function complaint(target,id,lock=false){return (await req(target).input('id',sql.Int,id).query(`SELECT ${complaintColumns} FROM dbo.KhieuNai ${lock?'WITH (UPDLOCK,HOLDLOCK)':''} WHERE khieu_nai_id=@id`)).recordset[0];}
-  async function complaintWork(id,user,work){const anchor=await complaint(await getPool(),id);complaintReader(anchor,user);return transaction(async tx=>{
-    const row=(await req(tx).input('id',sql.Int,anchor.giao_dich_id).query(`SELECT ${columns} FROM dbo.GiaoDich g WITH (UPDLOCK,HOLDLOCK) ${joins} WHERE g.giao_dich_id=@id`)).recordset[0];if(!row)missing();assertTrade(row);
-    const item=await complaint(tx,id,true);complaintReader(item,user);const room=await chat(tx,row);if(!room||item.giao_dich_id!==row.giao_dich_id||item.cuoc_tro_chuyen_id!==room.cuoc_tro_chuyen_id||![row.nguoi_mua_id,row.nguoi_ban_id].includes(item.nguoi_khieu_nai_id))conflict('Khiếu nại không khớp giao dịch/cuộc trò chuyện.');
+  async function complaint(target,id,lock=false){
+    return (await req(target).input('id',sql.Int,id).query(`SELECT ${complaintColumns},k.ghi_chu_noi_bo,SYSUTCDATETIME() AS server_time FROM dbo.KhieuNai k ${lock?'WITH (UPDLOCK,HOLDLOCK)':''} WHERE k.khieu_nai_id=@id`)).recordset[0];
+  }
+  async function complaintWork(id,user,work){const anchor=await complaint(await getPool(),id);if(!anchor)missing();return transaction(async tx=>{
+    const row=(await req(tx).input('id',sql.Int,anchor.giao_dich_id).query(`SELECT ${columns} FROM dbo.GiaoDich g WITH (UPDLOCK,HOLDLOCK) ${joins} WHERE g.giao_dich_id=@id`)).recordset[0];if(!row)missing();
+    complaintReader(anchor,user,row);assertTrade(row);
+    const item=await complaint(tx,id,true);complaintReader(item,user,row);const room=await chat(tx,row);
+    if(!room||item.giao_dich_id!==row.giao_dich_id||item.cuoc_tro_chuyen_id!==room.cuoc_tro_chuyen_id||![row.nguoi_mua_id,row.nguoi_ban_id].includes(item.nguoi_khieu_nai_id))conflict('Khiếu nại không khớp giao dịch/cuộc trò chuyện.');
     return work(tx,item,row,room);
   });}
+  async function saveEvidence(tx,id,items,response=false){
+    if(items.some(x=>x.kind!=='image')||items.length>5)conflict('Bằng chứng khiếu nại chỉ nhận tối đa 5 ảnh.');
+    for(const [index,item]of items.entries())await req(tx).input('id',sql.Int,id).input('url',sql.VarChar(2048),item.url).input('caption',sql.NVarChar(500),item.title||null).input('response',sql.Bit,response).input('order',sql.SmallInt,index+(response?6:1))
+      .query('INSERT dbo.BangChungKhieuNai(khieu_nai_id,duong_dan_anh_khieu_nai,mo_ta_anh_khieu_nai,thu_tu,la_giai_trinh) VALUES(@id,@url,@caption,@order,@response)');
+  }
   async function messages(target,roomId,before){const rows=(await req(target).input('room',sql.Int,roomId).input('before',sql.Int,before).query(`SELECT TOP(50) t.tin_nhan_id,t.nguoi_gui_id,u.ho_ten,t.noi_dung,t.thoi_gian_gui,t.da_doc FROM dbo.TinNhan t JOIN dbo.NguoiDung u ON u.nguoi_dung_id=t.nguoi_gui_id WHERE t.cuoc_tro_chuyen_id=@room AND t.tin_nhan_id<@before ORDER BY t.tin_nhan_id DESC`)).recordset;return page(rows,'tin_nhan_id',50);}
   async function publicAuction(target,id,lock=false){const row=(await req(target).input('id',sql.Int,id).query(`SELECT p.phien_dau_gia_id,p.trang_thai,p.thoi_gian_bat_dau,p.thoi_gian_ket_thuc,b.nguoi_dung_id AS seller,SYSUTCDATETIME() AS server_time FROM dbo.PhienDauGia p ${lock?'WITH (UPDLOCK,HOLDLOCK)':''} JOIN dbo.BaiDang b ON b.bai_dang_id=p.bai_dang_id WHERE p.phien_dau_gia_id=@id AND b.trang_thai='da_duyet' AND p.trang_thai IN('da_kich_hoat','da_ket_thuc')`)).recordset[0];if(!row)missing();return row;}
   return {
     async listTrades(user,before){const rows=(await req(await getPool()).input('user',sql.Int,user.nguoi_dung_id).input('before',sql.Int,before).query(`SELECT TOP(30) ${columns} FROM dbo.GiaoDich g ${joins} WHERE (g.nguoi_mua_id=@user OR g.nguoi_ban_id=@user) AND g.giao_dich_id<@before ORDER BY g.giao_dich_id DESC`)).recordset;return page(rows.map(row=>{participant(row,user);assertTrade(row);return tradeView(row);}), 'giao_dich_id');},
     async detail(id,user){const pool=await getPool(),row=await trade(pool,id,user),room=await chat(pool,row);
       const rating=(await req(pool).input('id',sql.Int,id).query('SELECT danh_gia_id,so_sao,noi_dung,ngay_danh_gia FROM dbo.DanhGia WHERE giao_dich_id=@id')).recordset[0]||null;
-      const complaints=(await req(pool).input('id',sql.Int,id).input('user',sql.Int,user.nguoi_dung_id).query(`SELECT TOP(30) ${complaintColumns} FROM dbo.KhieuNai WHERE giao_dich_id=@id AND nguoi_khieu_nai_id=@user ORDER BY khieu_nai_id DESC`)).recordset;
-      return {...tradeView(row),cuoc_tro_chuyen:room?{cuoc_tro_chuyen_id:room.cuoc_tro_chuyen_id,trang_thai:room.trang_thai}:null,danh_gia:rating,khieu_nai:complaints};
+      const cases=(await req(pool).input('id',sql.Int,id).input('user',sql.Int,user.nguoi_dung_id).query(`
+        SELECT TOP(30) ${caseSummary} FROM dbo.KhieuNai k JOIN dbo.GiaoDich g ON g.giao_dich_id=k.giao_dich_id
+        WHERE k.giao_dich_id=@id AND ${visibleComplaint}
+        ORDER BY CASE WHEN k.trang_thai='da_xu_ly' THEN 1 ELSE 0 END,k.khieu_nai_id DESC;
+        SELECT CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.KhieuNai WHERE giao_dich_id=@id AND trang_thai<>'da_xu_ly') THEN 1 ELSE 0 END AS BIT) AS co_khieu_nai_dang_mo;`)).recordsets;
+      return {...tradeView(row),cuoc_tro_chuyen:room?{cuoc_tro_chuyen_id:room.cuoc_tro_chuyen_id,trang_thai:room.trang_thai}:null,danh_gia:rating,khieu_nai:cases[0],...cases[1][0]};
     },
     ensureChat:(id,user)=>transaction(async tx=>{const row=await trade(tx,id,user,true);return chat(tx,row,true);}),
     async messages(id,user,before){const pool=await getPool(),row=await trade(pool,id,user),room=await chat(pool,row);if(!room)missing();return messages(pool,room.cuoc_tro_chuyen_id,before);},
@@ -40,16 +58,57 @@ export function createCommunityModel({getPool,sql,beforeCommit=async()=>{}}){
       return tradeView(await trade(tx,id,user));}),
     rate:(id,user,input)=>transaction(async tx=>{const row=await trade(tx,id,user,true);assertReview(row,user);const prior=(await req(tx).input('id',sql.Int,id).query('SELECT danh_gia_id,so_sao,noi_dung FROM dbo.DanhGia WHERE giao_dich_id=@id')).recordset[0];if(prior){if(prior.so_sao!==input.stars||(prior.noi_dung??null)!==input.content)conflict('Giao dịch đã được đánh giá; không ghi đè lịch sử.');return {...prior,replayed:true};}
       return (await req(tx).input('id',sql.Int,id).input('buyer',sql.Int,user.nguoi_dung_id).input('seller',sql.Int,row.nguoi_ban_id).input('stars',sql.TinyInt,input.stars).input('content',sql.NVarChar(2000),input.content).query('INSERT dbo.DanhGia(giao_dich_id,nguoi_danh_gia_id,nguoi_ban_id,so_sao,noi_dung) OUTPUT inserted.danh_gia_id VALUES(@id,@buyer,@seller,@stars,@content)')).recordset[0];}),
-    createComplaint:(id,user,input,items)=>transaction(async tx=>{const row=await trade(tx,id,user,true),room=await chat(tx,row,true);
-      if(items.some(x=>x.kind!=='image')||items.length>5)conflict('Bằng chứng khiếu nại chỉ nhận tối đa 5 ảnh.');
-      const saved=(await req(tx).input('trade',sql.Int,id).input('room',sql.Int,room.cuoc_tro_chuyen_id).input('user',sql.Int,user.nguoi_dung_id).input('reason',sql.NVarChar(300),input.reason).input('content',sql.NVarChar(sql.MAX),input.content).query('INSERT dbo.KhieuNai(giao_dich_id,cuoc_tro_chuyen_id,nguoi_khieu_nai_id,ly_do,noi_dung) OUTPUT inserted.khieu_nai_id VALUES(@trade,@room,@user,@reason,@content)')).recordset[0];
-      for(const [index,item]of items.entries())await req(tx).input('id',sql.Int,saved.khieu_nai_id).input('url',sql.VarChar(2048),item.url).input('caption',sql.NVarChar(500),item.title||null).input('order',sql.SmallInt,index+1).query('INSERT dbo.BangChungKhieuNai(khieu_nai_id,duong_dan_anh_khieu_nai,mo_ta_anh_khieu_nai,thu_tu) VALUES(@id,@url,@caption,@order)');
+    createComplaint:(id,user,input,items)=>transaction(async tx=>{
+      const row=await trade(tx,id,user,true);
+      const active=(await req(tx).input('trade',sql.Int,id).query("SELECT TOP(1) khieu_nai_id FROM dbo.KhieuNai WHERE giao_dich_id=@trade AND trang_thai<>'da_xu_ly'")).recordset[0];
+      if(active)conflict('Giao dịch đã có khiếu nại đang mở. Hãy theo dõi hồ sơ hiện tại.');
+      const room=await chat(tx,row,true);
+      const saved=(await req(tx).input('trade',sql.Int,id).input('room',sql.Int,room.cuoc_tro_chuyen_id).input('user',sql.Int,user.nguoi_dung_id).input('reason',sql.NVarChar(300),input.reason).input('content',sql.NVarChar(sql.MAX),input.content).input('hours',sql.Int,COMPLAINT_RESPONSE_HOURS).query(`
+        DECLARE @now DATETIME2(3)=SYSUTCDATETIME();
+        INSERT dbo.KhieuNai(giao_dich_id,cuoc_tro_chuyen_id,nguoi_khieu_nai_id,ly_do,noi_dung,ngay_khieu_nai,han_giai_trinh)
+        OUTPUT inserted.khieu_nai_id VALUES(@trade,@room,@user,@reason,@content,@now,DATEADD(hour,@hours,@now));`)).recordset[0];
+      await saveEvidence(tx,saved.khieu_nai_id,items);
       return saved;
     }),
-    async listComplaints(user,before){const rows=(await req(await getPool()).input('before',sql.Int,before).input('user',sql.Int,user.nguoi_dung_id).input('admin',sql.Bit,user.vai_tro==='admin').query(`SELECT TOP(30) ${complaintColumns} FROM dbo.KhieuNai WHERE khieu_nai_id<@before AND (@admin=1 OR nguoi_khieu_nai_id=@user) ORDER BY khieu_nai_id DESC`)).recordset;return page(rows,'khieu_nai_id');},
-    complaintDetail:(id,user)=>complaintWork(id,user,async(tx,item,row)=>({...item,giao_dich:tradeView(row),bang_chung:(await req(tx).input('id',sql.Int,id).query('SELECT bang_chung_id,duong_dan_anh_khieu_nai,mo_ta_anh_khieu_nai,thu_tu FROM dbo.BangChungKhieuNai WHERE khieu_nai_id=@id ORDER BY thu_tu')).recordset})),
+    async listComplaints(user,before,scope='all'){
+      const rows=(await req(await getPool()).input('before',sql.Int,before).input('user',sql.Int,user.nguoi_dung_id).input('admin',sql.Bit,user.vai_tro==='admin').input('scope',sql.VarChar(8),scope).query(`
+        SELECT TOP(30) ${caseSummary} FROM dbo.KhieuNai k JOIN dbo.GiaoDich g ON g.giao_dich_id=k.giao_dich_id
+        WHERE k.khieu_nai_id<@before AND (@admin=1 OR ${visibleComplaint}) AND
+          (@scope='all' OR (@scope='mine' AND k.nguoi_khieu_nai_id=@user) OR
+            (@scope='reply' AND @admin=0 AND k.nguoi_khieu_nai_id<>@user AND ${responseDueSql}))
+        ORDER BY k.khieu_nai_id DESC`)).recordset;
+      return page(rows,'khieu_nai_id');
+    },
+    complaintDetail:(id,user)=>complaintWork(id,user,async(tx,item,row)=>{
+      const {ghi_chu_noi_bo,...visible}=item;
+      const evidence=(await req(tx).input('id',sql.Int,id).query('SELECT bang_chung_id,duong_dan_anh_khieu_nai,mo_ta_anh_khieu_nai,thu_tu,la_giai_trinh FROM dbo.BangChungKhieuNai WHERE khieu_nai_id=@id ORDER BY thu_tu')).recordset;
+      const pending=responsePending(item,item.server_time);
+      return {...visible,...(user.vai_tro==='admin'?{ghi_chu_noi_bo}:{}),giao_dich:tradeView(row),
+        bang_chung:evidence.filter(x=>!x.la_giai_trinh),bang_chung_giai_trinh:evidence.filter(x=>x.la_giai_trinh),
+        can_toi_phan_hoi:user.vai_tro==='nguoi_dung'&&item.nguoi_khieu_nai_id!==user.nguoi_dung_id&&pending,
+        dang_cho_giai_trinh:pending};
+    }),
+    checkComplaintResponse:(id,user)=>complaintWork(id,user,async(tx,item,row)=>assertComplaintResponse(item,user,row,item.server_time)),
+    respondComplaint:(id,user,input,items)=>complaintWork(id,user,async(tx,item,row)=>{
+      assertComplaintResponse(item,user,row,item.server_time);
+      await req(tx).input('id',sql.Int,id).input('content',sql.NVarChar(sql.MAX),input.content).input('at',sql.DateTime2(3),item.server_time)
+        .query('UPDATE dbo.KhieuNai SET giai_trinh=@content,ngay_giai_trinh=@at WHERE khieu_nai_id=@id');
+      await saveEvidence(tx,id,items,true);
+      return {khieu_nai_id:id};
+    }),
     claim:(id,user)=>complaintWork(id,user,async(tx,item)=>{if(user.vai_tro!=='admin')missing();if(item.admin_id!==null&&item.admin_id!==user.nguoi_dung_id)conflict('Khiếu nại đã được Admin khác tiếp nhận.');if(item.trang_thai==='cho_xu_ly')await req(tx).input('id',sql.Int,id).input('admin',sql.Int,user.nguoi_dung_id).query("UPDATE dbo.KhieuNai SET trang_thai='dang_xu_ly',admin_id=@admin WHERE khieu_nai_id=@id");return {khieu_nai_id:id};}),
-    resolve:(id,user,reply)=>complaintWork(id,user,async(tx,item)=>{assignedAdmin(item,user);if(item.trang_thai==='da_xu_ly'){if(item.phan_hoi_admin!==reply)conflict('Khiếu nại đã được xử lý; không ghi đè kết quả.');return {khieu_nai_id:id,replayed:true};}if(item.trang_thai!=='dang_xu_ly')conflict('Cần tiếp nhận khiếu nại trước.');await req(tx).input('id',sql.Int,id).input('reply',sql.NVarChar(sql.MAX),reply).query("UPDATE dbo.KhieuNai SET trang_thai='da_xu_ly',phan_hoi_admin=@reply,ngay_xu_ly=SYSUTCDATETIME() WHERE khieu_nai_id=@id");return {khieu_nai_id:id};}),
+    resolve:(id,user,{reply,outcome,note})=>complaintWork(id,user,async(tx,item)=>{
+      assignedAdmin(item,user);
+      if(item.trang_thai==='da_xu_ly'){
+        if(item.phan_hoi_admin!==reply||item.ket_luan!==outcome||item.ghi_chu_noi_bo!==note)conflict('Khiếu nại đã được xử lý; không ghi đè kết quả.');
+        return {khieu_nai_id:id,replayed:true};
+      }
+      if(item.trang_thai!=='dang_xu_ly')conflict('Cần tiếp nhận khiếu nại trước.');
+      if(responsePending(item,item.server_time))conflict('Hãy đợi bên còn lại giải trình hoặc hết hạn phản hồi trước khi kết luận.');
+      await req(tx).input('id',sql.Int,id).input('reply',sql.NVarChar(sql.MAX),reply).input('outcome',sql.VarChar(30),outcome).input('note',sql.NVarChar(sql.MAX),note)
+        .query("UPDATE dbo.KhieuNai SET trang_thai='da_xu_ly',phan_hoi_admin=@reply,ket_luan=@outcome,ghi_chu_noi_bo=@note,ngay_xu_ly=SYSUTCDATETIME() WHERE khieu_nai_id=@id");
+      return {khieu_nai_id:id};
+    }),
     complaintMessages:(id,user,before)=>complaintWork(id,user,async(tx,item,row,room)=>{assignedAdmin(item,user);if(item.trang_thai!=='dang_xu_ly')conflict('Chỉ xem trao đổi khi khiếu nại đang được xử lý.');return messages(tx,room.cuoc_tro_chuyen_id,before);}),
     async comments(id,before){const pool=await getPool(),auction=await publicAuction(pool,id);let canComment=true;try{assertComment(auction);}catch{canComment=false;}
       const rows=(await req(pool).input('id',sql.Int,id).input('before',sql.Int,before).query('SELECT TOP(50) c.binh_luan_id,c.nguoi_dung_id,u.ho_ten,c.noi_dung,c.thoi_gian_binh_luan FROM dbo.BinhLuan c JOIN dbo.NguoiDung u ON u.nguoi_dung_id=c.nguoi_dung_id WHERE c.phien_dau_gia_id=@id AND c.binh_luan_id<@before ORDER BY c.binh_luan_id DESC')).recordset;

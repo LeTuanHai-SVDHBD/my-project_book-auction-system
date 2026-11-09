@@ -24,6 +24,20 @@ test('NULL needs evidence, while provider/media outage stays pending',()=>{
   assert.equal(moderationDecision(partial,{media:[{sent:false,reason:'video_timeout'}]},thresholds),null);
   assert.equal(moderationDecision({...partial,trang_thai:'that_bai'}, {}, thresholds),null);
 });
+test('separate missing photos and unverified provenance into concrete steps for the seller',()=>{
+  const partial={...scored,trang_thai:'chua_day_du',diem_do_hiem:null,diem_tinh_trang:null,chi_tiet:[
+    {nhom_tieu_chi:'do_hiem',tieu_chi:'Lai lịch và dấu ấn riêng',trang_thai_danh_gia:'Cần xác minh',
+      bang_chung:'M2 đọc được nhãn sở hữu.',canh_bao:'Admin cần xác minh thủ công.'},
+    {nhom_tieu_chi:'tinh_trang',tieu_chi:'Mép giấy',trang_thai_danh_gia:'Chưa đủ dữ liệu'},
+    {nhom_tieu_chi:'tinh_trang',tieu_chi:'Bìa áo',trang_thai_danh_gia:'Không áp dụng'},
+  ]};
+  const verdict=moderationDecision(partial,{},thresholds);
+  assert.equal(verdict.approve,false);
+  assert.match(verdict.reason,/Cần xác minh\. Quan sát: M2 đọc được nhãn sở hữu/);
+  assert.match(verdict.reason,/mã lưu trữ/);
+  assert.match(verdict.reason,/mép trên, mép dưới và mép ngoài/);
+  assert.doesNotMatch(verdict.reason,/Admin|Bìa áo|Mức đạt/);
+});
 test('legacy false does not disable automatic moderation; only isolated smoke can exercise manual decisions',()=>{
   assert.deepEqual(parseAiConfig({AI_AUTO_MODERATION:'false',AI_MIN_RARITY_SCORE:'',AI_MIN_CONDITION_SCORE:''}).autoModeration,{rarity:70,condition:70});
   assert.throws(()=>parseAiConfig({AI_MIN_CONDITION_SCORE:'101'}),/AI_MIN_CONDITION_SCORE/);
@@ -48,10 +62,29 @@ test('automatic mode keeps the Admin decision endpoint blocked even if Gemini is
   const posts=createPostService({autoModeration:parseAiConfig({AI_ENABLED:'false'}).autoModeration,model:{review:()=>assert.fail('manual review')}});
   await assert.rejects(posts.review(2,1,{}),{code:'AUTO_MODERATION_ENABLED'});
 });
-test('scheduler deduplicates active versions and does not enqueue a changed round',async()=>{
-  const rows=[1,2,3,4].map(bai_dang_id=>({bai_dang_id,row_version:'v1',trang_thai_phien:'cho_kiem_duyet'}));
-  const sent=[];await enqueueAutoReviews({signal:new AbortController().signal,model:{autoCandidates:async()=>rows},posts:{detail:async id=>({...rows[id-1],row_version:id===3?'v2':'v1',trang_thai_phien:id===4?'da_qua_kiem_duyet':'cho_kiem_duyet'})},queue:{status:async id=>id===2?{trigger:'auto',source_version:'v1',state:'running'}:null,enqueue:async (row,trigger)=>sent.push([row.bai_dang_id,trigger])}});
-  assert.deepEqual(sent,[[1,'auto']]);
+test('scheduler only recovers unanalysed rounds, even if a result is saved after the SQL scan',async()=>{
+  const rows=[1,2,3,4,5,6].map(bai_dang_id=>({bai_dang_id,row_version:'v1',trang_thai_phien:'cho_kiem_duyet'}));
+  const sent=[];await enqueueAutoReviews({signal:new AbortController().signal,model:{autoCandidates:async()=>rows},posts:{detail:async id=>({...rows[id-1],row_version:id===3?'v2':'v1',trang_thai_phien:id===4?'da_qua_kiem_duyet':'cho_kiem_duyet',
+    ai:id>=5?{phan_tich_id:id,thong_tin:{source_version:id===5?'v1':'previous'}}:null})},queue:{status:async id=>id===2?{trigger:'auto',source_version:'v1',state:'running'}:null,enqueue:async (row,trigger)=>sent.push([row.bai_dang_id,trigger])}});
+  assert.deepEqual(sent,[[1,'auto'],[6,'auto']]);
+});
+test('after a timeout only an explicit retry can make another Gemini request for this round',async()=>{
+  const row={bai_dang_id:1,row_version:'0000000000000001',trang_thai_phien:'cho_kiem_duyet'};
+  const job=(retryOf)=>({postId:1,sourceVersion:row.row_version,inputHash:inputHash(row),trigger:'auto',requestId:randomUUID(),...(retryOf?{retryOf}:{})});
+  let calls=0,writes=0,stage;
+  const run=createAiProcessor({posts:{detail:async()=>row},model:{find:async()=>null,save:async(j,result,info,check,verdict)=>{
+    await check();assert.equal(verdict,null);assert.equal(info.error_code,'AI_TIMEOUT');
+    return row.ai={...result,phan_tich_id:++writes,thong_tin:info};
+  }},queue:{get:async()=>null,update:async(j,p)=>{stage=p.state;return {...j,...p};}},
+  provider:{analyze:async()=>{calls++;throw Object.assign(Error('timeout'),{code:'AI_TIMEOUT'});}},
+  locks:{acquire:async()=>({renew:async()=>true,release:async()=>{}})},config:{configured:true,autoModeration:thresholds,jobTimeout:1000}});
+  await run(job());assert.equal(stage,'done');
+  await run(job());assert.equal(stage,'skipped');assert.equal(calls,1);
+  await run(job(1));assert.equal(stage,'done');assert.equal(calls,2);
+  await run(job(1));assert.equal(stage,'skipped');assert.equal(calls,2);
+  row.row_version='0000000000000002';
+  await run(job(2));assert.equal(stage,'skipped');
+  await run(job());assert.equal(stage,'done');assert.equal(calls,3);
 });
 test('auto processor sends one persisted verdict for the exact input; replay and stale job do not call Gemini',async()=>{
   const row={bai_dang_id:1,row_version:'0000000000000001',trang_thai_phien:'cho_kiem_duyet'};

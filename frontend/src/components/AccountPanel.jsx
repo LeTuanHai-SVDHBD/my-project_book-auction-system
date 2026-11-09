@@ -1,5 +1,6 @@
 /** Đăng ký, đăng nhập và thông tin tài khoản; không lưu xác thực vào storage. */
 import { useEffect, useState } from 'react';
+import { useSuccessFeedback } from './SuccessFeedback.jsx';
 import { authApi } from '../services/authApi.js';
 export default function AccountPanel({ user, onUserChange: setUser }) {
   const [loading, setLoading] = useState(true);
@@ -9,7 +10,8 @@ export default function AccountPanel({ user, onUserChange: setUser }) {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  const [sessionNotice, setSessionNotice] = useState('');
+  const notify = useSuccessFeedback();
   const [reload, setReload] = useState(0);
   useEffect(() => {
     let canceled = false;
@@ -19,27 +21,27 @@ export default function AccountPanel({ user, onUserChange: setUser }) {
       .finally(() => { if (!canceled) setLoading(false); });
     return () => { canceled = true; };
   }, [reload, setUser]);
-  useEffect(()=>{const signedOut=event=>{setUser(null);setMode('login');setPassword('');setError('');setBusy(false);setLoading(false);setMessage(event.detail?.message||'Bạn đã được đăng xuất.');};window.addEventListener('account:signed-out',signedOut);return()=>window.removeEventListener('account:signed-out',signedOut);},[setUser]);
+  useEffect(()=>{const signedOut=event=>{setUser(null);setMode('login');setPassword('');setError('');setBusy(false);setLoading(false);setSessionNotice(event.detail?.message||'Bạn đã được đăng xuất.');};window.addEventListener('account:signed-out',signedOut);return()=>window.removeEventListener('account:signed-out',signedOut);},[setUser]);
   async function submit(event) {
-    event.preventDefault(); setBusy(true); setError(''); setMessage('');
+    event.preventDefault(); setBusy(true); setError(''); setSessionNotice('');
     try {
       if (mode === 'register') {
         await authApi.register({ ho_ten: name, email, mat_khau: password });
-        setMode('login'); setMessage('Đăng ký thành công. Hãy đăng nhập bằng tài khoản vừa tạo.');
+        setMode('login'); notify({ message: 'Đăng ký thành công. Hãy đăng nhập bằng tài khoản vừa tạo.' });
       } else setUser(await authApi.login({ email, mat_khau: password }));
       setPassword('');
     } catch (failure) { setError(failure.message || 'Không kết nối được máy chủ. Vui lòng thử lại.'); }
     finally { setBusy(false); }
   }
   async function logout() {
-    setBusy(true); setError(''); setMessage('');
-    try { await authApi.logout(); setUser(null); setPassword(''); setMessage('Bạn đã đăng xuất.'); }
+    setBusy(true); setError(''); setSessionNotice('');
+    try { await authApi.logout(); setUser(null); setPassword(''); notify({ message: 'Bạn đã đăng xuất.' }); }
     catch (failure) { setError(failure.message); }
     finally { setBusy(false); }
   }
   async function admin() {
-    setBusy(true); setError(''); setMessage('');
-    try { setMessage((await authApi.admin()).message); }
+    setBusy(true); setError(''); setSessionNotice('');
+    try { notify({ message: (await authApi.admin()).message }); }
     catch (failure) { setError(failure.message); if (failure.status === 401) setUser(null); }
     finally { setBusy(false); }
   }
@@ -58,8 +60,8 @@ export default function AccountPanel({ user, onUserChange: setUser }) {
         <button className="secondary" onClick={logout} disabled={busy}>Đăng xuất</button>
         <button className="text-button" onClick={() => setReload(value => value + 1)} disabled={busy}>Tải lại thông tin tài khoản</button>
       </> : <>
-        <div className="account-tabs"><button aria-pressed={mode === 'login'} disabled={busy} onClick={() => { setMode('login'); setPassword(''); setError(''); setMessage(''); }}>Đăng nhập</button>
-          <button aria-pressed={mode === 'register'} disabled={busy} onClick={() => { setMode('register'); setPassword(''); setError(''); setMessage(''); }}>Đăng ký</button></div>
+        <div className="account-tabs"><button aria-pressed={mode === 'login'} disabled={busy} onClick={() => { setMode('login'); setPassword(''); setError(''); setSessionNotice(''); }}>Đăng nhập</button>
+          <button aria-pressed={mode === 'register'} disabled={busy} onClick={() => { setMode('register'); setPassword(''); setError(''); setSessionNotice(''); }}>Đăng ký</button></div>
         <h2>{mode === 'register' ? 'Tạo tài khoản mới' : 'Chào mừng trở lại'}</h2>
         <form onSubmit={submit}>
           {mode === 'register' && <label>Họ và tên<input value={name} onChange={event => setName(event.target.value)} maxLength={100} autoComplete="name" required disabled={busy}/></label>}
@@ -72,7 +74,7 @@ export default function AccountPanel({ user, onUserChange: setUser }) {
         <button className="text-button" onClick={() => setReload(value => value + 1)} disabled={busy}>Kiểm tra lại kết nối</button>
       </>}
       {error && <p className="error" role="alert">{error}</p>}
-      {message && <p className="account-success" role="status">{message}</p>}
+      {sessionNotice && <p className="notice" role="status">{sessionNotice}</p>}
     </section>
   </div>;
 }

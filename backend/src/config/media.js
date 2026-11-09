@@ -18,7 +18,7 @@ export function parseMediaConfig(env) {
     pendingSeconds: 3600,
     uploadTimeoutMs: integer('MEDIA_IMAGE_UPLOAD_TIMEOUT_MS',120000,300000,1000),
     videoUploadTimeoutMs: integer('MEDIA_VIDEO_UPLOAD_TIMEOUT_MS',300000,300000,1000),
-    recoveryTimeoutMs: integer('MEDIA_RECOVERY_TIMEOUT_MS',15000,30000,1000),recoveryAttempts:3,recoveryDelayMs:1000 };
+    recoveryTimeoutMs: integer('MEDIA_RECOVERY_TIMEOUT_MS',15000,30000,1000) };
 }
 export function publicMediaConfig(config) {
   return { configured: config.configured, imageMaxBytes: config.imageMaxBytes, videoMaxBytes: config.videoMaxBytes,
@@ -29,4 +29,8 @@ export function publicMediaConfig(config) {
 }
 
 // Client includes time for the incoming binary body (Node request timeout), provider and bounded recovery.
-export function mediaUploadBudget(config,kind) {return (kind==='video'?(config.videoUploadTimeoutMs||300000):config.uploadTimeoutMs)+(config.recoveryAttempts||3)*(config.recoveryTimeoutMs||15000)+Math.max(0,(config.recoveryAttempts||3)-1)*(config.recoveryDelayMs??1000)+310000;}
+export const mediaRecoveryDelays=kind=>kind==='video'?[0,2000,8000]:[0,1000,1000];
+export function mediaUploadBudget(config,kind) {
+  const recovery=mediaRecoveryDelays(kind).reduce((total,delay)=>total+delay+(config.recoveryTimeoutMs||15000),0);
+  return (kind==='video'?(config.videoUploadTimeoutMs||300000):config.uploadTimeoutMs)+recovery+310000;
+}

@@ -2,6 +2,26 @@
 
 # Kiểm chứng và nghiệm thu
 
+## Bố cục responsive và khung xem ảnh
+
+- Chromium với API dữ liệu mẫu: đo tràn ngang cho 21 tổ hợp trang/vai trò, mỗi tổ hợp ở
+  320, 390, 640, 768, 1024, 1101 và 1440 px. Không phát hiện tràn ngang toàn trang trong các mẫu đã kiểm tra.
+- Thử menu di động, chọn năm xuất bản, mở biểu mẫu khiếu nại và hộp thông báo. Khung ảnh mở trong trang
+  ở 320 và 1440 px; thử đổi ảnh bằng nút và phím, đóng bằng ×, Esc hoặc bấm nền tối.
+- `npm run check`, `npm run build` và `npm test` đạt: 231 PASS, 12 SKIP, tổng 243 test.
+  Đợt kiểm tra giao diện này dùng dữ liệu mẫu, không kết nối dịch vụ thật.
+
+## Upload video theo phần và đối soát phản hồi Cloudinary
+
+- `npm run check` và `npm test` đạt: 215 PASS, 12 SKIP, tổng 227 test.
+- Mô phỏng Cloudinary xác nhận byte range nối tiếp, chỉ nhận phản hồi cuối đã xác minh và tra metadata khi phần cuối bị timeout mà không gửi lại tệp. Chưa thử với tài khoản Cloudinary hoặc tệp của người dùng.
+
+## Giữ trạng thái ổn định sau lần phân tích AI thất bại
+
+- `npm run check`, `npm test` và `npm run build` đều đạt: 212 PASS, 12 SKIP (dịch vụ thật), tổng 224 test.
+- Mô phỏng timeout xác nhận worker bỏ job tự động cũ, chỉ chạy lại theo yêu cầu gắn với kết quả mới nhất và vẫn tự chạy lần đầu cho vòng mới. HTTP fixture xác nhận job cũ không làm giao diện hiện lại tiến độ.
+- Không có migration mới; chưa chạy Gemini, Redis hoặc SQL thật trong lần sửa này.
+
 ## Tạm dừng khi Gemini báo 429
 
 - `npm run check`, `npm test` và `npm run build` đều đạt. Bộ test có 211 PASS, 12 SKIP (dịch vụ thật), 223 bài.
@@ -28,7 +48,7 @@
 | Tương tác UI | Tìm kiếm rỗng/lỗi, Home/End gallery, trạng thái lượt giá mô phỏng, bốn bước gửi lại, gỡ ảnh cũ và khôi phục nháp, thông báo/Escape, menu Admin di động |
 | Quyết định tự duyệt | Test hai ngưỡng độc lập, biên bằng ngưỡng, NULL và lỗi kỹ thuật, chống replay/version cũ, chặn thao tác Admin khi bật tự duyệt. UI fixture xác nhận lý do và nguồn AI hiển thị đúng. |
 
-Schema đích sau [migration 008](backend/migrations/008_auto_moderation.sql): **21 bảng, 166 cột, 100 CHECK, 15 UNIQUE constraints**.
+Schema đích sau [migration 009](backend/migrations/009_two_party_complaints.sql): **21 bảng, 172 cột, 102 CHECK, 15 UNIQUE constraints**.
 Lượt này chưa chạy migration/SQL opt-in, Redis thật, Gemini thật hoặc smoke. Kiểm tra trên dịch vụ thật bằng `npm.cmd run db:migrate`, `npm.cmd run smoke:ai` và hồ sơ có ảnh/video sau khi cấu hình [hai ngưỡng](docs/ai-analysis.md#kiểm-duyệt-tự-động). Các bài test SQL mới kiểm tra cùng COMMIT, rollback và đúng snapshot khi có database test.
 
 ## Lượt rà soát tài liệu trước đó

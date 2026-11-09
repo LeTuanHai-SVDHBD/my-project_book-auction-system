@@ -1,19 +1,22 @@
 /** Approved BookBid navigation; account and notification controls belong to Admin sidebar. */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { navigate } from "../services/navigation.js";
 import { Dialog, Icon } from "./DesignUi.jsx";
 import Notifications, { useNotifications } from "./Notifications.jsx";
+const MOBILE_NAV_ID = "bookbid-mobile-nav";
+
 export default function BookBidShell({ user, route, children }) {
   const [menu, setMenu] = useState(false),
     [notifications, setNotifications] = useState(false),
     [query, setQuery] = useState("");
+  const menuButton = useRef(null);
   const admin = user?.vai_tro === "admin",
     inbox = useNotifications(user);
   useEffect(() => {
     setMenu(false);
   }, [route.page, route.id, route.query]);
   useEffect(() => {
-    const desktop = matchMedia("(min-width:1101px)"),
+    const desktop = matchMedia("(width > 1100px)"),
       close = () => {
         if (desktop.matches) setMenu(false);
       };
@@ -31,6 +34,7 @@ export default function BookBidShell({ user, route, children }) {
   const go = (page) => navigate(page);
   const search = (event) => {
     event.preventDefault();
+    setMenu(false);
     navigate("catalog", null, new URLSearchParams({ q: query }).toString());
   };
   const bell = (
@@ -109,6 +113,12 @@ export default function BookBidShell({ user, route, children }) {
       </a>
     </>
   );
+  const repliesDue = user ? inbox.data?.complaintsToReply ?? 0 : 0;
+  const complaintCount = repliesDue > 0 && (
+    <span className="complaint-menu-count" aria-label={`${repliesDue} hồ sơ cần phản hồi`}>
+      {repliesDue > 99 ? "99+" : repliesDue}
+    </span>
+  );
   const links = [
     ["home", "Trang chủ"],
     ["catalog", "Đấu giá"],
@@ -117,6 +127,7 @@ export default function BookBidShell({ user, route, children }) {
           ["create", "Đăng sách"],
           ["mine", "Bài của tôi"],
           ["trades", "Giao dịch"],
+          ["complaints", "Khiếu nại"],
         ]
       : [["account", "Đăng nhập"]]),
   ];
@@ -160,9 +171,14 @@ export default function BookBidShell({ user, route, children }) {
           )}
         </>
       ) : (
-        <header className="site-header">
+        <header className="site-header" onKeyDown={(event) => {
+          if (event.key === "Escape" && menu) {
+            setMenu(false);
+            menuButton.current?.focus();
+          }
+        }}>
           <div className="header-inner">
-            <a className="brand" href="#/home">
+            <a className="brand" href="#/home" onClick={() => setMenu(false)}>
               <span className="brand-mark">B</span>
               <strong>BookBid</strong>
             </a>
@@ -185,7 +201,7 @@ export default function BookBidShell({ user, route, children }) {
                   href={`#/${page}`}
                   aria-current={route.page === page ? "page" : undefined}
                 >
-                  {label}
+                  {label}{page === "complaints" && complaintCount}
                 </a>
               ))}
             </nav>
@@ -199,27 +215,26 @@ export default function BookBidShell({ user, route, children }) {
                 </>
               )}
               <button
+                ref={menuButton}
+                type="button"
                 className="icon-button mobile-menu"
-                aria-label="Mở điều hướng"
+                aria-label={menu ? "Đóng điều hướng" : "Mở điều hướng"}
                 aria-expanded={menu}
+                aria-controls={MOBILE_NAV_ID}
                 onClick={() => setMenu((v) => !v)}
               >
                 <Icon name={menu ? "close" : "menu"} />
               </button>
             </div>
           </div>
-          {menu && (
-            <nav className="mobile-nav" aria-label="Điều hướng di động">
-              {[
-                ...links,
-                ...(user ? [["complaints", "Khiếu nại của tôi"]] : []),
-              ].map(([page, label]) => (
-                <a key={page} href={`#/${page}`} onClick={() => setMenu(false)}>
-                  {label}
-                </a>
-              ))}
-            </nav>
-          )}
+          <nav id={MOBILE_NAV_ID} className="mobile-nav" aria-label="Điều hướng di động" hidden={!menu}>
+            {links.map(([page, label]) => (
+              <a key={page} href={`#/${page}`} aria-current={route.page === page ? "page" : undefined}
+                onClick={() => setMenu(false)}>
+                <span>{label}</span>{page === "complaints" && complaintCount}
+              </a>
+            ))}
+          </nav>
         </header>
       )}
       <div className={admin ? "admin-content-wrap" : ""}>
@@ -250,7 +265,7 @@ export default function BookBidShell({ user, route, children }) {
               : [
                   ["mine", "Bài đăng của tôi"],
                   ["trades", "Giao dịch"],
-                  ["complaints", "Khiếu nại của tôi"],
+                  ["complaints", "Khiếu nại"],
                 ]
             ).map(([page, label]) => (
               <a key={page} href={`#/${page}`}>

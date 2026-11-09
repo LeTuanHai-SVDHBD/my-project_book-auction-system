@@ -5,9 +5,9 @@ export const when=value=>value?new Date(value).toLocaleString('vi-VN'):'Chưa c�
 export const money=value=>`${BigInt(value).toLocaleString('vi-VN')} đ`;
 export function useCommunityPage(path){
   const [before,setBefore]=useState(null),[data,setData]=useState(null),[error,setError]=useState('');const sequence=useRef(0);
-  const refresh=useCallback(async()=>{const current=++sequence.current;try{const result=await communityGet(path+(before?`?before=${before}`:''));if(current===sequence.current){setData(result);setError('');}}catch(failure){if(current===sequence.current)setError(failure.message);}},[path,before]);
+  const refresh=useCallback(async()=>{const current=++sequence.current;try{const result=await communityGet(path+(before?`${path.includes('?')?'&':'?'}before=${before}`:''));if(current===sequence.current){setData(result);setError('');}}catch(failure){if(current===sequence.current)setError(failure.message);}},[path,before]);
   useEffect(()=>{let active=true,timer;async function poll(){await refresh();if(active&&!before)timer=setTimeout(poll,3000);}setData(null);void poll();return()=>{active=false;++sequence.current;clearTimeout(timer);};},[refresh,before]);
-  return {data,error,refresh,older:()=>setBefore(data?.nextBefore),latest:()=>before?setBefore(null):void refresh(),historical:before!==null};
+  return {data,error,refresh,older:()=>setBefore(data?.nextBefore),latest:()=>before?setBefore(null):void refresh(),historical:before!==null,cursor:before};
 }
 export function FeedButtons({feed}){return <div className="actions feed-actions">{feed.data?.nextBefore&&<button type="button" onClick={feed.older}>Xem trang cũ hơn</button>}{feed.historical&&<button type="button" onClick={feed.latest}>Về trang mới nhất</button>}<button type="button" className="text-button" onClick={feed.refresh}>Tải lại nội dung</button></div>;}
 export function ChatFeed({tradeId,complaintId,user,readOnly=false}){

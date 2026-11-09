@@ -1,6 +1,6 @@
 /** Analyse a fixed source version; persist the automatic verdict with the score receipt. */
 import {scoreObservations} from './scoring.js';
-import {inputHash} from './input.js';
+import {currentAnalysisId,inputHash} from './input.js';
 import {moderationDecision} from './moderation.js';
 import {RULE_VERSION} from './criteria.js';
 import {aiFailureMessage,safeAiDiagnostics,safeAiExecution} from './errors.js';
@@ -22,15 +22,14 @@ export function createAiProcessor({posts,model,queue,provider,locks,quota,config
     try{
       let row;try{row=await posts.detail(job.postId,{admin:true});}catch(error){if(error.status===404){await queue.update(job,{state:'skipped'});return;}throw error;}
       if(!config.configured||row.row_version!==job.sourceVersion||row.trang_thai_phien!=='cho_kiem_duyet'||automatic&&inputHash(row)!==job.inputHash){await queue.update(job,{state:'skipped'});return;}
+      const latestId=currentAnalysisId(row);
+      // A background job may recover the first run; only an explicit retry can supersede a saved analysis.
+      if((job.retryOf!==undefined&&job.retryOf!==latestId)
+        ||(latestId&&job.retryOf===undefined&&(automatic||isQuotaAnalysis(row.ai)))){
+        await queue.update(job,{state:'skipped'});return;
+      }
       let cached=await queue.get(job.requestId),result=cached?.result,metadata=cached?.metadata;
       if(!result){
-        const latest=row.ai;
-        const sameRound=latest?.thong_tin?.source_version===row.row_version;
-        // Old automatic retries queued before the pause must not restart this version.
-        const quotaFailed=sameRound&&isQuotaAnalysis(latest);
-        if((quotaFailed||job.retryOf!==undefined)&&(!quotaFailed||job.retryOf!==latest.phan_tich_id)){
-          await queue.update(job,{state:'skipped'});return;
-        }
         await queue.update(job,{state:'running'});
         const base={request_id:job.requestId,input_hash:job.inputHash,source_version:job.sourceVersion,rule_version:RULE_VERSION,model:config.model,trigger:job.trigger};
         try{

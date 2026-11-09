@@ -17,6 +17,12 @@ export function safeMediaDiagnostics(value={}) {
  const safe={};if(['upload','recover','destroy'].includes(value.operation))safe.operation=value.operation;
  if(Number.isInteger(value.http_status)&&value.http_status>=100&&value.http_status<=599)safe.http_status=value.http_status;
  if(transports.has(value.transport_code))safe.transport_code=value.transport_code;
+ if(['image','video'].includes(value.kind))safe.kind=value.kind;
+ if(['awaiting_headers','response_body','http_response'].includes(value.stage))safe.stage=value.stage;
+ for(const [key,max] of [['file_bytes',104857600],['part',32],['parts',32],['elapsed_ms',3600000],['timeout_ms',300000]]){
+  if(Number.isSafeInteger(value[key])&&value[key]>=0&&value[key]<=max)safe[key]=value[key];
+ }
+ if(typeof value.deadline_reached==='boolean')safe.deadline_reached=value.deadline_reached;
  return safe;
 }
 export function mediaFailure(code,details={}) {const error=new HttpError(code==='MEDIA_NOT_CONFIGURED'?503:502,code,MEDIA_MESSAGES[code]||MEDIA_MESSAGES.MEDIA_PROVIDER_ERROR);error.publicMediaError=Object.hasOwn(MEDIA_MESSAGES,code);error.mediaDiagnostics=safeMediaDiagnostics(details);return error;}

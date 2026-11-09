@@ -40,8 +40,10 @@ test('HTTP phân tích giữ quyền sở hữu/Admin, CSRF, version, key ở ba
   assert.equal((await owner.call('/ai/7?analysis=10')).status,404);
   const failed=await admin.call('/ai/7');assert.equal(failed.data.analysis.thong_tin.error_code,'AI_PROVIDER_UNAVAILABLE');
   assert.equal(failed.data.can_retry,true);assert(!JSON.stringify(failed.data).includes('kiểm duyệt thủ công'));
-  assert.equal((await admin.call('/ai/7','POST',{row_version:post.row_version})).status,202);assert.equal(enqueued,1);
+  assert.equal((await admin.call('/ai/7','POST',{row_version:post.row_version})).status,202);assert.equal(enqueued,1);assert.equal(lastRetryOf,10);
   active={trigger:'auto',state:'running',source_version:post.row_version};
+  const obsolete=await admin.call('/ai/7');assert.equal(obsolete.data.job,null);assert.equal(obsolete.data.can_retry,true);
+  active.retry_of=10;
   assert.equal((await admin.call('/ai/7')).data.can_retry,false);active=null;
   const previousInfo=post.ai.thong_tin,until=Date.now()+120000;
   post.ai.thong_tin={...previousInfo,error_code:'AI_QUOTA_EXCEEDED',retry_not_before:until};

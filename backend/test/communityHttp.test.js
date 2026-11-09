@@ -16,10 +16,45 @@ test('hai xác nhận riêng, gửi lại không đổi timestamp, đánh giá m
  assert.equal((await f.seller.call(path+'/trades/1/confirm','POST',{})).data.trang_thai,'hoan_tat');assert.equal((await f.seller.call(path+'/trades/1/review','POST',{so_sao:5})).status,403);assert.equal((await f.buyer.call(path+'/trades/1/review','POST',{so_sao:5,noi_dung:'Đúng mô tả'})).status,200);assert.equal((await f.buyer.call(path+'/trades/1/review','POST',{so_sao:5,noi_dung:'Đúng mô tả'})).data.replayed,true);assert.equal((await f.buyer.call(path+'/trades/1/review','POST',{so_sao:1})).status,409);assert.equal((await f.guest.call(path+'/auctions/8/reputation')).data.so_danh_gia,1);
 });
 test('khiếu nại chỉ nhận vé ảnh của mình; Admin phải tiếp nhận, Admin khác/ngoài cuộc không xem chat',async t=>{const f=await setup(t);const otherImage=f.image(3);assert.equal((await f.buyer.call(path+'/trades/1/complaints','POST',{ly_do:'Ảnh',noi_dung:'Bằng chứng',media:[otherImage]})).status,409);const image=f.image(2);
- const created=await f.buyer.call(path+'/trades/1/complaints','POST',{ly_do:'Chưa thống nhất',noi_dung:'Đối chiếu giúp',media:[image]});assert.equal(created.status,201);assert.equal(f.evidence.get(image.upload_id).status,'bound');const id=created.data.khieu_nai_id;assert.equal((await f.other.call(`${path}/complaints/${id}`)).status,404);assert.equal((await f.seller.call(`${path}/complaints/${id}`)).status,404);
+ const created=await f.buyer.call(path+'/trades/1/complaints','POST',{ly_do:'Chưa thống nhất',noi_dung:'Đối chiếu giúp',media:[image]});assert.equal(created.status,201);assert.equal(f.evidence.get(image.upload_id).status,'bound');const id=created.data.khieu_nai_id;assert.equal((await f.other.call(`${path}/complaints/${id}`)).status,404);assert.equal((await f.seller.call(`${path}/complaints/${id}`)).data.can_toi_phan_hoi,true);
+ assert.equal((await f.seller.call(path+'/complaints?scope=reply')).data.items.length,1);assert.equal((await f.buyer.call(path+'/complaints?scope=reply')).data.items.length,0);
+ assert.equal((await f.seller.call(path+'/trades/1/complaints','POST',{ly_do:'Trùng',noi_dung:'Không mở hồ sơ thứ hai',media:[]})).status,409);
  assert.equal((await f.admin.call(`${path}/complaints/${id}/messages`)).status,403);assert.equal((await f.admin.call(`${path}/complaints/${id}/claim`,'POST',{})).status,200);assert.equal((await f.admin2.call(`${path}/complaints/${id}/claim`,'POST',{})).status,409);assert.equal((await f.admin2.call(`${path}/complaints/${id}/messages`)).status,403);assert.equal((await f.admin.call(`${path}/complaints/${id}/messages`)).status,200);
- assert.equal((await f.admin.call(`${path}/complaints/${id}/resolve`,'POST',{phan_hoi_admin:'Đã đối chiếu hai bên.'})).status,200);assert.equal(f.trade.trang_thai,'cho_xac_nhan');assert.equal((await f.admin.call(`${path}/complaints/${id}/messages`)).status,409);assert.equal((await f.buyer.call(`${path}/complaints/${id}`)).data.phan_hoi_admin,'Đã đối chiếu hai bên.');
+ const decision={ket_luan:'co_can_cu',phan_hoi_admin:'Đã đối chiếu hai bên.',ghi_chu_noi_bo:'Nội bộ'};
+ const reply={noi_dung:'Giải trình của bên bán',media:[f.image(1)]};
+ assert.equal((await f.admin.call(`${path}/complaints/${id}/resolve`,'POST',decision)).status,409);
+ assert.equal((await f.buyer.call(`${path}/complaints/${id}/response`,'POST',reply)).status,404);
+ assert.equal((await f.other.call(`${path}/complaints/${id}/response`,'POST',reply)).status,404);
+ assert.equal((await f.seller.call(`${path}/complaints/${id}/response`,'POST',reply,false)).status,403);
+ assert.equal((await f.seller.call(`${path}/complaints/${id}/response`,'POST',reply)).status,201);
+ assert.equal((await f.seller.call(`${path}/complaints/${id}/response`,'POST',reply)).status,409);
+ assert.equal((await f.seller.call(path+'/complaints?scope=reply')).data.items.length,0);
+ assert.equal((await f.admin.call(`${path}/complaints/${id}/resolve`,'POST',decision)).status,200);
+ assert.equal((await f.seller.call(`${path}/complaints/${id}`)).data.ket_luan,'co_can_cu');
+ assert.equal((await f.seller.call(`${path}/complaints/${id}`)).data.ghi_chu_noi_bo,undefined);
+ assert.equal((await f.admin.call(`${path}/complaints/${id}`)).data.ghi_chu_noi_bo,'Nội bộ');assert.equal(f.trade.trang_thai,'cho_xac_nhan');assert.equal((await f.admin.call(`${path}/complaints/${id}/messages`)).status,409);assert.equal((await f.buyer.call(`${path}/complaints/${id}`)).data.phan_hoi_admin,'Đã đối chiếu hai bên.');
 });
 test('bình luận trước/sau giờ bị chặn; lịch sử phân trang đọc được sau kết thúc',async t=>{const f=await setup(t);assert.equal((await f.admin.call(path+'/auctions/8/comments','POST',{noi_dung:'Admin thử'})).status,403);assert.equal((await f.buyer.call(path+'/auctions/8/comments','POST',{noi_dung:'Còn đủ trang không?'})).status,201);f.auction.thoi_gian_ket_thuc=new Date(Date.now()-1).toISOString();assert.equal((await f.buyer.call(path+'/auctions/8/comments','POST',{noi_dung:'Hết giờ'})).status,409);const history=await f.guest.call(path+'/auctions/8/comments');assert.equal(history.data.items.length,1);assert.equal(history.data.duoc_binh_luan,false);
  for(let n=2;n<=60;n++)f.comments.push({binh_luan_id:n,noi_dung:'Lịch sử'});const first=await f.guest.call(path+'/auctions/8/comments'),second=await f.guest.call(path+`/auctions/8/comments?before=${first.data.nextBefore}`);assert.equal(first.data.items.length,50);assert.equal(second.data.items.length,10);assert(!first.data.items.some(x=>second.data.items.some(y=>y.binh_luan_id===x.binh_luan_id)));
+});
+
+test('người bán có thể mở hồ sơ, người mua được giải trình, quá hạn chuyển sang Admin',async t=>{
+ const f=await setup(t),saved=await f.seller.call(path+'/trades/1/complaints','POST',{ly_do:'Đối soát thanh toán',noi_dung:'Chưa nhận được tiền.',media:[]});
+ assert.equal(saved.status,201);const url=path+'/complaints/'+saved.data.khieu_nai_id;
+ assert.equal((await f.buyer.call(url)).data.can_toi_phan_hoi,true);
+ f.complaints[0].han_giai_trinh=new Date(Date.now()-1000).toISOString();
+ assert.equal((await f.buyer.call(url+'/response','POST',{noi_dung:'Phản hồi trễ',media:[]})).status,409);
+ assert.equal((await f.admin.call(url+'/claim','POST',{})).status,200);
+ assert.equal((await f.admin.call(url+'/resolve','POST',{ket_luan:'khong_co_can_cu',phan_hoi_admin:'Không đủ chứng cứ.'})).status,200);
+ assert.equal((await f.buyer.call(url)).data.ket_luan,'khong_co_can_cu');
+});
+
+test('hồ sơ lịch sử giữ quyền xem ban đầu',async t=>{
+ const f=await setup(t),saved=await f.buyer.call(path+'/trades/1/complaints','POST',{ly_do:'Hồ sơ cũ',noi_dung:'Nội dung đã lưu trước khi chia sẻ.',media:[]});
+ const url=path+'/complaints/'+saved.data.khieu_nai_id;
+ f.complaints[0].han_giai_trinh=null;
+ assert.equal((await f.seller.call(url)).status,404);
+ assert.equal((await f.seller.call(path+'/complaints')).data.items.length,0);
+ assert.equal((await f.buyer.call(url)).status,200);
+ assert.equal((await f.admin.call(url)).status,200);
 });

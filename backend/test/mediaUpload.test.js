@@ -9,6 +9,63 @@ const config=parseMediaConfig({CLOUDINARY_CLOUD_NAME:'demo',CLOUDINARY_API_KEY:'
 const publicId='bookauction/4/672ed37c-0258-42c7-b512-640310b79cb2';
 const input={kind:'video',publicId,bytes:Buffer.from('000000186674797069736f6d0000000069736f6d6d703432','hex'),mime:'video/mp4'};
 const asset=(patch={})=>({public_id:publicId,resource_type:'video',type:'upload',secure_url:`https://res.cloudinary.com/demo/video/upload/v1/${publicId}.mp4`,...patch});
+const chunkSize=6*1024*1024;
+test('video lớn được gửi theo các byte range nối tiếp, chỉ xác nhận từ phần cuối',async()=>{
+ const bytes=Buffer.alloc(2*chunkSize+7);bytes[0]=11;bytes[chunkSize]=22;bytes[2*chunkSize]=33;
+ const requests=[];const p=createCloudinary({config,fetchImpl:async(url,options)=>{
+  const {method,headers,body,signal}=options;
+  assert.equal(method,'POST');assert(url.endsWith('/video/upload'));
+  assert.equal(body.get('public_id'),publicId);assert.equal(body.get('overwrite'),'false');
+  const file=body.get('file');
+  requests.push({range:headers['Content-Range'],id:headers['X-Unique-Upload-Id'],size:file.size,
+    first:new Uint8Array(await file.slice(0,1).arrayBuffer())[0],signal});
+  return Response.json(requests.length<3?{done:false}:asset({done:true}));
+ }});
+ assert.equal((await p.upload({...input,bytes})).url,asset().secure_url);
+ assert.deepEqual(requests.map(({range,size,first})=>[range,size,first]),[
+  [`bytes 0-${chunkSize-1}/${bytes.length}`,chunkSize,11],
+  [`bytes ${chunkSize}-${2*chunkSize-1}/${bytes.length}`,chunkSize,22],
+  [`bytes ${2*chunkSize}-${bytes.length-1}/${bytes.length}`,7,33]
+ ]);
+ assert(requests[0].id);
+ assert(requests.every(x=>x.id===requests[0].id&&x.signal===requests[0].signal));
+});
+test('timeout ở phần cuối tra metadata sau khoảng chờ, không gửi lại phần nào',async()=>{
+ const sequence=[];let posts=0,gets=0;
+ const p=createCloudinary({config,wait:async ms=>sequence.push(ms),fetchImpl:async(url,options)=>{
+  if(options.method==='POST'){
+   sequence.push('POST');
+   if(++posts===1)return Response.json({done:false});
+   throw new DOMException('last chunk reply timed out','TimeoutError');
+  }
+  assert(url.endsWith('/resources/video/upload/'+encodeURIComponent(publicId)));
+  sequence.push('GET');return ++gets<3?new Response('',{status:404}):Response.json(asset());
+ }});
+ assert.equal((await p.upload({...input,bytes:Buffer.alloc(chunkSize+1)})).publicId,publicId);
+ assert.deepEqual(sequence,['POST','POST','GET',2000,'GET',8000,'GET']);
+});
+test('không gửi phần tiếp khi Cloudinary chưa xác nhận phần trước',async()=>{
+ let posts=0;const p=createCloudinary({config,wait:async()=>{},fetchImpl:async(_url,options)=>{
+  if(options.method==='GET')return new Response('',{status:404});
+  posts++;return Response.json(asset({done:true}));
+ }});
+ await assert.rejects(p.upload({...input,bytes:Buffer.alloc(chunkSize+1)}),{code:'MEDIA_PROVIDER_ERROR'});
+ assert.equal(posts,1);
+});
+test('lỗi trước headers ghi đúng phần video và giới hạn, không ghi payload hoặc tên tệp',async()=>{
+ let posts=0;const p=createCloudinary({config,wait:async()=>{},fetchImpl:async(_url,options)=>{
+  if(options.method==='GET')return new Response('',{status:404});
+  if(++posts===1)return Response.json({done:false});
+  throw new DOMException('private-filename.mp4','TimeoutError');
+ }});
+ await assert.rejects(p.upload({...input,bytes:Buffer.alloc(chunkSize+1)}),error=>{
+  const {elapsed_ms,...data}=error.mediaDiagnostics;
+  assert(Number.isSafeInteger(elapsed_ms));
+  assert.deepEqual(data,{operation:'upload',kind:'video',stage:'awaiting_headers',file_bytes:chunkSize+1,part:2,parts:2,timeout_ms:300000,deadline_reached:false});
+  assert.equal(error.recoveryDiagnostics.http_status,404);
+  assert(!JSON.stringify(error).includes('private-filename'));return true;
+ });
+});
 test('video đã lên nhưng upload timeout: một POST, tra đúng public ID, xác minh rồi trả URL thật',async()=>{
  const calls=[];const p=createCloudinary({config,wait:async()=>{},fetchImpl:async(url,options)=>{
   calls.push({url,method:options.method});assert(!url.includes(config.apiSecret));assert(options.headers.Authorization.startsWith('Basic '));
@@ -31,6 +88,13 @@ test('body response treo bị hủy đúng deadline, sau đó phục hồi từ 
   calls++;if(options.method==='GET')return Response.json(asset());let timer;return new Response(new ReadableStream({start(c){timer=setTimeout(()=>c.enqueue(new Uint8Array([1])),200);},cancel(){clearTimeout(timer);cancelled++;}}));
  }});
  const value=await p.upload(input);assert.equal(value.publicId,publicId);assert.equal(calls,2);assert.equal(cancelled,1);
+});
+test('body bị treo khác lỗi chờ headers; nếu đối soát không thấy asset, log giữ nguyên giai đoạn timeout',async()=>{
+ const p=createCloudinary({config:{...config,videoUploadTimeoutMs:20},wait:async()=>{},fetchImpl:async(_url,options)=>{
+  if(options.method==='GET')return new Response('',{status:404});
+  let timer;return new Response(new ReadableStream({start(c){timer=setTimeout(()=>c.enqueue(new Uint8Array([1])),200);},cancel(){clearTimeout(timer);}}));
+ }});
+ await assert.rejects(p.upload(input),error=>error.code==='MEDIA_PROVIDER_TIMEOUT'&&error.mediaDiagnostics.stage==='response_body'&&error.mediaDiagnostics.deadline_reached===true);
 });
 test('HTTP auth/quota/tệp bị từ chối không tự tra hoặc upload lại; body không được phản chiếu',async()=>{
  for(const [status,code] of [[400,'MEDIA_PROVIDER_REJECTED'],[401,'MEDIA_PROVIDER_AUTH'],[403,'MEDIA_PROVIDER_AUTH'],[413,'MEDIA_PROVIDER_LIMIT'],[420,'MEDIA_PROVIDER_LIMIT'],[429,'MEDIA_PROVIDER_LIMIT']]){
@@ -56,7 +120,7 @@ test('overwrite:false existing cần metadata xác minh; URL đúng thì nhận,
 });
 test('cấu hình phân biệt ảnh/video, frontend đợi đủ upload và đối soát, không lộ khóa',()=>{
  assert.equal(config.uploadTimeoutMs,120000);assert.equal(config.videoUploadTimeoutMs,300000);
- const publicConfig=publicMediaConfig(config);assert(publicConfig.uploadTimeoutMs.video>=config.videoUploadTimeoutMs+45000+300000);assert(publicConfig.uploadTimeoutMs.image<publicConfig.uploadTimeoutMs.video);assert(!JSON.stringify(publicConfig).includes('private-fixture'));
+ const publicConfig=publicMediaConfig(config);assert.equal(publicConfig.uploadTimeoutMs.video,config.videoUploadTimeoutMs+45000+10000+310000);assert(publicConfig.uploadTimeoutMs.image<publicConfig.uploadTimeoutMs.video);assert(!JSON.stringify(publicConfig).includes('private-fixture'));
  for(const patch of [{MEDIA_VIDEO_UPLOAD_TIMEOUT_MS:'1'},{MEDIA_VIDEO_UPLOAD_TIMEOUT_MS:'300001'},{MEDIA_IMAGE_UPLOAD_TIMEOUT_MS:'no'},{MEDIA_RECOVERY_TIMEOUT_MS:'30001'}])assert.throws(()=>parseMediaConfig(patch));
 });
 test('lỗi media chỉ lộ thông báo tĩnh; lỗi nội bộ SQL vẫn được che',()=>{

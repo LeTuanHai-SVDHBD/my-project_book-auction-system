@@ -457,7 +457,7 @@ export default function PostsPanel({
     />
   );
   return (
-    <main className="posts-page page-container">
+    <main className={`posts-page page-container${mode === "catalog" ? " catalog-page" : ""}`}>
       {!post && (
         <header className="posts-heading">
           <div>

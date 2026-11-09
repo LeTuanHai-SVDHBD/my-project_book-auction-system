@@ -25,7 +25,10 @@ Cài đặt/cập nhật tại [setup-guide.md](setup-guide.md); tài nguyên fo
 không giả định bằng mã bài. Hash route giữ được Back/F5; Backend vẫn quyết định quyền mỗi request.
 
 Admin chỉ có sidebar, chứa avatar/tài khoản và thông báo, không có header ngang hoặc nút đăng sách.
-Người dùng dùng header/menu responsive. Khách không thấy avatar/hộp thông báo của người dùng.
+Trên desktop, các liên kết chính nằm ngang. Từ 1.100 px trở xuống, menu mở dưới thanh đầu trang,
+đánh dấu trang hiện tại và đóng khi chọn mục, tìm kiếm hoặc nhấn Escape. Trên điện thoại, ô tìm kiếm
+nằm ở hàng riêng. Trang đấu giá dùng bộ lọc có thể xuống hàng và lưới thẻ tự co theo chiều rộng.
+Khách không thấy avatar/hộp thông báo của người dùng.
 Mục **Khiếu nại** nằm cạnh **Giao dịch**; số cạnh mục này chỉ đếm hồ sơ còn hạn cần người dùng phản hồi.
 Login mới cùng tài khoản thu hồi phiên cũ, tab cũ về đăng nhập, không dùng lớp phủ F5 để giành quyền.
 CSRF chỉ giữ trong bộ nhớ; lỗi INVALID_CSRF được lấy token mới/thử lại tối đa một lần, không tự retry lỗi mạng.

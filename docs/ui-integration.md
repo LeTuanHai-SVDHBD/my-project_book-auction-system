@@ -141,6 +141,7 @@ Backend đích luôn kiểm tra quyền lại, kể cả thông báo cũ vẫn h
 
 Giao dịch hiển thị hai xác nhận riêng; đánh giá chỉ phía người mua sau hoàn tất, không hiện lời mời
 đánh giá người bán ở phía người bán. Khiếu nại tách lý do/nội dung, trạng thái, bằng chứng và phản hồi Admin.
+Trong chi tiết phiên, nút **Giao dịch của tôi** chỉ hiện cho chủ sách và người thắng sau khi có kết quả đã lưu với người thắng.
 Chỉ Admin được phân công/hồ sơ đang xử lý mới mở chat chỉ đọc. Chi tiết tại [after-sales.md](after-sales.md).
 
 Checklist bàn giao: khách/role, tìm kiếm rỗng/lọc/phân trang, nhập tiền/IME, nháp/upload,

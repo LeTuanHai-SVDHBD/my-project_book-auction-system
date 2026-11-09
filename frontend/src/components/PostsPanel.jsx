@@ -187,12 +187,6 @@ function Detail({
                 ownerView={mode === "mine"}
               />
             )}
-            {post.trang_thai_phien === "da_ket_thuc" &&
-              user?.vai_tro === "nguoi_dung" && (
-                <a href="#/trades" className="btn btn-outline">
-                  Giao dịch của tôi
-                </a>
-              )}
             {mode === "mine" &&
               post.trang_thai_phien === "da_qua_kiem_duyet" && (
                 <form onSubmit={activate}>

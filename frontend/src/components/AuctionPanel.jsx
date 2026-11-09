@@ -26,6 +26,9 @@ export default function AuctionPanel({auctionId,user,onSnapshot,ownerView=false}
   const [clock,setClock]=useState(null),[,tickClock]=useState(0);
   const sending=useRef(false),latestReceipt=useRef(null),refreshSequence=useRef(0);
   const isBidder=user?.vai_tro==='nguoi_dung';
+  const result=snapshot?.ket_qua;
+  const showTradeLink=isBidder&&snapshot?.trang_thai==='da_ket_thuc'&&result?.trang_thai==='co_nguoi_thang'
+    &&(ownerView||availability?.la_chu_sach||result.nguoi_thang_dau_id===user.nguoi_dung_id);
   const time=auctionTime(clock,snapshot?.trang_thai,performance.now());
   const awaitingOwnerResult=ownerView&&time.phase==='closing';
   const phaseBadge=awaitingOwnerResult?'ended':phaseBadges[time.phase]||'syncing';
@@ -117,5 +120,8 @@ export default function AuctionPanel({auctionId,user,onSnapshot,ownerView=false}
       {terminal(receipt)&&canBid&&!busy&&<button type="button" onClick={()=>{setAttempt(null);setReceipt(null);latestReceipt.current=null;setError('');}}>Nhập mức giá tiếp theo</button>}
     </div>}
     {loadError&&<p className="error" role="alert">{loadError}</p>}{error&&<p className="error" role="alert">{error}</p>}<button type="button" className="text-button" disabled={busy} onClick={()=>refresh()}>Tải lại phiên và kết quả</button>
+    {showTradeLink&&<div className="auction-trade-action">
+      <a href="#/trades" className="btn btn-outline">Giao dịch của tôi</a>
+    </div>}
   </section>;
 }

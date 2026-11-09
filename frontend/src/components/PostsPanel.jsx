@@ -5,6 +5,7 @@ import { OWNER_POST_FILTERS, normalizeOwnerPostStatus } from "../../../shared/ow
 import { STATUS, postStatus } from "../utils/statusPresentation.js";
 import { BOOK_GENRE_GROUPS } from "../../../shared/bookGenres.js";
 import { bookReviewDescription } from "../../../shared/bookCondition.js";
+import { mediaDisplayUrl } from "../../../shared/mediaDelivery.js";
 import { currentReview } from "../../../shared/aiVisibility.js";
 import { useSuccessFeedback } from "./SuccessFeedback.jsx";
 import { navigate } from "../services/navigation.js";
@@ -38,6 +39,19 @@ const ownerFilterOptions = OWNER_POST_FILTERS.map(key => [key, key === "all" ? "
 const moderationFilterOptions = [
   ["all", "Tất cả"], ["pending", "Chờ kiểm duyệt"], ["rejected", "Đã từ chối"],
 ];
+function OwnerBookThumbnail({ cover }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className="owner-book-thumbnail" aria-hidden="true">
+      {cover && !failed ? (
+        <img src={mediaDisplayUrl(cover, "image")} alt="" loading="lazy" decoding="async"
+          onError={() => setFailed(true)} />
+      ) : (
+        <Icon name="book" size={24} />
+      )}
+    </span>
+  );
+}
 function ReviewDecision({ review, postId, canExport }) {
   return (
     <blockquote className="review-decision">
@@ -667,11 +681,14 @@ export default function PostsPanel({
                   {items.map((item) => (
                     <tr key={item.bai_dang_id}>
                       <td>
-                        <a href={`#/mine/${item.bai_dang_id}${postQuery}`}>
-                          <b>{item.ten_sach}</b>
-                          <small>
-                            {item.tac_gia} · Bài #{item.bai_dang_id}
-                          </small>
+                        <a className="owner-book-link" href={`#/mine/${item.bai_dang_id}${postQuery}`}>
+                          <OwnerBookThumbnail key={item.anh_bia || "placeholder"} cover={item.anh_bia} />
+                          <span className="owner-book-text">
+                            <b>{item.ten_sach}</b>
+                            <small>
+                              {item.tac_gia || "Chưa rõ tác giả"} · Bài #{item.bai_dang_id}
+                            </small>
+                          </span>
                         </a>
                       </td>
                       <td data-label="Giá khởi điểm">{money(item.gia_khoi_diem)}</td>

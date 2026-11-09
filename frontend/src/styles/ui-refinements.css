@@ -96,6 +96,21 @@ button, input, select, textarea { scroll-margin-block: 110px; }
 .my-posts-table th:nth-child(3) { width: 24%; }
 .my-posts-table td { vertical-align: middle; overflow-wrap: anywhere; padding: 22px 20px; }
 .my-posts-table td:first-child small { display: block; margin-top: 6px; }
+.owner-book-link { display: flex; align-items: center; gap: 14px; }
+.owner-book-text { min-width: 0; }
+.owner-book-thumbnail {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 72px;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f4f1e9;
+  color: var(--muted);
+}
+.owner-book-thumbnail img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .my-posts-table tbody tr:hover { background: #f6f8fb; }
 .my-posts-table td:last-child a { display: inline-flex; align-items: center; min-height: 44px; }
 .catalog-select-filters { align-items: flex-end; flex-wrap: wrap; }
@@ -121,6 +136,7 @@ input[type="file"]::file-selector-button { padding: 10px 14px; margin-right: 12p
   .my-posts-table tbody { display: grid; gap: 16px; }
   .my-posts-table tr { border: 1px solid var(--line); border-radius: 16px; background: white; padding: 20px; }
   .my-posts-table td { padding: 8px 0; border: 0; }
+  .owner-book-thumbnail { width: 46px; height: 62px; }
   .my-posts-table td[data-label]::before { content: attr(data-label); display: block; color: var(--muted); font-size: 16px; margin-bottom: 6px; }
   .my-posts-table { border: 0; background: transparent; box-shadow: none; overflow: visible; }
 }

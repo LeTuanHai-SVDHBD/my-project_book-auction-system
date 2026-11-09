@@ -36,6 +36,7 @@ bị từ chối, đã duyệt chờ kích hoạt, sắp bắt đầu, đang đ�
 Bộ lọc **Đã kết thúc** gồm phiên đã hết giờ theo SQL và phiên đã chốt (kể cả kết thúc sớm).
 Nếu chưa chốt, chi tiết cho chủ sách hiện **Đang xác nhận kết quả**; kết quả chỉ hiện sau khi đã lưu.
 Khi mở chi tiết từ danh sách đã lọc rồi quay lại, giao diện giữ bộ lọc.
+Cột **Bản sách** hiển thị ảnh chính cạnh tên sách; nếu thiếu ảnh hoặc ảnh không tải được, dùng biểu tượng sách.
 
 ## Danh mục và tìm kiếm
 

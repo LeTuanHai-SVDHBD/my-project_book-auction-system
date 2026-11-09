@@ -1,6 +1,7 @@
 /** All media belong to one physical copy. Compatible previews keep original evidence links. */
 import { mediaDisplayUrl } from "../../../shared/mediaDelivery.js";
 import { useEffect, useRef, useState } from "react";
+import ImageLightbox from "./ImageLightbox.jsx";
 import ImageZoom from "./ImageZoom.jsx";
 import { Icon } from "./DesignUi.jsx";
 export default function BookGallery({ items = [] }) {
@@ -8,8 +9,22 @@ export default function BookGallery({ items = [] }) {
     gallery = useRef(null),
     selectionAction = useRef(null);
   const [selected, setSelected] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const restoreFocus = useRef(false);
   const current = Math.min(selected, Math.max(0, items.length - 1)),
     media = items[current];
+  const photos = items.flatMap((item, index) => item.kind === "image" ? [index] : []);
+  const photoIndex = photos.indexOf(current);
+  useEffect(() => {
+    if (!lightboxOpen && restoreFocus.current) {
+      restoreFocus.current = false;
+      gallery.current?.querySelector(".image-zoom-target")?.focus({ preventScroll: true });
+    }
+  }, [lightboxOpen]);
+  function closeLightbox() {
+    restoreFocus.current = true;
+    setLightboxOpen(false);
+  }
   useEffect(() => {
     const action = selectionAction.current;
     if (!action) return;
@@ -96,10 +111,10 @@ export default function BookGallery({ items = [] }) {
           />
         ) : (
           <ImageZoom
-            originalSrc={media.url}
             key={media.url}
             src={mediaDisplayUrl(media.url, media.kind)}
             alt={media.title || "Ảnh bản sách"}
+            onOpen={() => setLightboxOpen(true)}
           />
         )}
       </div>
@@ -161,6 +176,16 @@ export default function BookGallery({ items = [] }) {
           <Icon name="arrow" size={20} />
         </button>
       </div>
+      {lightboxOpen && photoIndex >= 0 && (
+        <ImageLightbox
+          src={mediaDisplayUrl(media.url, media.kind)}
+          alt={media.title || "Ảnh bản sách"}
+          index={photoIndex}
+          count={photos.length}
+          onSelect={(index) => choose(photos[index])}
+          onClose={closeLightbox}
+        />
+      )}
     </section>
   );
 }

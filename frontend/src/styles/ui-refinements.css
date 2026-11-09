@@ -399,7 +399,7 @@ input[type="file"]::file-selector-button { padding: 10px 14px; margin-right: 12p
   .live-trade-grid > div > .panel,.live-trade-grid .private-chat {padding:20px;}
   .form-grid,.book-info-grid {grid-template-columns:minmax(0,1fr);}
   .post-sheet fieldset {min-width:0;}
-  .post-sheet :is(input,textarea,select) {width:100%;min-width:0;font-size:max(16px,1em);}
+  .post-sheet :is(input:not([type="radio"], [type="checkbox"]), textarea, select) {width:100%;min-width:0;font-size:max(16px,1em);}
   .live-form-steps {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
   .live-form-steps li {padding-block:10px;font-size:16px;}
   .live-form-steps li > span {flex-shrink:0;}
@@ -461,7 +461,6 @@ input[type="file"]::file-selector-button { padding: 10px 14px; margin-right: 12p
   .my-posts-table tr {padding:14px;}
   .owner-book-link {align-items:flex-start;gap:10px;}
   .owner-book-text {min-width:0;overflow-wrap:anywhere;}
-  .gallery-browser {gap:6px;grid-template-columns:32px minmax(0,1fr) 32px;}
   .gallery-thumbnails {min-width:0;overflow-x:auto;}
   .gallery-stage .image-zoom-target {height:clamp(260px,76vw,370px);
     padding:10px 10px 52px;}
@@ -484,7 +483,7 @@ input[type="file"]::file-selector-button { padding: 10px 14px; margin-right: 12p
     padding:16px;
   }
   .dialog .actions > :is(button,a) {flex:1 1 100%;width:100%;}
-  .dialog.inbox-dialog {width:100vw;border-radius:0;}
+  .dialog.inbox-dialog {border-radius:0;}
   .inbox-entry,.inbox-toolbar,.inbox-filters {padding-inline:14px;}
   .inbox-footnote {padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));}
   .admin-navigation-drawer .figma-admin-sidebar {padding:20px 14px;}
@@ -498,7 +497,174 @@ input[type="file"]::file-selector-button { padding: 10px 14px; margin-right: 12p
   .site-header .brand strong {font-size:21px;}
   .site-header .header-actions {gap:4px;}
   .site-header .mobile-nav:not([hidden]) {grid-template-columns:minmax(0,1fr);}
-  .live-form-steps,.upload-selection {grid-template-columns:minmax(0,1fr);}
+  .upload-selection {grid-template-columns:minmax(0,1fr);}
   .gallery-stage .image-zoom-target {height:260px;}
 }
 @media (prefers-reduced-motion:reduce) {.book-card {transition:none;}}
+
+/* Reflow by usable content width, including the space beside the Admin sidebar. */
+.posts-page { container: bookbid-content / inline-size; }
+#main-content, .account-card, .live-trade-grid > div, .search-select-input > input { min-width: 0; }
+.site-footer > div { min-width: 0; }
+.site-footer a { overflow-wrap: anywhere; }
+.post-sheet :is(input:not([type="radio"], [type="checkbox"]), select, textarea),
+.account-card :is(input, select, textarea),
+.infrastructure-page .probe-form input { min-width: 0; max-width: 100%; }
+.post-sheet :is(.search-select-options button, .isbn-choice label) { white-space: normal; overflow-wrap: anywhere; }
+.search-select-options { max-height: min(280px, 46dvh); overscroll-behavior: contain; }
+.search-select-input > button { min-width: 44px; min-height: 44px; }
+.live-form-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.live-form-steps li { min-width: 0; overflow-wrap: anywhere; }
+.post-sheet .wizard-actions { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+.post-sheet .wizard-actions > :is(.primary, .secondary) { min-height: 44px; max-width: 100%; }
+.post-sheet .wizard-actions > .text-button { margin: 0; min-height: 44px; }
+.complaint-detail .case-overview { height: auto; min-height: 0; justify-content: flex-start; }
+.complaint-detail .case-overview h2 { min-width: 0; }
+.dialog > header { height: auto; }
+.dialog > header h2 { min-width: 0; }
+.inbox-filters { flex-wrap: wrap; }
+.admin-account, .figma-admin-sidebar nav a { overflow-wrap: anywhere; }
+.figma-admin-sidebar nav a svg, .admin-account > svg { flex: none; }
+.admin-mobile-menu > button { max-width: 100%; }
+.gallery-stage { min-height: 0; }
+.gallery-stage video { min-height: 0; max-height: min(65dvh, 540px); }
+.gallery-browser { grid-template-columns: 44px minmax(0, 1fr) 44px; gap: clamp(6px, 1vw, 10px); }
+.gallery-scroll { width: 44px; }
+.bid-history li > :is(strong, span, time) { min-width: 0; overflow-wrap: anywhere; }
+.ai-criterion :is(a, summary), .case-evidence figcaption { overflow-wrap: anywhere; }
+
+@container bookbid-content (max-width: 790px) {
+  .live-detail-grid, .live-trade-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .live-form-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@container bookbid-content (max-width: 580px) {
+  .post-sheet .form-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .live-form-steps { gap: 8px; margin-block: 22px; }
+  .live-form-steps li {
+    min-height: 52px;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #f7f7f3;
+    font-size: 14px;
+    line-height: 1.3;
+  }
+  .live-form-steps li[aria-current="step"] { background: #fff7e6; }
+  .live-form-steps li > span { width: 25px; height: 25px; }
+  .post-sheet .wizard-actions > :is(.primary, .secondary) { flex: 1 1 105px; }
+  .post-sheet .wizard-actions > .text-button { flex-basis: 100%; }
+  .live-trade-grid .private-chat form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .live-trade-grid .private-chat form > button { width: 100%; margin: 0; }
+}
+
+@media (max-width: 900px) {
+  .my-posts-table thead { inset-inline-start: 0; }
+  .my-posts-table thead th { padding: 0; }
+  .my-posts-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    gap: 10px 16px;
+    padding: 16px;
+  }
+  .my-posts-table td { min-width: 0; padding: 0; }
+  .my-posts-table td:first-child,
+  .my-posts-table td:last-child { grid-column: 1 / -1; }
+  .my-posts-table td:first-child { padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .my-posts-table td:last-child a { text-align: start; }
+}
+
+@media (max-width: 760px) {
+  .figma-hero-copy { padding: 32px clamp(16px, 4vw, 28px) 22px; }
+  .figma-hero h1 { font-size: clamp(34px, 7vw, 50px); }
+  .figma-hero-image { height: clamp(240px, 68vw, 390px); min-height: 0; }
+  .figma-hero-search .btn { flex: none; min-height: 44px; }
+  .figma-hero-search input { font-size: 16px; }
+  .figma-trust-row { flex-wrap: wrap; justify-content: flex-start; }
+  .figma-trust-row > b { flex: 1 1 72px; min-width: 0; }
+  .account-page { grid-template-columns: minmax(0, 1fr); padding: 26px 16px 40px; }
+  .account-card { padding: clamp(16px, 5vw, 26px); }
+  .account-card h2 { font-size: clamp(28px, 6vw, 36px); }
+  .account-tabs button { flex: 1 1 0; min-width: 0; min-height: 44px; padding-inline: 8px; }
+  .admin-mobile-menu { padding: 14px 16px 0; }
+}
+
+@media (max-width: 420px) {
+  .my-posts-table tr { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .my-posts-table td[data-label]::before { margin-bottom: 2px; }
+  .live-detail .panel, .post-sheet:not(.live-trade-detail),
+  .live-trade-grid > aside, .live-trade-grid > div > .panel, .live-trade-grid .private-chat { padding: 16px; }
+  .dialog:not(.admin-navigation-drawer) > header { gap: 10px; }
+}
+
+@media (max-height: 540px) {
+  .dialog.inbox-dialog > header { min-height: 0; padding-block: 10px; }
+  .dialog.inbox-dialog > header h2 { font-size: 24px; }
+  .inbox-toolbar { padding-block: 8px; }
+  .inbox-filters { padding-bottom: 8px; }
+  .inbox-footnote { margin-block: 0; padding-block: 8px; }
+}
+
+/* The full-size gallery uses the native dialog layer, outside the gallery crop. */
+button.image-zoom-target {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: inherit;
+}
+.image-lightbox {
+  position: fixed;
+  inset: 0;
+  width: min(1180px, 100%);
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  margin: auto;
+  padding: clamp(8px, 2vw, 22px);
+  border: 0;
+  background: transparent;
+  color: white;
+}
+.image-lightbox::backdrop { background: #0d1724eb; }
+.image-lightbox[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.lightbox-stage {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+}
+.lightbox-stage img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  min-height: 0;
+  object-fit: contain;
+}
+.image-lightbox button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid #ffffff72;
+  border-radius: 50%;
+  color: white;
+  background: #243348;
+}
+.image-lightbox button:hover { background: #3b4d66; }
+.image-lightbox button:focus-visible { outline: 2px solid white; outline-offset: 2px; }
+.image-lightbox .lightbox-close { justify-self: end; }
+.lightbox-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 44px;
+}
+.lightbox-controls > button:first-child svg { transform: rotate(180deg); }

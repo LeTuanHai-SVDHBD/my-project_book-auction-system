@@ -111,15 +111,19 @@ không gọi lại AI; xem [ai-analysis.md](ai-analysis.md) và [review-exports.
 | AI | Chưa phân tích xám; chờ vàng; đang phân tích xanh dương; xong xanh lá; thiếu dữ liệu cam; lỗi đỏ |
 
 Nhãn luôn có chữ và biểu tượng; không dùng màu làm tín hiệu duy nhất. Bài của tôi chuyển từ bảng sang thẻ
-ở màn hình hẹp. Chi tiết, nút tìm kiếm, bộ lọc, ngăn thông báo, hộp thoại, bảng điểm và media co theo chiều rộng.
-Giao diện dùng thương hiệu BookBid. Xem [kiểm chứng](../VALIDATION.md) để biết phạm vi QA thực tế.
+ở màn hình hẹp. Chi tiết sách và giao dịch xếp thành một cột khi vùng nội dung hẹp, kể cả bên cạnh thanh
+quản trị. Bốn bước đăng sách chuyển thành lưới 2 × 2, còn biểu mẫu xếp một cột trên điện thoại. Menu, bộ lọc,
+hộp thông báo và khung ảnh giữ các nút chính dễ chạm. Giao diện dùng thương hiệu BookBid.
+Xem [kiểm chứng](../VALIDATION.md) để biết phạm vi QA thực tế.
 
 ## Gallery và đấu giá
 
 Ảnh/video thuộc cùng một bản sách, giữ tỷ lệ/contain, không giả lập bìa nghiêng. Thumbnails có nút trước/sau,
 Home/End chọn đầu/cuối; trong dải thumbnails, ←/→ đổi mục và đưa mục chọn vào vùng nhìn.
-Phím điều khiển video native được giữ. Kính lúp desktop phóng đúng vùng ảnh, không phóng nền trống;
-chạm/Enter mở ảnh gốc. Bản chuyển JPEG/MP4 để xem không ghi đè URL Cloudinary gốc trong hồ sơ.
+Kính lúp desktop phóng đúng vùng ảnh. Nhấn ảnh, nút **Phóng to ảnh** hoặc Enter để mở khung xem ngay
+trên trang. Bấm nút mũi tên hoặc dùng ←/→ để đổi ảnh, Home/End đến ảnh đầu/cuối. Khung chỉ duyệt ảnh;
+video vẫn phát trong gallery. Đóng bằng ×, Esc hoặc bấm nền tối. Bản chuyển JPEG/MP4 để xem không ghi đè
+URL Cloudinary gốc trong hồ sơ.
 
 Chủ sách không có thao tác đặt giá. Người mua chờ cooldown chỉ thấy thời gian còn lại;
 đang chờ xử lý không được báo thành công trước quyết định SQL. Giá đang gõ không bị snapshot nền thay.
@@ -182,6 +186,5 @@ Checklist kiểm tra thủ công với dữ liệu thật, ở **320 / 360 / 390
   xoay điện thoại. Trường hợp cố tình cuộn riêng: ảnh thumbnail, chat,
   bình luận và bảng dữ liệu rộng.
 
-**Giới hạn xác minh:** lớp CSS đã rà cú pháp và selector trong source; không
-coi checklist bên trên là PASS trên trình duyệt thật cho tới khi chạy với
-`npm.cmd run dev:all`, dữ liệu thực và chụp màn hình trên máy nghiệm thu.
+**Phạm vi đã kiểm tra:** xem [kiểm chứng](../VALIDATION.md) cho các khung Chromium dùng dữ liệu mẫu.
+Dùng checklist này để nghiệm thu thêm trên thiết bị, trình duyệt và dữ liệu thực tế.

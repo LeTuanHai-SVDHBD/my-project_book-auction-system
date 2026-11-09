@@ -2,6 +2,15 @@
 
 # Kiểm chứng và nghiệm thu
 
+## Bố cục responsive và khung xem ảnh
+
+- Chromium với API dữ liệu mẫu: đo tràn ngang cho 21 tổ hợp trang/vai trò, mỗi tổ hợp ở
+  320, 390, 640, 768, 1024, 1101 và 1440 px. Không phát hiện tràn ngang toàn trang trong các mẫu đã kiểm tra.
+- Thử menu di động, chọn năm xuất bản, mở biểu mẫu khiếu nại và hộp thông báo. Khung ảnh mở trong trang
+  ở 320 và 1440 px; thử đổi ảnh bằng nút và phím, đóng bằng ×, Esc hoặc bấm nền tối.
+- `npm run check`, `npm run build` và `npm test` đạt: 231 PASS, 12 SKIP, tổng 243 test.
+  Đợt kiểm tra giao diện này dùng dữ liệu mẫu, không kết nối dịch vụ thật.
+
 ## Upload video theo phần và đối soát phản hồi Cloudinary
 
 - `npm run check` và `npm test` đạt: 215 PASS, 12 SKIP, tổng 227 test.
@@ -202,14 +211,3 @@ Ghi commit, ngày, môi trường, lệnh, exit code, PASS/SKIP/FAIL và thành 
 Che mật khẩu, cookie, API key, Authorization, dữ liệu cá nhân/chat không cần thiết.
 Đặt log/ảnh được chọn ở `academic/evidence/` theo [quy ước](academic/README.md);
 checklist chức năng hiện tại ở [tasks.md](docs/tasks.md). Không xóa dữ liệu ứng dụng để làm test chuyển sang PASS.
-
-## Rà soát responsive (2026-11-09)
-
-Đã đối chiếu cấu trúc component frontend và thứ tự CSS; bổ sung lớp bố cục
-cho các breakpoint 360/520/768/900/1024 và vùng Admin 1101–1470.
-Kiểm tra cú pháp CSS/selector tĩnh được thực hiện, **không phải E2E**.
-Trong môi trường kiểm tra này, Chromium bị chặn tải trang cục bộ
-(`ERR_BLOCKED_BY_ADMINISTRATOR`), vì vậy **chưa xác nhận** bố cục thực ở
-các khung màn hình hay smoke với dữ liệu thật. Xem checklist trong
-[ui-integration.md](docs/ui-integration.md#responsive-và-nghiệm-thu-giao-diện)
-và chạy `npm.cmd run build` khi pull trên máy Windows.

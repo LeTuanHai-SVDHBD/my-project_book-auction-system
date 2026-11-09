@@ -18,7 +18,7 @@ function suggested(snapshot) {
   const value=snapshot.gia_hien_tai===null?BigInt(snapshot.gia_khoi_diem):BigInt(snapshot.gia_hien_tai)+BigInt(snapshot.buoc_gia);
   return value.toString().length<=18?value.toString():'';
 }
-export default function AuctionPanel({auctionId,user,onSnapshot}) {
+export default function AuctionPanel({auctionId,user,onSnapshot,ownerView=false}) {
   const [snapshot,setSnapshot]=useState(null),[attempt,setAttempt]=useState(null),[receipt,setReceipt]=useState(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[checking,setChecking]=useState(false);
   const [availability,setAvailability]=useState(null),[remaining,setRemaining]=useState(0),[loadError,setLoadError]=useState('');
@@ -27,6 +27,8 @@ export default function AuctionPanel({auctionId,user,onSnapshot}) {
   const sending=useRef(false),latestReceipt=useRef(null),refreshSequence=useRef(0);
   const isBidder=user?.vai_tro==='nguoi_dung';
   const time=auctionTime(clock,snapshot?.trang_thai,performance.now());
+  const awaitingOwnerResult=ownerView&&time.phase==='closing';
+  const phaseBadge=awaitingOwnerResult?'ended':phaseBadges[time.phase]||'syncing';
   const showBidForm=isBidder&&availability&&!availability.la_chu_sach&&remaining===0&&time.phase==='open';
   const canBid=showBidForm&&!refreshing;
   function acceptReceipt(result){
@@ -90,8 +92,8 @@ export default function AuctionPanel({auctionId,user,onSnapshot}) {
   function submit(event){event.preventDefault();if(!canBid)return;const data=new FormData(event.currentTarget);void send({ma_yeu_cau:crypto.randomUUID(),muc_gia:data.get('muc_gia')});}
   return <section className="auction-panel" aria-label="Đặt giá và kết quả phiên"><h3>Phiên đấu giá và kết quả</h3>
     <p className="field-hint" role="status"><StatusBadge state={realtime==='live'?'connected':realtime==='syncing'?'syncing':'reconnecting'}/> {realtime==='live'?'Đã kết nối cập nhật trực tiếp.':realtime==='syncing'?'Đang lấy trạng thái mới nhất…':'Đang kết nối lại. Hệ thống sẽ tự cập nhật dữ liệu.'}</p>
-    {snapshot&&<><dl className="post-info"><dt>Giá mới nhất</dt><dd>{money(snapshot.gia_hien_tai)}</dd><dt>Trạng thái phiên</dt><dd><StatusBadge state={phaseBadges[time.phase]||'syncing'}/></dd></dl>
-      <p className="auction-timer">{time.phase==='scheduled'?`Bắt đầu sau ${duration(time.seconds)}`:time.phase==='open'?`Còn ${duration(time.seconds)}`:time.phase==='closing'?'Đã hết giờ, đang chờ máy chủ xác nhận kết quả.':time.phase==='closed'?'Phiên đã kết thúc.':'Đang đồng bộ thời gian phiên…'}</p>
+    {snapshot&&<><dl className="post-info"><dt>Giá mới nhất</dt><dd>{money(snapshot.gia_hien_tai)}</dd><dt>Trạng thái phiên</dt><dd><StatusBadge state={phaseBadge}/></dd></dl>
+      {awaitingOwnerResult?<p className="field-hint" role="status">Đang xác nhận kết quả.</p>:<p className="auction-timer">{time.phase==='scheduled'?`Bắt đầu sau ${duration(time.seconds)}`:time.phase==='open'?`Còn ${duration(time.seconds)}`:time.phase==='closing'?'Đã hết giờ, đang chờ máy chủ xác nhận kết quả.':time.phase==='closed'?'Phiên đã kết thúc.':'Đang đồng bộ thời gian phiên…'}</p>}
       {snapshot.ket_qua&&<div className="notice" role="status"><StatusBadge state={snapshot.ket_qua.trang_thai}/>
         {snapshot.ket_qua.muc_gia_thang!==null&&<p>Giá thắng: {money(snapshot.ket_qua.muc_gia_thang)}{snapshot.ket_qua.nguoi_thang_dau_id===user?.nguoi_dung_id?' · Bạn là người thắng.':''}</p>}
         <p>{snapshot.ket_qua.ly_do_ket_thuc==='dat_gia_toi_thieu'?'Đã đạt điều kiện kết thúc sớm.':snapshot.ket_qua.ly_do_ket_thuc==='het_thoi_gian'?'Đã hết thời gian đấu giá.':'Kết quả lịch sử.'}</p></div>}

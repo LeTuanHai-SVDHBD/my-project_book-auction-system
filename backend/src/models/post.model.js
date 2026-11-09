@@ -170,7 +170,7 @@ export function createPostModel({ getPool, sql }) {
         WHEN 'da_kich_hoat' THEN CASE
           WHEN p.thoi_gian_bat_dau IS NULL OR p.thoi_gian_ket_thuc IS NULL THEN 'syncing'
           WHEN @now<p.thoi_gian_bat_dau THEN 'scheduled'
-          WHEN @now>=p.thoi_gian_ket_thuc THEN 'closing'
+          WHEN @now>=p.thoi_gian_ket_thuc THEN 'ended'
           ELSE 'live' END
         ELSE 'unknown' END AS owner_status) phase`;
       const req=request(await getPool()).input('owner',sql.Int,owner).input('public',sql.Bit,publicOnly).input('after',sql.Int,after);

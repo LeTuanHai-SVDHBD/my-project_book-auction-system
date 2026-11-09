@@ -32,8 +32,9 @@ CSRF chỉ giữ trong bộ nhớ; lỗi INVALID_CSRF được lấy token mới
 Xác nhận thao tác thành công hiện ở đầu màn hình trong khoảng 4 giây. Lỗi và trạng thái nghiệp vụ vẫn hiển thị tại nơi thao tác; hộp thông báo tài khoản lưu các cập nhật riêng.
 
 Trang **Bài đăng của tôi** lọc toàn bộ bài của chủ sách trước khi phân trang. Các trạng thái gồm chờ kiểm duyệt,
-bị từ chối, đã duyệt chờ kích hoạt, sắp bắt đầu, đang đấu giá, chờ chốt kết quả và đã kết thúc.
-Các pha của phiên đã kích hoạt tính theo giờ SQL; chỉ phiên đã chốt mới thuộc **Đã kết thúc**.
+bị từ chối, đã duyệt chờ kích hoạt, sắp bắt đầu, đang đấu giá và đã kết thúc.
+Bộ lọc **Đã kết thúc** gồm phiên đã hết giờ theo SQL và phiên đã chốt (kể cả kết thúc sớm).
+Nếu chưa chốt, chi tiết cho chủ sách hiện **Đang xác nhận kết quả**; kết quả chỉ hiện sau khi đã lưu.
 Khi mở chi tiết từ danh sách đã lọc rồi quay lại, giao diện giữ bộ lọc.
 
 ## Danh mục và tìm kiếm

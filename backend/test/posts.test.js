@@ -259,7 +259,7 @@ test('HTTP Admin: tất cả/chờ/từ chối, phân trang qua hai nhóm và b�
 
 test('HTTP Bài của tôi: lọc theo chủ sách và giữ trạng thái khi lấy trang sau',async t=>{
  const ownerRows=Array.from({length:35},(_,index)=>({bai_dang_id:index+1,nguoi_dung_id:1,owner_status:'rejected'}));
- ownerRows.push({bai_dang_id:50,nguoi_dung_id:1,owner_status:'approved'},{bai_dang_id:60,nguoi_dung_id:2,owner_status:'rejected'});
+ ownerRows.push({bai_dang_id:50,nguoi_dung_id:1,owner_status:'approved'},{bai_dang_id:55,nguoi_dung_id:1,owner_status:'ended'},{bai_dang_id:60,nguoi_dung_id:2,owner_status:'rejected'});
  const fixture=await serverFixture(t,{ownerRows}),owner=fixture.client();
  assert.equal((await owner.call('/posts/mine?status=rejected')).status,401);
  await owner.login('a@example.test');
@@ -267,8 +267,10 @@ test('HTTP Bài của tôi: lọc theo chủ sách và giữ trạng thái khi l
  assert.equal(first.status,200);assert.deepEqual(first.data.items.map(row=>row.bai_dang_id),Array.from({length:30},(_,index)=>35-index));
  const older=await owner.call(`/posts/mine?status=rejected&before=${first.data.nextBefore}`);
  assert.deepEqual(older.data.items.map(row=>row.bai_dang_id),[5,4,3,2,1]);assert.equal(older.data.nextBefore,null);
- assert.equal((await owner.call('/posts/mine')).data.items[0].bai_dang_id,50);
- assert.deepEqual((await owner.call('/posts/mine?status=closing')).data,{items:[],nextBefore:null});
+ assert.equal((await owner.call('/posts/mine')).data.items[0].bai_dang_id,55);
+ const ended=await owner.call('/posts/mine?status=ended');
+ assert.deepEqual(ended.data.items.map(row=>row.bai_dang_id),[55]);
+ assert.deepEqual((await owner.call('/posts/mine?status=closing')).data,ended.data);
  for(const suffix of ['?status=unknown','?status=approved&status=ended','?status=live&owner=2','?before=invalid'])
    assert.equal((await owner.call('/posts/mine'+suffix)).status,400);
 });

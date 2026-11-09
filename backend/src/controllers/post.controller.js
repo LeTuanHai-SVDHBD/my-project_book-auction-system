@@ -1,5 +1,5 @@
 /** HTTP bài đăng: đầu vào hợp đồng chặt chẽ, dữ liệu công khai dùng danh sách trường cho phép. */
-import {OWNER_POST_FILTERS} from '../../../shared/ownerPostFilters.js';
+import {OWNER_POST_FILTERS,normalizeOwnerPostStatus} from '../../../shared/ownerPostFilters.js';
 import {HttpError} from '../middlewares/errorHandler.js';
 import {moderationQuery,moderationPage} from '../services/moderationList.js';
 import {catalogSearch} from '../services/catalogSearch.js';
@@ -18,7 +18,7 @@ export function createPostController({model,service,limits,aiConfig}) {
     },
     mine:async(req,res)=>{
       object(req.query,['status','before'],'Danh sách bài của tôi');
-      const ownerStatus=req.query.status??'all';
+      const ownerStatus=normalizeOwnerPostStatus(req.query.status??'all');
       if(!OWNER_POST_FILTERS.includes(ownerStatus))
         throw new HttpError(400,'INVALID_OWNER_POST_FILTER','Trạng thái lọc bài đăng không hợp lệ.');
       return listResponse(res,await model.list({owner:req.user.nguoi_dung_id,after:page(req),ownerStatus}));

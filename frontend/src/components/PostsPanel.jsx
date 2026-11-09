@@ -1,7 +1,7 @@
 import StatusBadge from "./StatusBadge.jsx";
 /** Danh mục, bài của tôi, kiểm duyệt tự động và luồng đặt giá/kết quả phiên. */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { OWNER_POST_FILTERS } from "../../../shared/ownerPostFilters.js";
+import { OWNER_POST_FILTERS, normalizeOwnerPostStatus } from "../../../shared/ownerPostFilters.js";
 import { STATUS, postStatus } from "../utils/statusPresentation.js";
 import { BOOK_GENRE_GROUPS } from "../../../shared/bookGenres.js";
 import { bookReviewDescription } from "../../../shared/bookCondition.js";
@@ -127,7 +127,7 @@ function Detail({
         </div>
         <div>
           <section className="panel live-auction-summary">
-            <StatusBadge post={post} />
+            {!(mode === "mine" && published) && <StatusBadge post={post} />}
             <h1>{post.ten_sach}</h1>
             <p>{post.tieu_de}</p>
             <p className="field-hint">
@@ -170,6 +170,7 @@ function Detail({
                 auctionId={post.phien_dau_gia_id}
                 user={user}
                 onSnapshot={onAuctionChange}
+                ownerView={mode === "mine"}
               />
             )}
             {post.trang_thai_phien === "da_ket_thuc" &&
@@ -295,7 +296,8 @@ export default function PostsPanel({
   query = "",
 }) {
   const filters = new URLSearchParams(query);
-  const status = filters.get("status") || "all";
+  const requestedStatus = filters.get("status") || "all";
+  const status = mode === "mine" ? normalizeOwnerPostStatus(requestedStatus) : requestedStatus;
   const ownerFiltered = mode === "mine" && status !== "all";
   const postQuery = query ? `?${query}` : "";
   const [items, setItems] = useState([]),
@@ -674,7 +676,7 @@ export default function PostsPanel({
                       </td>
                       <td data-label="Giá khởi điểm">{money(item.gia_khoi_diem)}</td>
                       <td data-label="Trạng thái">
-                        <StatusBadge state={item.owner_status ?? postStatus(item)} />
+                        <StatusBadge state={normalizeOwnerPostStatus(item.owner_status ?? postStatus(item))} />
                       </td>
                       <td>
                         <a

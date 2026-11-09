@@ -66,13 +66,17 @@ test('SQL xuất kết quả: quyết định và snapshot cùng COMMIT, hai vò
     await review('phe_duyet');assert(!(await model.list(moderationQuery({}))).some(p=>p.bai_dang_id===postId));const secondId=(await model.detail(postId,{owner})).kiem_duyet[0].kiem_duyet_id;
     const second=await model.exportReview(owner,postId,secondId);assert.equal(second.media.length,1);assert.equal(second.review.ket_qua,'Phê duyệt');assert.equal(second.post.tieu_de,'Đã bổ sung');
     assert.equal(await ownerPhase('approved'),'approved');
-    for(const [phase,start,end] of [['scheduled',1,2],['live',-1,1],['closing',-2,-1]]){
+    for(const [phase,start,end] of [['scheduled',1,2],['live',-1,1],['ended',-2,-1]]){
       await pool.request().input('id',sql.Int,auctionId).input('start',sql.Int,start).input('end',sql.Int,end)
         .query("UPDATE dbo.PhienDauGia SET trang_thai='da_kich_hoat',thoi_gian_bat_dau=DATEADD(HOUR,@start,SYSUTCDATETIME()),thoi_gian_ket_thuc=DATEADD(HOUR,@end,SYSUTCDATETIME()) WHERE phien_dau_gia_id=@id");
-      assert.equal(await ownerPhase(phase),phase);assert.equal(await ownerPhase('ended'),undefined);
+      assert.equal(await ownerPhase(phase),phase);
+      if(phase==='ended'){
+        assert.equal(await ownerPhase('live'),undefined);
+        assert.equal((await model.detail(postId,{owner})).trang_thai_phien,'da_kich_hoat');
+      }else assert.equal(await ownerPhase('ended'),undefined);
     }
     await pool.request().input('id',sql.Int,auctionId).query("UPDATE dbo.PhienDauGia SET trang_thai='da_ket_thuc',thoi_gian_bat_dau=DATEADD(HOUR,-2,SYSUTCDATETIME()),thoi_gian_ket_thuc=DATEADD(HOUR,-1,SYSUTCDATETIME()) WHERE phien_dau_gia_id=@id;INSERT dbo.KetQuaDauGia(phien_dau_gia_id,trang_thai,thoi_gian_ket_thuc) VALUES(@id,'khong_co_nguoi_thang',SYSUTCDATETIME());");
-    assert.equal(await ownerPhase('ended'),'ended');assert.equal(await ownerPhase('closing'),undefined);
+    assert.equal(await ownerPhase('ended'),'ended');assert.equal((await model.detail(postId,{owner})).trang_thai_phien,'da_ket_thuc');
     const searchable=await model.search({q:'Sách đã sửa',genre:'',group:'',phase:'ended',sort:'newest',page:1});const publicCard=searchable.items.find(x=>x.bai_dang_id===postId);assert(publicCard);assert.equal(publicCard.anh_bia,null);assert.equal((await model.detail(postId,{publicOnly:true})).media.length,1);
     const relistInput={...input,book:undefined,requestId:randomUUID(),reuseMedia:true};
     ({id:relistedId}=await model.create({owner,input:relistInput,sourceId:postId,items:[],limits:{maxVideos:3},code:'EX'+randomUUID().replaceAll('-','')}));

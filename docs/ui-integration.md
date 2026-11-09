@@ -157,3 +157,31 @@ Nguồn kiểm chứng và thành phần thật/fixture: [VALIDATION.md](../VALI
 lưu tại `frontend/public/assets/library.jpg`. Đây là ảnh trang trí, không thay cho ảnh/video hoặc bằng chứng của sách.
 Font local Inter và Playfair Display có các tệp giấy phép [Inter OFL](../frontend/public/assets/fonts/inter-OFL.txt)
 và [Playfair Display OFL](../frontend/public/assets/fonts/playfairdisplay-OFL.txt); giữ chúng khi phân phối tài nguyên.
+
+## Responsive và nghiệm thu giao diện
+
+Lớp CSS responsive cuối cùng là `frontend/src/styles/ui-refinements.css` (nạp cuối trong `main.jsx`).
+Các quy tắc mới chỉ thay bố cục: khung Admin có sidebar, trang chủ,
+chi tiết đấu giá/gallery, đăng sách bốn bước và media, bảng **Bài của tôi**,
+giao dịch/chat, khiếu nại, hộp thông báo và các dialog. Không thay API hoặc trạng thái.
+Với bảng nhiều cột, chỉ bảng có vùng cuộn ngang mới được cuộn riêng; không ẩn
+nội dung vượt màn hình bằng `overflow-x: hidden` ở `body`.
+
+Checklist kiểm tra thủ công với dữ liệu thật, ở **320 / 360 / 390 / 520 / 768 /
+900 / 1024 / 1280 / 1440 / 1920 px**:
+- Khách: trang chủ, ô tìm kiếm, bộ lọc đấu giá, danh sách/chi tiết sách,
+  ảnh-video và nút điều hướng; thử menu mở/đóng.
+- Người bán: đăng sách 4 bước (có/không ISBN), nhiều ảnh/video, chọn ảnh chính,
+  lưu nháp, giá tiền; danh sách Bài của tôi và gửi duyệt lại.
+- Người mua: đặt giá/chờ cooldown, bình luận dài, uy tín người bán,
+  giao dịch/chat dài, xem và phản hồi khiếu nại.
+- Admin: thanh điều hướng hoặc drawer, thẻ kiểm duyệt, AI nhiều bằng chứng,
+  khiếu nại, hộp thông báo và modal khi bàn phím đang mở.
+- Kiểm tra `document.documentElement.scrollWidth <= innerWidth`, mục tiêu
+  chạm >=44px, bàn phím/focus, phóng chữ 200%, bật reduced motion và
+  xoay điện thoại. Trường hợp cố tình cuộn riêng: ảnh thumbnail, chat,
+  bình luận và bảng dữ liệu rộng.
+
+**Giới hạn xác minh:** lớp CSS đã rà cú pháp và selector trong source; không
+coi checklist bên trên là PASS trên trình duyệt thật cho tới khi chạy với
+`npm.cmd run dev:all`, dữ liệu thực và chụp màn hình trên máy nghiệm thu.

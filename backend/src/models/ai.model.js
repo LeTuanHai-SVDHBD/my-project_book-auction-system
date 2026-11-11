@@ -11,16 +11,6 @@ export function createAiModel({getPool,sql}) {
     return rows.recordset[0]||null;
   }
   return {find,
-    async timingSamples(model,rule) {
-      const rows=await request(await getPool()).input('model',sql.NVarChar(100),model).input('rule',sql.NVarChar(100),rule)
-        .input('meta',sql.NVarChar(200),META_CRITERION).query(`SELECT TOP(200) c.bang_chung
-          FROM dbo.PhanTichAI a JOIN dbo.ChiTietPhanTichAI c ON c.phan_tich_id=a.phan_tich_id AND c.tieu_chi=@meta
-          WHERE a.trang_thai IN ('thanh_cong','chua_day_du')
-            AND JSON_VALUE(CASE WHEN ISJSON(c.bang_chung)=1 THEN c.bang_chung ELSE N'{}' END,'$.model')=@model
-            AND JSON_VALUE(CASE WHEN ISJSON(c.bang_chung)=1 THEN c.bang_chung ELSE N'{}' END,'$.rule_version')=@rule
-          ORDER BY a.phan_tich_id DESC`);
-      return rows.recordset.flatMap(row=>{try{return [JSON.parse(row.bang_chung)];}catch{return [];}});
-    },
     async autoCandidates() {
       const rows=await request(await getPool()).input('meta',sql.NVarChar(200),META_CRITERION).query(`
         SELECT TOP(12) b.bai_dang_id,CONVERT(BINARY(8),p.row_version) AS row_version

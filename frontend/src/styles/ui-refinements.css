@@ -56,7 +56,8 @@ button, input, select, textarea { scroll-margin-block: 110px; }
 .auction-panel { border-top: 1px solid var(--line); padding-top: 24px; }
 .admin-review-form { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); }
 .admin-review-form textarea { width: 100%; max-width: 100%; }
-.admin-review-form .review-confirmation { display: flex; align-items: flex-start; gap: 10px; margin-block: 18px; }
+.admin-review-form .review-confirmation { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; margin-block: 18px; }
+.admin-review-form .review-confirmation span { flex: 1; min-width: 0; }
 .admin-review-form .review-confirmation input { flex: none; width: 20px; height: 20px; margin-top: 3px; }
 .admin-review-form .actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .admin-review-form .actions button { flex: 1 1 180px; }

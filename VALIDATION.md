@@ -2,12 +2,24 @@
 
 # Kiểm chứng và nghiệm thu
 
+## Ước tính thời gian ngay từ hồ sơ và checkbox — 11/11/2026
+
+- `npm run check`, `npm run build`, `npm test` đạt: **236 PASS, 12 SKIP, 248 test**.
+- Hồ sơ mới có khoảng thời gian dự kiến ngay, không đợi 5 mẫu hoặc truy vấn thống kê SQL.
+  Kiểm thử thay đổi độ dài thông tin, số ảnh/video, dung lượng và thời lượng đã biết; metadata
+  thiếu một phần giữ thời lượng/dung lượng chưa xác định. Người bán không nhận phần ước tính nội bộ.
+- Chromium với API mẫu: ước tính xuất hiện trước lần phân tích đầu; checkbox cùng hàng với chữ
+  ở khung 320/390/768/1440 px, màn hình hẹp chỉ xuống dòng nội dung và không tràn ngang toàn trang.
+- Đây là kiểm chứng công thức, API và bố cục với dữ liệu mẫu, **chưa đo độ chính xác của khoảng dự kiến
+  qua Gemini thật**. Hệ số được công khai là giả định kỹ thuật, không phải thời gian trung bình đã đo.
+  Chưa chạy SQL/Redis/Gemini thật; không có migration mới cho lần sửa này.
+
 ## Admin quyết định và thời gian AI — 11/11/2026
 
 - `npm run check`, `npm run build`, `npm test` đạt: **235 PASS, 12 SKIP, 247 test**.
 - Test fixture xác nhận điểm cao/thấp/NULL và lỗi không tự tạo quyết định; xếp hàng sau COMMIT,
   replay, quota và phiên bản cũ vẫn được kiểm tra. Thống kê dùng thời gian đo, không dùng timeout;
-  thiếu 5 mẫu giữ NULL, phân nhóm văn bản/ảnh/video và không trả thống kê cho người bán.
+  cơ chế 5 mẫu khi đó đã được thay bằng ước tính tải hồ sơ ở mục trên. Phần AI nội bộ vẫn không trả cho người bán.
 - Chromium với API mẫu: sửa gợi ý, giữ nội dung Admin đang gõ qua polling, yêu cầu xác nhận trước
   phê duyệt, từ chối khi AI lỗi, nhãn Admin và ẩn AI của người bán đang chờ. Khung 320/390/768/1440 px không tràn ngang trong các trang được kiểm tra.
 - Migration 010 và kịch bản SQL opt-in đã được bổ sung nhưng **chưa chạy SQL/Redis/Gemini thật**

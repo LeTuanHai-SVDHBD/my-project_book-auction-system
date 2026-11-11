@@ -1,6 +1,5 @@
 /** Admission/đọc phân tích riêng; Gemini chạy ở worker, không trong giao dịch đăng sách. */
-import {analysisWorkload,averageAnalysisTime} from '../ai/timing.js';
-import {RULE_VERSION} from '../ai/criteria.js';
+import {analysisWorkload,estimateAnalysisTime} from '../ai/timing.js';
 import {HttpError} from '../middlewares/errorHandler.js';
 import {analysisView,currentAnalysisId} from '../ai/input.js';
 import {aiFailureMessage} from '../ai/errors.js';
@@ -56,12 +55,9 @@ export function createAiService({posts,model,queue,config,quota}) {
       if(waiting&&config.configured)try{resumeAt=Math.max(resumeAt,await quota?.until()||0);}catch{/* Fall back to the saved attempt. */}
       const paused=resumeAt>Date.now();
       const canRetry=config.configured&&waiting&&Boolean(latestId)&&!activeJob(currentJob)&&!paused;
-      let timing=null;
-      try {
-        const manifest=currentAnalysisId(row)?row.ai?.thong_tin?.media:[];
-        const workload=currentJob?.progress?.workload||analysisWorkload(row,manifest);
-        timing=averageAnalysisTime(workload,await model.timingSamples?.(config.model,RULE_VERSION)||[]);
-      } catch { /* Thống kê không được chặn đọc kết quả hoặc quyết định của Admin. */ }
+      const manifest=currentAnalysisId(row)?row.ai?.thong_tin?.media:[];
+      const workload=currentJob?.progress?.workload||analysisWorkload(row,manifest);
+      const timing=estimateAnalysisTime(workload);
       return {timing,configured:config.configured,job:currentJob,can_retry:canRetry,quota_limited:quotaLimited,
         quota_resume_at:paused?resumeAt:null,analysis,history:await model.history(postId)};
     }

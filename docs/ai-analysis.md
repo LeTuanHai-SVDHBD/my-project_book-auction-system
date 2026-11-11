@@ -72,13 +72,21 @@ Không gán Admin giả cho quyết định AI cũ. Hai điểm không chứng t
 
 ## Thời gian phân tích dành cho Admin
 
-Metadata SQL lưu tải đầu vào và thời gian thực tế. Thống kê chọn tối đa 20 mẫu trong 200 lần thành công gần nhất,
-cùng model/bộ quy tắc/phiên bản thống kê và nhóm độ dài văn bản, số ảnh, số video.
-Khi chuẩn bị media đã xác định được thời lượng và bytes, thu hẹp nhóm theo các thông số này.
-Cần tối thiểu 5 mẫu; ít hơn thì ghi rõ chưa đủ dữ liệu, không tự đặt con số ước lượng.
-Không dùng giới hạn timeout làm thời gian trung bình. Tổng xử lý gồm chuẩn bị media và các lượt gọi Gemini,
-không gồm chờ hàng đợi; đồng hồ chờ và đồng hồ xử lý được hiển thị riêng.
-Thống kê không phải cam kết hoàn tất. Không công bố tiến độ/thống kê này cho người bán đang chờ duyệt.
+Admin nhận **khoảng thời gian phân tích dự kiến ngay khi mở hồ sơ**, dựa trên độ dài nội dung,
+số ảnh, số video; bổ sung dung lượng và thời lượng khi media đã được chuẩn bị.
+Không cần lịch sử hoặc tối thiểu 5 mẫu. Đây là ước tính sơ bộ bằng hệ số kỹ thuật trong
+`ai/timing.js`, không phải trung bình thực nghiệm, số liệu hiệu năng đã đo hoặc cam kết từ Gemini.
+
+Công thức sơ bộ, đơn vị giây: U = ceil(số ký tự / 2000), I = số ảnh, V = số video, B = MiB đã biết.
+Cận dưới = 20 + 2U + I + 0,1B + phần video; cận trên = 45 + 4U + 4I + 0,7B + phần video.
+Khi biết tổng thời lượng D, phần video là 15V + 0,1D và 40V + 0,4D.
+Khi chưa biết thời lượng, phần video là 30V và 120V; UI ghi rõ đang ước tính theo số video.
+Hai cận làm tròn lên bội số 5 giây. Các hệ số là giả định sơ bộ để hỗ trợ chờ, cần hiệu chỉnh
+bằng kết quả thực tế khi có, không trình bày chúng như kết quả benchmark.
+
+Không dùng giới hạn timeout làm dự báo. Đồng hồ chờ hàng đợi và đồng hồ xử lý vẫn riêng;
+thời gian thực tế từng lần tiếp tục được lưu. Nếu vượt khoảng dự kiến thì ghi rõ vẫn đang xử lý,
+không tự kết luận hoàn tất. Người bán đang chờ duyệt không nhận phần nội bộ này.
 
 ## Hai điểm độc lập
 

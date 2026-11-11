@@ -118,7 +118,7 @@ function AdminReviewForm({ post, onRefresh }) {
         onClick={()=>{dirty.current=true;setReason(suggestion);}}>Dùng gợi ý của AI</button>}
       <label className="review-confirmation">
         <input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)} />
-        Tôi đã đối chiếu thông tin và bằng chứng về yếu tố quý hiếm của bản sách.
+        <span>Tôi đã đối chiếu thông tin và bằng chứng về yếu tố quý hiếm của bản sách.</span>
       </label>
       <div className="actions">
         <button className="secondary" type="submit" value="tu_choi">Từ chối có lý do</button>

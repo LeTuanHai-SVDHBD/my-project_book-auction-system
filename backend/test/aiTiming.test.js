@@ -1,34 +1,46 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {analysisWorkload,averageAnalysisTime} from '../src/ai/timing.js';
+import {analysisWorkload,estimateAnalysisTime} from '../src/ai/timing.js';
 import {createAiService} from '../src/services/ai.service.js';
 
-test('average uses measured successful comparable runs, never timeout; insufficient samples stay null',()=>{
-  const row={mo_ta:'Một bản sách',media:[{kind:'image',url:'image'}]},workload=analysisWorkload(row);
-  const samples=Array.from({length:6},(_,i)=>({workload,execution:{total_ms:(i+1)*10000,provider_timeout_ms:180000}}));
-  assert.equal(averageAnalysisTime(workload,samples.slice(0,4)).average_ms,null);
-  assert.equal(averageAnalysisTime(workload,samples).average_ms,35000);
-  assert.equal(averageAnalysisTime(workload,[{workload,execution:{provider_timeout_ms:180000}},...samples]).sample_count,6);
-  assert.equal(averageAnalysisTime({...workload,videos:1},samples).sample_count,0);
-  assert.equal(averageAnalysisTime({...workload,text_chars:15000},samples).sample_count,0);
-  assert.equal(averageAnalysisTime(workload,Array(30).fill(samples[0])).sample_count,20);
+test('a fresh listing immediately receives an estimated range without historical samples',()=>{
+  const workload=analysisWorkload({mo_ta:'Một bản sách',media:[{kind:'image',url:'image'}]});
+  const timing=estimateAnalysisTime(workload);
+  assert(timing.estimated_min_ms>0);
+  assert(timing.estimated_max_ms>timing.estimated_min_ms);
+  assert.equal(timing.method,'workload-heuristic-v1');
+  assert(!Object.hasOwn(timing,'minimum_samples'));
+  assert(!Object.hasOwn(timing,'average_ms'));
 });
-test('known video duration and bytes refine the groups, unknown duration is not reported as zero',()=>{
-  const row={media:[{kind:'video',url:'video'}]},unknown=analysisWorkload(row);
-  assert.equal(unknown.video_seconds,null);
-  const known=analysisWorkload(row,[{kind:'video',sent:true,bytes:1024,duration_seconds:400}]);
-  const sample={workload:known,execution:{total_ms:100000}};
-  assert.equal(averageAnalysisTime(known,Array(5).fill(sample)).average_ms,100000);
-  assert.equal(averageAnalysisTime({...known,video_seconds:30},[sample]).sample_count,0);
-  assert.equal(averageAnalysisTime({...known,media_bytes:30000000},[sample]).sample_count,0);
+test('longer text, more photos and more videos increase the workload estimate independently',()=>{
+  const base=analysisWorkload({mo_ta:'Sách',media:[]});
+  const original=estimateAnalysisTime(base);
+  for(const patch of [{text_chars:12000},{images:30},{videos:2}]) {
+    const next=estimateAnalysisTime({...base,...patch});
+    assert(next.estimated_min_ms>original.estimated_min_ms);
+    assert(next.estimated_max_ms>original.estimated_max_ms);
+  }
 });
-test('only Admin can read workload/timing statistics; pending seller does not trigger statistics query',async()=>{
+test('unknown video duration is explicit; measured duration and file bytes refine the estimate',()=>{
+  const row={media:[{kind:'video',url:'video'}]};
+  const unknown=estimateAnalysisTime(analysisWorkload(row));
+  assert.equal(unknown.video_duration_known,false);
+  const partial=analysisWorkload({media:[{kind:'video',url:'a'},{kind:'video',url:'b'}]},
+    [{kind:'video',sent:true,bytes:1024,duration_seconds:30}]);
+  assert.equal(partial.video_seconds,null);assert.equal(partial.media_bytes,null);
+  const small=analysisWorkload(row,[{kind:'video',sent:true,bytes:1048576,duration_seconds:30}]);
+  const big=analysisWorkload(row,[{kind:'video',sent:true,bytes:50000000,duration_seconds:600}]);
+  assert.equal(estimateAnalysisTime(small).video_duration_known,true);
+  assert(estimateAnalysisTime(big).estimated_max_ms>estimateAnalysisTime(small).estimated_max_ms);
+  assert(estimateAnalysisTime({...big,media_bytes:100000000}).estimated_max_ms>estimateAnalysisTime(big).estimated_max_ms);
+});
+test('only Admin receives the immediate estimate; statistics storage is not queried',async()=>{
   let queried=0;
   const row={row_version:'0000000000000001',trang_thai_phien:'cho_kiem_duyet',media:[]};
   const service=createAiService({posts:{detail:async()=>row},config:{configured:true,autoAnalysis:true,model:'fixture'},
-    model:{history:async()=>[],timingSamples:async()=>{queried++;return [];}},queue:{status:async()=>null}});
+    model:{history:async()=>[],timingSamples:async()=>{queried++;throw Error('No history');}},queue:{status:async()=>null}});
   const seller=await service.status(1,{vai_tro:'nguoi_dung',nguoi_dung_id:1});
-  assert(!Object.hasOwn(seller,'timing'));assert.equal(queried,0);
+  assert(!Object.hasOwn(seller,'timing'));
   const admin=await service.status(1,{vai_tro:'admin',nguoi_dung_id:2});
-  assert.equal(admin.timing.average_ms,null);assert.equal(queried,1);
+  assert(admin.timing.estimated_min_ms>0);assert.equal(queried,0);
 });

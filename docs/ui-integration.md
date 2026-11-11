@@ -190,4 +190,4 @@ Checklist kiểm tra thủ công với dữ liệu thật, ở **320 / 360 / 390
 **Phạm vi đã kiểm tra:** xem [kiểm chứng](../VALIDATION.md) cho các khung Chromium dùng dữ liệu mẫu.
 Dùng checklist này để nghiệm thu thêm trên thiết bị, trình duyệt và dữ liệu thực tế.
 
-Admin thấy thời gian trung bình theo mẫu tương tự (tối thiểu 5), thời gian đã chạy/chờ riêng và kết quả thực tế từng lượt. Chưa đủ mẫu thì không hiển thị số ước lượng. Người bán chờ duyệt không nhận thống kê AI.
+Admin thấy khoảng thời gian dự kiến ngay từ tải hồ sơ, không cần mẫu lịch sử; thời gian đã chạy/chờ và kết quả thực tế từng lượt hiển thị riêng. Đây là ước tính sơ bộ, không phải trung bình đã đo. Checkbox xác nhận và nội dung cùng một hàng; màn hình hẹp chỉ xuống dòng phần chữ. Người bán chờ duyệt không nhận phần AI nội bộ.

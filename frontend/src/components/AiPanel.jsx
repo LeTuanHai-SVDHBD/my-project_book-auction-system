@@ -147,10 +147,16 @@ export default function AiPanel({ post, user, publicView = false }) {
         </p>
       )}
       {admin && data && <div className="ai-timing" role="status">
-        <p>{data.timing?.average_ms != null
-          ? `Thời gian phân tích trung bình: khoảng ${Math.ceil(data.timing.average_ms / 1000)} giây · ${data.timing.sample_count} lần chạy có đầu vào tương tự.`
-          : `Chưa đủ dữ liệu để ước tính thời gian phân tích trung bình (${data.timing?.sample_count ?? 0}/${data.timing?.minimum_samples ?? 5} mẫu).`}</p>
-        <p className="field-hint">Thống kê theo thông tin, số ảnh/video và dung lượng, thời lượng khi đã xác định; không gồm thời gian chờ hàng đợi. Đây không phải thời hạn bảo đảm.</p>
+        {data.timing && <p>
+          Thời gian phân tích dự kiến: khoảng {Math.ceil(data.timing.estimated_min_ms/1000)}–{Math.ceil(data.timing.estimated_max_ms/1000)} giây.
+        </p>}
+        <p className="field-hint">Ước tính sơ bộ từ độ dài nội dung, số ảnh và video của hồ sơ; cập nhật theo dung lượng, thời lượng khi xác định được. Không gồm chờ hàng đợi; thực tế có thể lâu hơn nếu mạng chậm hoặc Gemini phải thử lại.</p>
+        {data.timing?.workload?.videos>0 && !data.timing.video_duration_known && <p className="field-hint">
+          Chưa xác định thời lượng video; đang ước tính theo số video.
+        </p>}
+        {pending && data.job.started_at && data.timing && now-data.job.started_at>data.timing.estimated_max_ms && <p className="field-hint">
+          Đang xử lý lâu hơn dự kiến. Hệ thống vẫn chờ kết quả, chưa xác nhận hoàn tất.
+        </p>}
         {pending && data.job.started_at && <p>Đã xử lý: {Math.max(0,Math.floor((now-data.job.started_at)/1000))} giây.</p>}
         {pending && !data.job.started_at && data.job.enqueued_at && <p>Đã chờ hàng đợi: {Math.max(0,Math.floor((now-data.job.enqueued_at)/1000))} giây.</p>}
       </div>}

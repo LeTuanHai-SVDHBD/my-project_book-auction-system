@@ -379,6 +379,13 @@ dùng model Gemini dự phòng đã cấu hình; lỗi dịch vụ không sinh q
 Theo phạm vi chốt ngày 11/11/2026: chỉ thay quyền quyết định, phân tích AI, vai trò hai điểm và lý do.
 AI tự chạy sau gửi hồ sơ, không tạo KiemDuyet hoặc đổi trạng thái bài/phiên. Admin vẫn quyết định khi AI lỗi/NULL/điểm thấp, với căn cứ bắt buộc.
 Migration 010 cho phép Admin tham khảo một phân tích; giữ nguyên quyết định AI lịch sử. Lưu quyết định nguyên tử và chống phiên bản cũ.
-Thời gian AI chỉ Admin thấy, dùng trung bình các mẫu thực tương tự, không bịa số khi thiếu mẫu.
+Thời gian AI chỉ Admin thấy. Yêu cầu sau đó được chỉnh thành ước tính sơ bộ ngay từ tải hồ sơ, không cần mẫu lịch sử; xem ADR-032.
 Giữ nguyên cơ chế giá kết thúc sớm, kích hoạt, tranh chấp và giao dịch. Phạm vi là đồ án sàn sách giữa người dùng;
 thay đổi này không phải xác nhận hệ thống đã đáp ứng toàn bộ pháp luật kinh doanh/đấu giá.
+
+## ADR-032 — Ước tính thời gian ngay từ hồ sơ
+
+Theo chỉnh lại yêu cầu: bỏ điều kiện 5 mẫu và truy vấn thống kê mỗi lần polling.
+Hiển thị khoảng dự kiến theo độ dài thông tin, số ảnh/video; cập nhật theo dung lượng và thời lượng khi biết.
+Các hệ số là giả định kỹ thuật được ghi rõ trong ai-analysis.md, không gọi là thời gian trung bình thực nghiệm.
+Không đổi điểm AI, quyết định Admin, timeout, quota hoặc công bố dữ liệu cho người bán.

@@ -1,4 +1,5 @@
-/** Analyse a fixed source version; persist the automatic verdict with the score receipt. */
+/** Analyse a fixed source version; persist advisory scores without changing the post state. */
+import {analysisWorkload} from './timing.js';
 import {scoreObservations} from './scoring.js';
 import {currentAnalysisId,inputHash} from './input.js';
 import {moderationDecision} from './moderation.js';
@@ -8,7 +9,7 @@ import {isQuotaAnalysis,quotaResumeAt} from './quota.js';
 export function createAiProcessor({posts,model,queue,provider,locks,quota,config,signal}) {
   return async job=>{
     const automatic=job.trigger==='auto';
-    if(automatic!==Boolean(config.autoModeration)){await queue.update(job,{state:'skipped'});return;}
+    if(automatic!==Boolean(config.autoAnalysis)){await queue.update(job,{state:'skipped'});return;}
     const stored=await model.find(job);if(stored){await queue.update(job,{state:'done',analysisId:stored.phan_tich_id});return;}
     const lease=await locks.acquire(job.postId);if(!lease)throw Error('AI_BUSY');
     const ownership=new AbortController();let renewTimer,renewTask,stopped=false;
@@ -30,8 +31,9 @@ export function createAiProcessor({posts,model,queue,provider,locks,quota,config
       }
       let cached=await queue.get(job.requestId),result=cached?.result,metadata=cached?.metadata;
       if(!result){
+        job={...job,startedAt:cached?.startedAt||Date.now()};
         await queue.update(job,{state:'running'});
-        const base={request_id:job.requestId,input_hash:job.inputHash,source_version:job.sourceVersion,rule_version:RULE_VERSION,model:config.model,trigger:job.trigger};
+        const base={workload:analysisWorkload(row),request_id:job.requestId,input_hash:job.inputHash,source_version:job.sourceVersion,rule_version:RULE_VERSION,model:config.model,trigger:job.trigger};
         try{
           const response=await provider.analyze(row,AbortSignal.any([AbortSignal.timeout(config.jobTimeout),ownership.signal,...(signal?[signal]:[])]),{
             onProgress:progress=>queue.update(job,{state:'running',progress})
@@ -39,7 +41,7 @@ export function createAiProcessor({posts,model,queue,provider,locks,quota,config
           assertOwnership();
           result=scoreObservations(response.observations,{mediaIds:response.mediaIds,sourceUrls:response.sourceUrls});
           const warnings=[...result.canh_bao,...response.warnings];if(warnings.length)result.trang_thai='chua_day_du';
-          metadata={...base,model:response.providerModel,media:response.manifest,execution:safeAiExecution(response.execution),warnings};
+          metadata={...base,model:response.providerModel,media:response.manifest,execution:safeAiExecution(response.execution),workload:analysisWorkload(row,response.manifest),warnings};
         }catch(error){assertOwnership();result={diem_do_hiem:null,diem_tinh_trang:null,trang_thai:'that_bai',chi_tiet:[]};metadata={...base,model:error.aiContext?.model||base.model,error_code:error.code||'AI_INVALID_RESPONSE',provider_error:safeAiDiagnostics(error.aiDiagnostics),
           media:(error.aiContext?.media||[]).filter(item=>row.media?.some(source=>source.url===item.url&&source.kind===item.kind)),execution:safeAiExecution(error.aiContext?.execution),
           warnings:[aiFailureMessage(error.code)]};
@@ -51,9 +53,9 @@ export function createAiProcessor({posts,model,queue,provider,locks,quota,config
       try{
         assertOwnership();
         if(metadata.retry_not_before)await quota?.pauseUntil(metadata.retry_not_before);
-        const verdict=automatic?moderationDecision(result,metadata,config.autoModeration):null;
-        if(automatic)metadata={...metadata,moderation:{thresholds:config.autoModeration,decision:verdict?(verdict.approve?'approved':'rejected'):'retry'}};
-        const saved=await model.save(job,result,metadata,async()=>{assertOwnership();if(!await lease.renew())throw Error('AI_LEASE_LOST');},verdict);
+        const verdict=moderationDecision(result,metadata,config.reviewThresholds);
+        metadata={...metadata,recommendation:verdict,moderation:undefined};
+        const saved=await model.save(job,result,metadata,async()=>{assertOwnership();if(!await lease.renew())throw Error('AI_LEASE_LOST');});
         await queue.update(job,{state:'done',analysisId:saved.phan_tich_id});
       }catch(error){if(error.code==='AI_INPUT_CHANGED')await queue.update(job,{state:'skipped'});else throw error;}
     }finally{stopped=true;clearTimeout(renewTimer);await renewTask;await lease.release();}

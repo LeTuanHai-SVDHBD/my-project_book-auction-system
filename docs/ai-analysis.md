@@ -3,10 +3,10 @@
 # Phân tích AI và bộ chấm điểm
 
 Gemini đọc hồ sơ và trả quan sát có cấu trúc. Backend tính hai điểm độc lập theo quy tắc cố định.
-Backend dùng hai ngưỡng cấu hình để tự lưu quyết định và lý do. Admin theo dõi và có thể yêu cầu phân tích lại khi chưa có quyết định.
+AI tự phân tích sau khi gửi hồ sơ; hai ngưỡng chỉ tạo khuyến nghị. Chỉ Admin phê duyệt/từ chối và xác nhận lý do. Admin vẫn có thể quyết định khi AI lỗi, thiếu bằng chứng hoặc điểm thấp.
 Bộ quy tắc `book-review-2026-10-v1` được định nghĩa trong
 [criteria.js](../backend/src/ai/criteria.js) và [scoring.js](../backend/src/ai/scoring.js).
-Tài liệu đối chiếu source ngày 06/11/2026; không thay thế thử chất lượng thẩm định bằng sách thật.
+Tài liệu đối chiếu source ngày 11/11/2026; không thay thế thử chất lượng thẩm định bằng sách thật.
 
 ## Cấu hình và khởi động
 
@@ -17,8 +17,8 @@ npm.cmd run setup:ai
 ```
 
 Script chỉ bổ sung biến thiếu, giữ key/cờ bật/timeout đang có; AI tắt mặc định.
-Tự duyệt dùng các bảng đã có. Migration 008 thêm liên kết quyết định với lần phân tích; không thêm SDK.
-Toàn hệ thống hiện có 21 bảng/172 cột sau migration 009; không dùng số schema của phiên bản trước.
+Migration 010 cho Admin ghi quyết định kèm lần phân tích được tham khảo; chặn INSERT quyết định mới không có Admin, giữ lịch sử AI cũ. Không thêm bảng hoặc SDK.
+Toàn hệ thống hiện có 21 bảng/172 cột sau migration 010; không dùng số schema của phiên bản trước.
 
 Mở `.env` ở thư mục gốc trên máy phát triển:
 
@@ -49,39 +49,36 @@ npm.cmd run dev:all
 
 `AI_ENABLED` bật Gemini. Nếu chưa bật hoặc thiếu key, bài vẫn chờ kiểm duyệt. Giá trị `AI_AUTO_MODERATION` cũ không còn điều khiển luồng bài đăng.
 
-## Kiểm duyệt tự động
+## Admin quyết định, AI hỗ trợ
 
-Nếu chưa có migration 008, dừng `dev:all` và chạy `npm.cmd run db:migrate` sau khi SQL Server sẵn sàng.
-Bật Gemini và có thể ghi đè ngưỡng trong `.env`:
+Dừng API và worker, chạy `npm.cmd run db:migrate` để áp dụng đến migration 010 rồi khởi động lại cả hai.
+Các biến `AI_MIN_RARITY_SCORE` và `AI_MIN_CONDITION_SCORE` vẫn là số nguyên 1–100, mặc định 70; chỉ dùng làm ngưỡng khuyến nghị.
 
-```dotenv
-AI_ENABLED=true
-AI_MIN_RARITY_SCORE=70
-AI_MIN_CONDITION_SCORE=70
-```
-
-Hai ngưỡng là số nguyên từ 1 đến 100, mặc định 70/100 mỗi nhóm nếu bỏ trống. Giá trị đã cấu hình được giữ nguyên.
-Giữ Gemini key hiện có và chạy lại `npm.cmd run dev:all` để API và worker dùng cùng cấu hình.
-
-| Kết quả phân tích | Quyết định tự động |
+| Tình huống | Hành vi |
 |---|---|
-| Cả hai điểm đạt hoặc bằng ngưỡng tương ứng | Phê duyệt; người bán đặt lịch và kích hoạt sau |
-| Một hoặc hai điểm dưới ngưỡng | Từ chối; ghi nhóm, điểm, ngưỡng, tiêu chí và quan sát chưa đạt |
-| Phân tích hoàn tất nhưng một nhóm thiếu bằng chứng | Từ chối để người bán bổ sung; nhóm thiếu vẫn giữ NULL |
-| Lỗi Gemini, tải/xử lý media tạm thời hoặc chưa có cấu hình | Bài tiếp tục chờ; không sinh quyết định từ lỗi kỹ thuật |
+| Hai nhóm đạt ngưỡng | Hiện khuyến nghị đạt; bài vẫn chờ Admin |
+| Điểm thấp hoặc thiếu bằng chứng | AI gợi ý căn cứ cần xem lại; không tự từ chối |
+| Lỗi Gemini/429/media hoặc chưa cấu hình | Admin thấy lỗi và có thể quyết định theo bằng chứng; không biến lỗi thành điểm 0 |
+| Admin quyết định | Bắt buộc lý do; phê duyệt cần xác nhận đã đối chiếu bằng chứng |
+| AI trả kết quả sau quyết định Admin | Không ghi phân tích trễ hoặc thay đổi quyết định |
 
-Sau khi SQL lưu bài mới, gửi lại hoặc đăng lại, API xếp hàng AI mà không chờ kết quả phân tích.
-Worker quét tối đa 12 bài chờ mỗi lượt 10 giây để khôi phục lần phân tích đầu tiên khi Redis lỗi hoặc bài chưa được xếp hàng.
-Sau khi SQL đã lưu một lần phân tích cho phiên bản hiện tại, worker không tự chạy lần phân tích mới, kể cả khi lần trước thất bại do timeout, 503 hoặc 429.
-Nếu bài còn chờ, Admin bấm **Phân tích lại bằng AI** để gửi yêu cầu cho đúng lần phân tích mới nhất. Các lượt gọi lại giới hạn bên trong cùng một lần phân tích và thời gian tạm dừng do lỗi 429 vẫn áp dụng.
-Bài đã quyết định không tự chấm lại. Mỗi vòng gửi lại dùng phiên bản mới.
+Sau COMMIT bài mới/gửi lại/đăng lại, API xếp hàng phân tích. Worker quét để phục hồi job đầu của vòng mới.
+Không tự chạy lượt mới sau khi đã lưu kết quả/lỗi cùng phiên bản; nút **Phân tích lại bằng AI** dành cho Admin, vẫn tuân thủ quota.
+Ngưỡng không khóa quyền quyết định của Admin. Lý do AI là gợi ý có thể sửa; nội dung đang nhập không bị polling ghi đè.
+Chỉ quyết định Admin mới công bố kết quả cho người bán. Hồ sơ được duyệt mới đặt lịch/kích hoạt theo luồng hiện hành.
 
-Migration 008 cho phép `KiemDuyet.admin_id` NULL khi có `phan_tich_id`; quyết định cũ giữ Admin và dữ liệu lịch sử.
-Điểm/chi tiết, trạng thái bài và phiên, quyết định, snapshot PDF và lịch sử được ghi cùng COMMIT sau kiểm tra phiên bản.
-Người bán nhận thông báo từ quyết định đã lưu, xem lý do và có thể bổ sung hồ sơ.
-Duyệt tay trả 409 `AUTO_MODERATION_ENABLED`; POST phân tích lại được phép khi đã có lần phân tích cho phiên bản đang chờ.
-Điểm là đánh giá theo bằng chứng đã cung cấp, không chứng thực ấn bản hay chữ ký.
+`KiemDuyet.admin_id` xác định người quyết định; `phan_tich_id` có thể cùng tồn tại để giữ điểm/bằng chứng trong PDF và màn hình người mua.
+Không gán Admin giả cho quyết định AI cũ. Hai điểm không chứng thực ấn bản hay chữ ký.
 
+## Thời gian phân tích dành cho Admin
+
+Metadata SQL lưu tải đầu vào và thời gian thực tế. Thống kê chọn tối đa 20 mẫu trong 200 lần thành công gần nhất,
+cùng model/bộ quy tắc/phiên bản thống kê và nhóm độ dài văn bản, số ảnh, số video.
+Khi chuẩn bị media đã xác định được thời lượng và bytes, thu hẹp nhóm theo các thông số này.
+Cần tối thiểu 5 mẫu; ít hơn thì ghi rõ chưa đủ dữ liệu, không tự đặt con số ước lượng.
+Không dùng giới hạn timeout làm thời gian trung bình. Tổng xử lý gồm chuẩn bị media và các lượt gọi Gemini,
+không gồm chờ hàng đợi; đồng hồ chờ và đồng hồ xử lý được hiển thị riêng.
+Thống kê không phải cam kết hoàn tất. Không công bố tiến độ/thống kê này cho người bán đang chờ duyệt.
 
 ## Hai điểm độc lập
 
@@ -139,7 +136,7 @@ Backend dùng phép chia số nguyên chính xác ở bước làm tròn. Không
 
 Khi hồ sơ chưa đạt, lý do nêu tiêu chí còn thiếu hoặc cần xác minh, quan sát hiện có và ảnh/tài liệu nên bổ sung.
 Chẳng hạn, tiêu chí mép giấy cần ảnh mép trên, mép dưới và mép ngoài khi đóng sách.
-Luồng tự duyệt hiện tại cho người bán bổ sung rồi gửi lại, không chuyển hồ sơ sang hàng đợi xác minh thủ công.
+Admin đối chiếu các điểm cần xác minh, quyết định hoặc yêu cầu người bán bổ sung bằng lý do từ chối.
 
 Đầu ra có trường ngoài hợp đồng, điểm/trọng số do mô hình tự chèn, mã media hoặc nguồn lạ được chặn/hạ về cần xác minh.
 Độ tin cậy chỉ là mô hình tự báo cáo, không dùng làm trọng số hoặc bằng chứng xác thực.
@@ -296,7 +293,7 @@ Phiên bản bài có lần phân tích mới nhất lỗi 429 vẫn chờ kiể
 - Admin xem tiến độ, lịch sử, chẩn đoán và kết quả tại **Kiểm duyệt**; không có nút từ chối hoặc phê duyệt tay.
 - Chủ bài đang chờ duyệt chỉ thấy tiến độ và lịch sử quyết định trước đó (nếu có), không hiện/gọi panel AI. Sau phê duyệt hoặc từ chối, quyết định/lý do hiện trước, phần **Kết quả AI tham khảo** thu gọn bên dưới. Gửi duyệt lại sẽ ẩn AI cho tới quyết định mới.
 - Người mua và khách xem **Điểm và bằng chứng AI** trên chi tiết bài đã công bố (`GET /api/posts/catalog/:id`). Dữ liệu công khai chỉ lấy lần phân tích đúng đầu vào và được liên kết với quyết định phê duyệt; không đưa lịch sử, chẩn đoán, đường dẫn đối chiếu hoặc ghi chú kiểm duyệt riêng vào phản hồi công khai.
-- Backend cũng lọc `ai` trong chi tiết riêng và `GET /api/ai/:id`: người bán không nhận job/lịch sử phân tích chưa công bố hoặc mã lỗi provider. Chỉ công bố kết quả có hash đầu vào hiện tại và đúng `phan_tich_id` của quyết định tự duyệt. Quyết định thủ công cũ đối chiếu theo thời gian. Không đủ metadata/mốc thời gian thì báo chưa có kết quả phù hợp, không gán kết quả cũ vào lần mới. Query `analysis` của người bán chỉ nhận ID đã công bố hiện tại; Admin vẫn xem lịch sử riêng.
+- Backend cũng lọc `ai` trong chi tiết riêng và `GET /api/ai/:id`: người bán không nhận job/lịch sử phân tích chưa công bố hoặc mã lỗi provider. Chỉ công bố kết quả có hash đầu vào hiện tại và đúng `phan_tich_id` của quyết định. Quyết định thủ công cũ đối chiếu theo thời gian. Không đủ metadata/mốc thời gian thì báo chưa có kết quả phù hợp, không gán kết quả cũ vào lần mới. Query `analysis` của người bán chỉ nhận ID đã công bố hiện tại; Admin vẫn xem lịch sử riêng.
 - Người bán thấy hai điểm, lý do NULL, tiêu chí, bằng chứng, nguồn và phép tính của kết quả phù hợp. Nếu phân tích thất bại, hiện **AI chưa phân tích thành công. Vui lòng xem quyết định và lý do kiểm duyệt của Admin.**, không hiện `AI_TIMEOUT` hoặc hướng dẫn cấu hình. Không đổi cách tính điểm hay dữ liệu phân tích đã lưu.
 
 Khi đang chạy lại, kết quả cũ có nhãn rõ là lần trước, không nhầm với tiến độ mới.
@@ -352,7 +349,7 @@ Bản ghi `AI_TIMEOUT` đã lưu vẫn thuộc lần trước. Bài còn chờ s
 Bài M4 báo “vượt ngân sách media” từ lần chạy trước vẫn là dữ liệu lịch sử. Sau cập nhật Files API,
 Kết quả cũ giữ nguyên; vòng kiểm duyệt mới dùng cấu hình hiện tại.
 `sent` trong manifest là đã đưa media vào yêu cầu, không chứng minh mô hình đã xem mọi frame hoặc kết luận đúng.
-Chuẩn bị schema test hiện tại 008 và bật từng SQL opt-in riêng theo [VALIDATION](../VALIDATION.md).
+Chuẩn bị schema test hiện tại 010 và bật từng SQL opt-in riêng theo [VALIDATION](../VALIDATION.md).
 
 ```powershell
 npm.cmd run test:ai
@@ -371,17 +368,8 @@ Khi API/worker/SQL/Redis thật đang chạy, Gemini đã bật và có quota:
 npm.cmd run smoke:ai
 ```
 
-Smoke dùng provider thật cho bài mẫu không có ảnh và xác nhận hai điểm NULL. Ở chế độ tự duyệt, worker tự
-phân tích rồi lưu từ chối vì thiếu bằng chứng; smoke đối chiếu đúng ID phân tích và lý do. Ở chế độ thủ công,
-smoke yêu cầu phân tích rồi ghi quyết định bằng Admin như trước. Chỉ dọn dữ liệu fixture; job chưa rõ hoàn tất
-thì giữ để đối soát. Redis job hết TTL, không FLUSHDB.
-Smoke này không thay nghiệm thu chất lượng thẩm định ảnh/video thật hoặc xác thực nguồn.
-Các smoke M4/M5/M6/M8 tạo kết quả kiểm duyệt fixture để kiểm tra nghiệp vụ khác. Chạy chúng với
-API/worker test riêng ở `development`, `DB_DATABASE=BookAuctionTest_*` và `AI_TEST_MANUAL_REVIEW=true`
-trên cả terminal chạy dịch vụ và terminal chạy smoke. Không đặt cờ này trong môi trường dùng dữ liệu thật.
-
-Nghiệm thu thủ công: dùng sách có bộ ảnh đủ/thiếu, mở bằng chứng từng tiêu chí, tự tính lại hai tổng;
-thử một hồ sơ đạt cả hai ngưỡng, một hồ sơ không đạt, lỗi quota và gửi duyệt lại. Không dùng điểm AI đơn lẻ để kết luận sách thật/hiếm.
+Smoke dùng provider thật cho bài mẫu không có ảnh: xác nhận hai điểm NULL, bài vẫn chờ và người bán chưa nhận AI.
+Sau đó Admin từ chối fixture và người bán mới thấy kết quả liên kết đúng vòng. Không dùng smoke để kết luận chất lượng thẩm định.
 Bằng chứng đã chạy và giới hạn còn lại tại [VALIDATION.md](../VALIDATION.md).
 
 ## Tài liệu nhà cung cấp

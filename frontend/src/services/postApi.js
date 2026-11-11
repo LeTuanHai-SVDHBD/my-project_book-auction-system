@@ -8,6 +8,7 @@ export const postApi={
   save:(body,id,mode)=>apiPost(id?`/posts/${id}/${mode}`:'/posts',body),
   exportReview:(id,reviewId)=>apiPost(`/posts/${id}/reviews/${reviewId}/export`),
   activate:(id,body)=>apiPost(`/posts/${id}/activate`,body),
+  review:(id,body)=>apiPost(`/posts/${id}/review`,body),
   config:()=>apiRequest('/media/config'),
   async identify(file) {
     const actual=detectMedia(await file.slice(0,65536).arrayBuffer());

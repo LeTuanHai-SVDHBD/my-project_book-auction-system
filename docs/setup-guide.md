@@ -30,7 +30,7 @@ npm.cmd run admin:create
 npm.cmd run dev:all
 ```
 
-`db:init` tạo database nếu cần, chạy schema nền 001 và migration 002–008. Nó không phải lệnh reset dữ liệu;
+`db:init` tạo database nếu cần, chạy schema nền 001 và migration 002–010. Nó không phải lệnh reset dữ liệu;
 schema có sẵn chỉ được nâng cấp nếu thuộc chữ ký đã biết. `admin:create` nhập tên/email/mật khẩu kín
 (12–128 ký tự) trong terminal, không tự nâng quyền tài khoản thường có email trùng.
 Người dùng thường đăng ký trên web; không có mật khẩu Admin mặc định trong source.
@@ -74,7 +74,7 @@ Dùng cùng hostname `127.0.0.1` khi mở web/API để dễ kiểm tra cookie; 
 | `SQLSERVER_VOLUME_NAME`, `REDIS_VOLUME_NAME` | Chọn named volume; máy có dữ liệu dùng đúng tên đã inspect |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Ba giá trị Backend để upload media |
 | `AI_ENABLED`, `GEMINI_API_KEY`, `GEMINI_MODEL` | Bật Gemini; khóa chỉ ở Backend |
-| `AI_MIN_RARITY_SCORE`, `AI_MIN_CONDITION_SCORE` | Hai ngưỡng tự duyệt 1–100 (mặc định 70 mỗi nhóm); xem [cấu hình](ai-analysis.md#kiểm-duyệt-tự-động) |
+| `AI_MIN_RARITY_SCORE`, `AI_MIN_CONDITION_SCORE` | Hai ngưỡng khuyến nghị tham khảo 1–100 (mặc định 70 mỗi nhóm); xem [cấu hình](ai-analysis.md#admin-quyết-định-ai-hỗ-trợ) |
 | `GEMINI_FALLBACK_MODEL` | Tuỳ chọn: model Gemini tương thích dùng cho lượt thử lại khi model chính trả 503 |
 
 Các biến giới hạn/thời gian chờ media và AI nằm ở [media-upload.md](media-upload.md) và
@@ -119,7 +119,7 @@ npm.cmd run db:migrate
 npm.cmd run dev:all
 ```
 
-`db:migrate` áp dụng 002–008, giữ dữ liệu và có thể chạy lại. Không tự chạy 001 lên database đang có dữ liệu.
+`db:migrate` áp dụng 002–010, giữ dữ liệu và có thể chạy lại. Không tự chạy 001 lên database đang có dữ liệu.
 Nếu schema lạ, dừng và đối chiếu; không xóa database/volume để ép lệnh chạy.
 Schema đích đối chiếu [manifest](../backend/schema-manifest.json): 21 bảng, 172 cột, 102 CHECK, 15 UNIQUE.
 Migration 007 giữ hồ sơ theo bài và media lịch sử. Migration 008 liên kết quyết định tự duyệt với đúng lần phân tích; giữ các quyết định Admin đã lưu. Migration 009 thêm hạn phản hồi, giải trình, kết luận và ghi chú nội bộ cho khiếu nại; hồ sơ cũ giữ quyền xem ban đầu.
@@ -156,7 +156,7 @@ Các smoke nghiệp vụ và điều kiện chạy được liệt kê tại [RE
 | Tab cũ bị đăng xuất | Đúng chính sách khi tài khoản vừa đăng nhập nơi khác; F5 không giành lại phiên |
 | Cloudinary có tệp nhưng web báo lỗi | Đối soát theo public ID, chưa có vé thì không gắn vào bài; không upload lặp liên tục |
 | `1.jpg` bị từ chối | Tên không bị cấm; kiểm tra nội dung thực/codec/tệp hỏng, xem lỗi theo tên tệp |
-| AI chưa có kết quả | Kiểm tra worker và `AI_ENABLED`/key; nếu tự duyệt, kiểm tra hai ngưỡng và trạng thái lần phân tích gần nhất |
+| AI chưa có kết quả | Kiểm tra worker và `AI_ENABLED`/key; kiểm tra trạng thái lần phân tích; Admin vẫn quyết định được |
 | AI HTTP 503 | Lỗi dịch vụ provider; xem chẩn đoán, thử lại hữu hạn; không tự kết luận khóa sai |
 | Video M4 chưa gửi AI | Xem manifest/lý do, dung lượng video, Files API/deadline/quota; không tăng ngân sách ảnh để chữa video |
 | Nháp không còn media | Vé chưa gửi hết hạn sau 1 giờ; nội dung nháp và file đã gắn SQL có vòng đời khác |
@@ -170,3 +170,5 @@ Get-NetTCPConnection -LocalPort 5173 -State Listen | Select-Object LocalAddress,
 
 Chỉ dừng tiến trình sau khi nhận diện đúng ứng dụng; không kill hàng loạt mọi tiến trình Node.
 Không sửa lỗi bằng cách xóa dữ liệu SQL/Redis hoặc đưa API key vào log/ảnh chụp.
+
+Migration 010 giữ dữ liệu và lịch sử; cho Admin ghi quyết định kèm AI tham khảo, chặn quyết định mới không có Admin. Dừng và khởi động lại cả API/worker khi nâng cấp. Không chạy worker phiên bản cũ sau migration.

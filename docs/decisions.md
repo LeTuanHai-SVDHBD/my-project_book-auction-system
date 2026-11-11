@@ -361,9 +361,11 @@ Không copy chat/bằng chứng/giá ẩn vào thông báo. Xem [ui-integration.
 
 ## ADR-030 — Kiểm duyệt tự động theo hai điểm độc lập
 
+**Đã được thay thế bởi ADR-031; phần dưới giữ làm lịch sử.**
+
 Theo yêu cầu ngày 06/11/2026, có thể bật tự duyệt với hai ngưỡng cấu hình bắt buộc. Backend dùng điểm đã tính và bằng chứng, không lấy quyết định từ văn bản Gemini. Cả hai điểm đạt thì phê duyệt; không đủ điểm hoặc thiếu bằng chứng thì ghi lý do để bổ sung. Lỗi kỹ thuật giữ chờ và thử lại có giãn cách.
 
-SQL lưu phân tích, quyết định, snapshot và cập nhật trạng thái nguyên tử; quyết định tự duyệt có `phan_tich_id`, không gán Admin giả. Worker phục hồi bài chờ từ SQL, kiểm tra lại phiên bản và dùng receipt chống ghi lặp. Admin chỉ theo dõi khi bật tự duyệt; chế độ thủ công vẫn dùng được cho môi trường thử. Phê duyệt không kích hoạt phiên. Xem [cấu hình](ai-analysis.md#kiểm-duyệt-tự-động).
+SQL lưu phân tích, quyết định, snapshot và cập nhật trạng thái nguyên tử; quyết định tự duyệt có `phan_tich_id`, không gán Admin giả. Worker phục hồi bài chờ từ SQL, kiểm tra lại phiên bản và dùng receipt chống ghi lặp. Admin chỉ theo dõi khi bật tự duyệt; chế độ thủ công vẫn dùng được cho môi trường thử. Phê duyệt không kích hoạt phiên. Xem [cấu hình](ai-analysis.md#admin-quyết-định-ai-hỗ-trợ).
 
 ### Cập nhật: tự duyệt trong luồng sử dụng bình thường
 
@@ -371,3 +373,12 @@ API xếp hàng sau khi lưu bài; worker quét SQL làm đường phục hồi.
 quyết định luồng này. Hai ngưỡng mặc định 70/100, vẫn cho phép cấu hình riêng. Admin chỉ yêu cầu phân tích
 lại bài đang chờ đã có một lần phân tích cùng phiên bản. Lỗi HTTP 503 được thử lại có giãn cách và có thể
 dùng model Gemini dự phòng đã cấu hình; lỗi dịch vụ không sinh quyết định từ chối.
+
+## ADR-031 — Admin quyết định, AI tự phân tích và gợi ý
+
+Theo phạm vi chốt ngày 11/11/2026: chỉ thay quyền quyết định, phân tích AI, vai trò hai điểm và lý do.
+AI tự chạy sau gửi hồ sơ, không tạo KiemDuyet hoặc đổi trạng thái bài/phiên. Admin vẫn quyết định khi AI lỗi/NULL/điểm thấp, với căn cứ bắt buộc.
+Migration 010 cho phép Admin tham khảo một phân tích; giữ nguyên quyết định AI lịch sử. Lưu quyết định nguyên tử và chống phiên bản cũ.
+Thời gian AI chỉ Admin thấy, dùng trung bình các mẫu thực tương tự, không bịa số khi thiếu mẫu.
+Giữ nguyên cơ chế giá kết thúc sớm, kích hoạt, tranh chấp và giao dịch. Phạm vi là đồ án sàn sách giữa người dùng;
+thay đổi này không phải xác nhận hệ thống đã đáp ứng toàn bộ pháp luật kinh doanh/đấu giá.

@@ -1,12 +1,12 @@
-/** Cấu hình Gemini phía backend; bài đăng dùng tự duyệt khi dịch vụ sẵn sàng. */
+/** Gemini tự phân tích; điểm chỉ hỗ trợ quyết định của Admin. */
 export const AI_MAX_RETRY_WAIT_MS=15000;
 export function parseAiConfig(env) {
   if(env.AI_ENABLED!==undefined&&!['true','false',''].includes(env.AI_ENABLED))throw Error('AI_ENABLED chỉ nhận true hoặc false.');
   const integer=(name,fallback,min,max)=>{const n=Number(env[name]||fallback);if(!Number.isInteger(n)||n<min||n>max)throw Error(`${name} không hợp lệ.`);return n;};
-  // Only the isolated smoke environment can exercise the legacy manual endpoint.
+  // Isolated smoke may request analysis manually; ordinary submissions are analysed automatically.
   const manualFixture=env.AI_TEST_MANUAL_REVIEW==='true';
   if(manualFixture&&((env.NODE_ENV||'development')!=='development'||!/^BookAuctionTest_[A-Za-z0-9_]+$/.test(env.DB_DATABASE||'')))throw Error('AI_TEST_MANUAL_REVIEW chỉ dùng ở development với DB_DATABASE=BookAuctionTest_* riêng.');
-  const autoModeration=manualFixture?null:{
+  const reviewThresholds={
     rarity:integer('AI_MIN_RARITY_SCORE',70,1,100),
     condition:integer('AI_MIN_CONDITION_SCORE',70,1,100),
   };
@@ -22,7 +22,7 @@ export function parseAiConfig(env) {
   const videoMaxBytes=integer('AI_VIDEO_MAX_MB',100,1,100)*1048576;
   const maxAttempts=integer('AI_PROVIDER_MAX_ATTEMPTS',2,1,2),thinkingLevel=env.AI_THINKING_LEVEL||'low';
   if(!['low','medium','high','default'].includes(thinkingLevel))throw Error('AI_THINKING_LEVEL không hợp lệ.');
-  return {autoModeration,enabled:env.AI_ENABLED==='true',configured:env.AI_ENABLED==='true'&&key.length>10&&!key.includes('CHANGE_ME'),key,model,fallbackModel:fallbackModel===model?null:fallbackModel,
+  return {autoAnalysis:!manualFixture,reviewThresholds,enabled:env.AI_ENABLED==='true',configured:env.AI_ENABLED==='true'&&key.length>10&&!key.includes('CHANGE_ME'),key,model,fallbackModel:fallbackModel===model?null:fallbackModel,
     cloudName:env.CLOUDINARY_CLOUD_NAME||'',providerTimeout,providerMaxTimeout,maxAttempts,thinkingLevel,mediaPrepareTimeout,videoPrepareTimeout,videoDownloadTimeout,videoMaxBytes,videoMaxCount,
     jobTimeout:mediaPrepareTimeout+videoPrepareTimeout*videoMaxCount+providerMaxTimeout*maxAttempts+AI_MAX_RETRY_WAIT_MS*(maxAttempts-1)+10000,
     leaseRenewMs:15000,mediaConcurrency:4,mediaDownloadTimeout:15000,

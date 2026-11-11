@@ -39,7 +39,7 @@ export default function AiPanel({ post, user, publicView = false }) {
   const [data, setData] = useState(null),
     [selected, setSelected] = useState(""),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""), [now, setNow] = useState(Date.now());
   const sequence = useRef(0);
   const load = useCallback(
     async (analysisId = selected) => {
@@ -78,6 +78,12 @@ export default function AiPanel({ post, user, publicView = false }) {
       clearTimeout(timer);
     };
   }, [load, visible, admin, publicView]);
+  useEffect(() => {
+    if (!admin || !["queued","running"].includes(data?.job?.state)) return;
+    setNow(Date.now());
+    const timer=setInterval(()=>setNow(Date.now()),1000);
+    return ()=>clearInterval(timer);
+  }, [admin,data?.job?.request_id,data?.job?.state]);
   async function request() {
     setBusy(true);
     setError("");
@@ -115,11 +121,11 @@ export default function AiPanel({ post, user, publicView = false }) {
       <p className="field-hint">
         {publicView
           ? "Kết quả tham khảo từ ảnh, video và thông tin của bài đã được phê duyệt."
-          : "Hệ thống đối chiếu hai điểm độc lập với mức đạt của từng nhóm."}
+          : "Hai điểm độc lập là thông tin tham khảo. Admin đưa ra quyết định kiểm duyệt cuối cùng."}
       </p>
       {publicView && !analysis && <p>Chưa có kết quả AI công khai cho bản sách này.</p>}
       {admin && waiting && data && !data.configured && (
-        <p className="notice">AI chưa sẵn sàng. Bài đăng sẽ tiếp tục chờ.</p>
+        <p className="notice">AI chưa sẵn sàng. Admin vẫn có thể kiểm duyệt dựa trên bằng chứng.</p>
       )}
       {quotaPaused && (
         <p className="notice" role="status">
@@ -130,7 +136,7 @@ export default function AiPanel({ post, user, publicView = false }) {
           </time>.
         </p>
       )}
-      {admin && waiting && !pending && !canRetry && !quotaPaused && data?.configured && (
+      {admin && waiting && !pending && !analysis && !quotaPaused && data?.configured && (
         <p role="status"><StatusBadge state="queued" /> Hệ thống tự phân tích khi đến lượt.</p>
       )}
       {admin && pending && !quotaPaused && (
@@ -140,12 +146,24 @@ export default function AiPanel({ post, user, publicView = false }) {
             " Kết quả bên dưới thuộc lần phân tích trước; yêu cầu mới chưa hoàn tất."}
         </p>
       )}
+      {admin && data && <div className="ai-timing" role="status">
+        <p>{data.timing?.average_ms != null
+          ? `Thời gian phân tích trung bình: khoảng ${Math.ceil(data.timing.average_ms / 1000)} giây · ${data.timing.sample_count} lần chạy có đầu vào tương tự.`
+          : `Chưa đủ dữ liệu để ước tính thời gian phân tích trung bình (${data.timing?.sample_count ?? 0}/${data.timing?.minimum_samples ?? 5} mẫu).`}</p>
+        <p className="field-hint">Thống kê theo thông tin, số ảnh/video và dung lượng, thời lượng khi đã xác định; không gồm thời gian chờ hàng đợi. Đây không phải thời hạn bảo đảm.</p>
+        {pending && data.job.started_at && <p>Đã xử lý: {Math.max(0,Math.floor((now-data.job.started_at)/1000))} giây.</p>}
+        {pending && !data.job.started_at && data.job.enqueued_at && <p>Đã chờ hàng đợi: {Math.max(0,Math.floor((now-data.job.enqueued_at)/1000))} giây.</p>}
+      </div>}
+      {admin && analysis?.loi_thoi === false && analysis.thong_tin?.recommendation && <p className="notice">
+        Khuyến nghị AI: {analysis.thong_tin.recommendation.approve ? "Hai nhóm đạt ngưỡng tham khảo" : "Cần xem lại bằng chứng hoặc điểm chưa đạt"}.
+        Bài đăng vẫn cần quyết định của Admin.
+      </p>}
       {canRetry && (
         <div>
           <p className="notice" role="status">
             {data.quota_limited
               ? "Lần phân tích trước dừng vì hạn mức Gemini. Hãy kiểm tra hạn mức trước khi yêu cầu phân tích lại."
-              : "Chưa có quyết định cho hồ sơ này. Bạn có thể yêu cầu AI phân tích lại."}
+              : "Admin chưa quyết định cho hồ sơ này. Bạn có thể yêu cầu AI phân tích lại nếu cần."}
           </p>
           <button className="primary" type="button" disabled={busy} onClick={request}>
             {busy ? "Đang gửi…" : "Phân tích lại bằng AI"}
@@ -225,7 +243,7 @@ export default function AiPanel({ post, user, publicView = false }) {
                 Gemini {analysis.thong_tin.execution.attempts ?? 0} lượt · Chuẩn
                 bị media{" "}
                 {Math.ceil((analysis.thong_tin.execution.media_ms ?? 0) / 1000)}{" "}
-                giây · Giới hạn mỗi lượt{" "}
+                giây · Giới hạn chờ mỗi lượt{" "}
                 {Math.ceil(
                   (analysis.thong_tin.execution.provider_timeout_ms ?? 0) /
                     1000,
@@ -233,6 +251,9 @@ export default function AiPanel({ post, user, publicView = false }) {
                 giây.
               </p>
             )}
+            {admin && Number.isFinite(analysis.thong_tin?.execution?.total_ms) && <p className="field-hint">
+              Thời gian xử lý lần này: {Math.ceil(analysis.thong_tin.execution.total_ms / 1000)} giây.
+            </p>}
             {admin && analysis.thong_tin?.error_code && (
               <p className="field-hint">
                 Mã lỗi: {analysis.thong_tin.error_code}

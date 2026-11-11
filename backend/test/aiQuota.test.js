@@ -42,7 +42,7 @@ test('processor persists 429 without a verdict and skips an older queued retry o
     queue:{get:async()=>null,update:async(job,patch)=>{lastJob={...job,...patch};return lastJob;}},
     quota:{pauseUntil:async value=>{paused=value;}},locks:{acquire:async()=>({renew:async()=>true,release:async()=>{}})},
     model:{find:async()=>null,save:async(j,result,info,check,verdict)=>{
-      await check();assert.equal(verdict,null);assert.equal(result.trang_thai,'that_bai');assert.equal(info.retry_not_before,paused);
+      await check();assert.equal(verdict,undefined);assert.equal(result.trang_thai,'that_bai');assert.equal(info.retry_not_before,paused);
       row.ai={...result,phan_tich_id:++writes,thong_tin:info};return row.ai;
     }}});
   const start=Date.now();await process(job());

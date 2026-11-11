@@ -4,6 +4,7 @@ import {BOOK_GENRES,BOOK_GENRE_GROUPS} from '../../../shared/bookGenres.js';
 import {ISBN_MAX_LENGTH} from '../../../shared/bookIdentifiers.js';
 import {searchPattern,catalogOrders} from '../services/catalogSearch.js';
 import { HttpError } from '../middlewares/errorHandler.js';
+import {META_CRITERION} from '../ai/criteria.js';
 import {analysisView} from '../ai/input.js';
 import {ownerAiResult,publicAiResult} from '../services/aiPresentation.js';
 import {createReviewSnapshot,readReviewSnapshot} from '../services/reviewExport.js';
@@ -94,7 +95,7 @@ export function createPostModel({ getPool, sql }) {
   async function reviewData(target,postId) {
     const post=(await request(target).input('id',sql.Int,postId).query(`SELECT ${projection} ${joins} WHERE b.bai_dang_id=@id`)).recordset[0];
     post.media=(await media(target,postId)).map(({publicId,...item})=>item);
-    post.kiem_duyet=(await request(target).input('id',sql.Int,postId).query('SELECT kiem_duyet_id,phan_tich_id,ket_qua,phan_hoi_admin,ngay_kiem_duyet FROM dbo.KiemDuyet WHERE bai_dang_id=@id ORDER BY kiem_duyet_id DESC')).recordset;
+    post.kiem_duyet=(await request(target).input('id',sql.Int,postId).query('SELECT kiem_duyet_id,admin_id,phan_tich_id,ket_qua,phan_hoi_admin,ngay_kiem_duyet FROM dbo.KiemDuyet WHERE bai_dang_id=@id ORDER BY kiem_duyet_id DESC')).recordset;
     const review=currentReview(post);
     if(review) {
       post.ai=(await request(target).input('id',sql.Int,postId).input('decided',sql.DateTime2(3),review.ngay_kiem_duyet).input('analysis',sql.Int,review.phan_tich_id??null)
@@ -118,7 +119,7 @@ export function createPostModel({ getPool, sql }) {
       .input('reason',sql.NVarChar(sql.MAX),reason)
       .query('INSERT dbo.KiemDuyet(bai_dang_id,admin_id,phan_tich_id,ket_qua,phan_hoi_admin) OUTPUT INSERTED.kiem_duyet_id VALUES(@id,@admin,@analysis,@result,@reason)');
     await saveSnapshot(tx,postId,saved.recordset[0].kiem_duyet_id,await reviewData(tx,postId));
-    await history(tx,row.phien_dau_gia_id,admin,`${analysisId?'AI':'Admin'} ${approve?'phê duyệt':'từ chối'} bài đăng và phiên`);
+    await history(tx,row.phien_dau_gia_id,admin,`${admin==null?'AI (lịch sử)':'Admin'} ${approve?'phê duyệt':'từ chối'} bài đăng và phiên`);
   }
   return {
     findRequest,
@@ -192,7 +193,7 @@ export function createPostModel({ getPool, sql }) {
       row.media=(await media(pool,postId)).map(({publicId,...item})=>item);
       row.kiem_duyet=(await request(pool).input('id',sql.Int,postId).query(publicOnly
         ? 'SELECT TOP(1) phan_tich_id,ket_qua,ngay_kiem_duyet FROM dbo.KiemDuyet WHERE bai_dang_id=@id ORDER BY kiem_duyet_id DESC'
-        : 'SELECT kiem_duyet_id,phan_tich_id,ket_qua,phan_hoi_admin,ngay_kiem_duyet,CAST(CASE WHEN ket_qua_snapshot IS NULL THEN 0 ELSE 1 END AS BIT) AS co_the_xuat FROM dbo.KiemDuyet WHERE bai_dang_id=@id ORDER BY kiem_duyet_id DESC')).recordset;
+        : 'SELECT kiem_duyet_id,admin_id,phan_tich_id,ket_qua,phan_hoi_admin,ngay_kiem_duyet,CAST(CASE WHEN ket_qua_snapshot IS NULL THEN 0 ELSE 1 END AS BIT) AS co_the_xuat FROM dbo.KiemDuyet WHERE bai_dang_id=@id ORDER BY kiem_duyet_id DESC')).recordset;
       const decision=currentReview(row);
       if(publicOnly&&decision?.phan_tich_id==null){
         const {kiem_duyet,...details}=row;
@@ -287,15 +288,14 @@ export function createPostModel({ getPool, sql }) {
         if (row.nguoi_dung_id===admin) throw new HttpError(403,'SELF_REVIEW','Không tự kiểm duyệt bài của mình.');
         assertStatePair(row,'cho_kiem_duyet','cho_kiem_duyet','Bài không còn chờ kiểm duyệt.');
         const approve=input.decision==='phe_duyet';
-        await applyReview(tx,row,{postId,admin,analysisId:null,approve,reason:(approve?'Đã kiểm tra bằng chứng về yếu tố quý hiếm. ':'')+input.reason});
+        const analysis=(await request(tx).input('post',sql.Int,postId).input('version',sql.VarChar(16),input.rowVersion)
+          .input('meta',sql.NVarChar(200),META_CRITERION).query(`SELECT TOP(1) a.phan_tich_id FROM dbo.PhanTichAI a
+            JOIN dbo.ChiTietPhanTichAI c ON c.phan_tich_id=a.phan_tich_id AND c.tieu_chi=@meta
+            WHERE a.bai_dang_id=@post AND JSON_VALUE(CASE WHEN ISJSON(c.bang_chung)=1 THEN c.bang_chung ELSE N'{}' END,'$.source_version')=@version
+            ORDER BY a.phan_tich_id DESC`)).recordset[0];
+        await applyReview(tx,row,{postId,admin,analysisId:analysis?.phan_tich_id??null,approve,reason:input.reason});
         return {id:postId};
       });
-    },
-    async recordAutoReview(tx,{job,analysisId,verdict}) {
-      const row=await locked(tx,job.postId,null,'admin');
-      assertVersion(row,job.sourceVersion);
-      assertStatePair(row,'cho_kiem_duyet','cho_kiem_duyet','Bài không còn chờ kiểm duyệt.');
-      await applyReview(tx,row,{postId:job.postId,admin:null,analysisId,approve:verdict.approve,reason:verdict.reason});
     },
     async exportReview(owner,postId,reviewId) {
       return transaction(async tx=>{

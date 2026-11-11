@@ -2,6 +2,18 @@
 
 # Kiểm chứng và nghiệm thu
 
+## Admin quyết định và thời gian AI — 11/11/2026
+
+- `npm run check`, `npm run build`, `npm test` đạt: **235 PASS, 12 SKIP, 247 test**.
+- Test fixture xác nhận điểm cao/thấp/NULL và lỗi không tự tạo quyết định; xếp hàng sau COMMIT,
+  replay, quota và phiên bản cũ vẫn được kiểm tra. Thống kê dùng thời gian đo, không dùng timeout;
+  thiếu 5 mẫu giữ NULL, phân nhóm văn bản/ảnh/video và không trả thống kê cho người bán.
+- Chromium với API mẫu: sửa gợi ý, giữ nội dung Admin đang gõ qua polling, yêu cầu xác nhận trước
+  phê duyệt, từ chối khi AI lỗi, nhãn Admin và ẩn AI của người bán đang chờ. Khung 320/390/768/1440 px không tràn ngang trong các trang được kiểm tra.
+- Migration 010 và kịch bản SQL opt-in đã được bổ sung nhưng **chưa chạy SQL/Redis/Gemini thật**
+  trong lần sửa này. Sau khi cập nhật, dừng cả API/worker, chạy `npm.cmd run db:migrate` rồi khởi động lại.
+  Giữ dữ liệu cũ; không đổi quyết định AI lịch sử thành quyết định Admin.
+
 ## Bố cục responsive và khung xem ảnh
 
 - Chromium với API dữ liệu mẫu: đo tràn ngang cho 21 tổ hợp trang/vai trò, mỗi tổ hợp ở

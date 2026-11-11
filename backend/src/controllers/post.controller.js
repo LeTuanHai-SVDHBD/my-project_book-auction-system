@@ -1,5 +1,7 @@
 /** HTTP bài đăng: đầu vào hợp đồng chặt chẽ, dữ liệu công khai dùng danh sách trường cho phép. */
 import {OWNER_POST_FILTERS,normalizeOwnerPostStatus} from '../../../shared/ownerPostFilters.js';
+import {moderationDecision} from '../ai/moderation.js';
+import {currentAnalysisId} from '../ai/input.js';
 import {HttpError} from '../middlewares/errorHandler.js';
 import {moderationQuery,moderationPage} from '../services/moderationList.js';
 import {catalogSearch} from '../services/catalogSearch.js';
@@ -24,7 +26,12 @@ export function createPostController({model,service,limits,aiConfig}) {
       return listResponse(res,await model.list({owner:req.user.nguoi_dung_id,after:page(req),ownerStatus}));
     },
     pending:async(req,res)=>res.json(moderationPage(await model.list(moderationQuery(req.query)))),
-    detail:async(req,res)=>res.json({...await model.detail(id(req.params.id),options(req)),kiem_duyet_tu_dong:Boolean(aiConfig?.autoModeration),ai_san_sang:Boolean(aiConfig?.configured)}),
+    detail:async(req,res)=>{
+      const row=await model.detail(id(req.params.id),options(req));
+      return res.json({...row,kiem_duyet_tu_dong:false,phan_tich_tu_dong:Boolean(aiConfig?.autoAnalysis),ai_san_sang:Boolean(aiConfig?.configured),
+        ...(req.user.vai_tro==='admin'?{ai_khuyen_nghi:currentAnalysisId(row)&&row.ai?.loi_thoi===false
+          ?moderationDecision(row.ai,row.ai.thong_tin||{},aiConfig?.reviewThresholds):null}:{})});
+    },
     exportReview:async(req,res)=>res.json(await model.exportReview(req.user.nguoi_dung_id,id(req.params.id),id(req.params.reviewId))),
     create:async(req,res)=>{ const result=await service.create(req.user.nguoi_dung_id,validatePost(req.body,limits));res.status(result.replayed?200:201).json(result); },
     relist:async(req,res)=>{const result=await service.create(req.user.nguoi_dung_id,validatePost(req.body,{...limits,mode:'relist'}),id(req.params.id));res.status(result.replayed?200:201).json(result);},

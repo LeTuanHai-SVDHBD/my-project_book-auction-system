@@ -18,7 +18,7 @@ try{
   for(const [label,role,client] of [['seller','nguoi_dung',seller],['admin','admin',admin]]){const user=await users.create({ho_ten:'AI smoke fixture',email:`ai-${label}-${runId}@example.test`,passwordHash:hash,role});accounts.push(user);await client.call('/auth/csrf');await client.call('/auth/login','POST',{email:user.email,mat_khau:secret});}
   stage='đăng bài kiểm thử';
   const created=await seller.call('/posts','POST',{ma_yeu_cau:randomUUID(),sach:{ten_sach:`AI SMOKE ${runId}`,tinh_trang_sach:'Fixture không có ảnh, không được suy ra tình trạng tốt.'},bai_dang:{tieu_de:`AI SMOKE ${runId}`,mo_ta_tinh_trang:'Không có dữ liệu hình ảnh. Chỉ kiểm thử kết nối và NULL.'},phien:{gia_khoi_diem:'100000',gia_toi_thieu:'200000',buoc_gia:'1000',thoi_gian_cho_dat_lai:20},media:[]});postId=created.id;
-  const initialPost=await admin.call(`/posts/${postId}`);auto=initialPost.kiem_duyet_tu_dong;
+  const initialPost=await admin.call(`/posts/${postId}`);auto=initialPost.phan_tich_tu_dong;
   cleanupSafe=false;
   if(!auto){
     const initialAi=await admin.call(`/ai/${postId}`);assert.equal(initialAi.analysis,null);assert.equal(initialAi.job,null);assert.deepEqual(initialAi.history,[]);
@@ -31,19 +31,12 @@ try{
   assert(data?.analysis,'Hết thời gian chờ kết quả AI.');assert.notEqual(data.analysis.trang_thai,'that_bai',`Gemini chưa hoàn tất: ${formatAiFailure(data.analysis.thong_tin)}`);
   assert.equal(data.analysis.diem_do_hiem,null);assert.equal(data.analysis.diem_tinh_trang,null);assert.equal(data.analysis.chi_tiet.length,9);
   assert(!JSON.stringify(data).includes(process.env.GEMINI_API_KEY));
-  if(!auto){
-    const waitingOwner=await seller.call(`/ai/${postId}`);assert.equal(waitingOwner.analysis,null);assert.equal(waitingOwner.job,null);assert.deepEqual(waitingOwner.history,[]);
-    assert.equal((await seller.call(`/posts/${postId}`)).ai,null);
-    const pendingPost=await admin.call(`/posts/${postId}`);assert.equal(pendingPost.trang_thai_phien,'cho_kiem_duyet');
-    stage='Admin quyết định và công bố kết quả cho chủ bài';
-    await admin.call(`/posts/${postId}/review`,'POST',{quyet_dinh:'tu_choi',ly_do:'Fixture smoke thiếu ảnh: từ chối thử để kiểm tra công bố kết quả, không thẩm định sách thật.',row_version:pendingPost.row_version});
-  }else{
-    stage='AI tự từ chối vì hồ sơ thiếu bằng chứng';
-    const rejected=await seller.call(`/posts/${postId}`);
-    assert.equal(rejected.trang_thai_phien,'khong_dat_kiem_duyet');
-    assert.equal(rejected.kiem_duyet[0].phan_tich_id,data.analysis.phan_tich_id);
-    assert.match(rejected.kiem_duyet[0].phan_hoi_admin,/chưa đủ bằng chứng/);
-  }
+  const waitingOwner=await seller.call(`/ai/${postId}`);assert.equal(waitingOwner.analysis,null);assert.equal(waitingOwner.job,null);assert.deepEqual(waitingOwner.history,[]);
+  assert.equal((await seller.call(`/posts/${postId}`)).ai,null);
+  const pendingPost=await admin.call(`/posts/${postId}`);assert.equal(pendingPost.trang_thai_phien,'cho_kiem_duyet');
+  assert.equal(pendingPost.kiem_duyet.length,0);
+  stage='Admin quyết định và công bố kết quả cho chủ bài';
+  await admin.call(`/posts/${postId}/review`,'POST',{quyet_dinh:'tu_choi',ly_do:'Fixture smoke thiếu ảnh: Admin từ chối để kiểm tra công bố kết quả, không thẩm định sách thật.',row_version:pendingPost.row_version});
   const owner=await seller.call(`/ai/${postId}`);assert.equal(owner.analysis?.phan_tich_id,data.analysis.phan_tich_id);
   assert.equal(owner.analysis.diem_do_hiem,null);assert.equal(owner.analysis.diem_tinh_trang,null);assert.equal(owner.job,null);assert.deepEqual(owner.history,[]);
   assert.equal((await seller.call(`/posts/${postId}`)).trang_thai_phien,'khong_dat_kiem_duyet');
@@ -55,4 +48,4 @@ finally{
   catch{console.error(`Chưa dọn xong fixture AI, bài #${postId}, run=${runId}.`);process.exitCode=1;}
   await closeDatabase();
 }
-if(finished&&!process.exitCode)console.log(auto?'PASS AI thật: worker tự phân tích, giữ NULL và từ chối vì thiếu bằng chứng; người bán thấy quyết định đã lưu.':'PASS AI thật: Admin yêu cầu phân tích; thiếu ảnh giữ NULL; người bán thấy kết quả sau quyết định Admin.');
+if(finished&&!process.exitCode)console.log('PASS AI thật: thiếu ảnh giữ NULL, bài vẫn chờ; Admin quyết định rồi người bán mới thấy kết quả.');

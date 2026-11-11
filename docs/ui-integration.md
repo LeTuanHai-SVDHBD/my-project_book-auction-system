@@ -91,7 +91,7 @@ Bài đã phê duyệt rời danh sách này, quyết định/lịch sử vẫn 
 
 Bài mới tự phân tích sau khi lưu. Admin thấy tiến độ, kết quả hoặc lỗi; nút **Phân tích lại bằng AI** chỉ xuất hiện khi bài còn chờ, đã có lượt phân tích cùng phiên bản và không có job hợp lệ đang chạy. Khi lần phân tích kết thúc với lỗi kỹ thuật, màn hình giữ kết quả lỗi và chờ Admin bấm thử lại.
 Khi Gemini trả 429, Admin thấy **Tạm dừng vì hạn mức** và giờ có thể thử lại. Trong thời gian chờ, giao diện ẩn nút thử lại và thông báo chuẩn bị media; bài vẫn ở danh sách chờ kiểm duyệt.
-Bài chờ ở màn hình chi tiết tự lấy lại kết quả mỗi 5 giây. AI tự ghi quyết định và điền ô chỉ đọc **Căn cứ và lý do kiểm duyệt** nếu từ chối. Chỉ kết quả phân tích không thất bại
+Bài chờ ở màn hình chi tiết tự lấy lại kết quả mỗi 5 giây. AI chỉ gợi ý. Admin điền/chỉnh **Căn cứ và lý do kiểm duyệt**, chọn phê duyệt hoặc từ chối; phê duyệt cần xác nhận đã đối chiếu bằng chứng. Chỉ kết quả phân tích không thất bại
 mới có hai ô điểm; NULL là thiếu bằng chứng, lỗi provider là thất bại/chẩn đoán riêng. Điểm `100.00` hiển thị `100/100`.
 Video có tiến độ lấy Cloudinary/chuyển Files/chờ ACTIVE; manifest giữ link gốc, cách gửi toàn tệp
 (Gemini lấy mẫu), bytes/thời lượng nếu có. Không coi “đã gửi” là xác minh mọi frame/trang sách.
@@ -189,3 +189,5 @@ Checklist kiểm tra thủ công với dữ liệu thật, ở **320 / 360 / 390
 
 **Phạm vi đã kiểm tra:** xem [kiểm chứng](../VALIDATION.md) cho các khung Chromium dùng dữ liệu mẫu.
 Dùng checklist này để nghiệm thu thêm trên thiết bị, trình duyệt và dữ liệu thực tế.
+
+Admin thấy thời gian trung bình theo mẫu tương tự (tối thiểu 5), thời gian đã chạy/chờ riêng và kết quả thực tế từng lượt. Chưa đủ mẫu thì không hiển thị số ước lượng. Người bán chờ duyệt không nhận thống kê AI.

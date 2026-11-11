@@ -17,7 +17,7 @@ test('HTTP phân tích giữ quyền sở hữu/Admin, CSRF, version, key ở ba
   let enqueued=0,active=null,quotaUntil=0,lastRetryOf;
   const post={row_version:'0000000000000001',trang_thai_bai:'cho_kiem_duyet',trang_thai_phien:'cho_kiem_duyet',ai:null};
   const posts={detail:async(id,options)=>{if(id!==7||!options.admin&&options.owner!==1)throw new HttpError(404,'POST_NOT_FOUND','Không tìm thấy.');return post;}};
-  const config={configured:true,autoModeration:{rarity:70,condition:70},key:'never-send-this-secret'},service=createAiService({posts,config,quota:{until:async()=>quotaUntil},model:{history:async()=>[],get:async()=>null},queue:{status:async()=>active,enqueue:async(row,trigger,retryOf)=>{assert.equal(trigger,'auto');lastRetryOf=retryOf;enqueued++;return {requestId:'fixture',state:'queued'};}}});
+  const config={configured:true,autoAnalysis:true,reviewThresholds:{rarity:70,condition:70},key:'never-send-this-secret'},service=createAiService({posts,config,quota:{until:async()=>quotaUntil},model:{history:async()=>[],get:async()=>null},queue:{status:async()=>active,enqueue:async(row,trigger,retryOf)=>{assert.equal(trigger,'auto');lastRetryOf=retryOf;enqueued++;return {requestId:'fixture',state:'queued'};}}});
   const authRouter=createAuthRouter({authConfig,sessionMiddleware,users,passwords:{verify:async()=>true},limiter:{consume:async()=>0}}),aiRouter=createAiRouter({sessionMiddleware,users,service});
   const server=createServer(createApp({config:{mode:'development',origins:[],probeToken:'x'},deps:{},probes:{},authRouter,aiRouter}));await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(async()=>{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));});

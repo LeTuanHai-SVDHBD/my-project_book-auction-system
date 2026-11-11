@@ -7,10 +7,10 @@ redis.call('SET',KEYS[1],ARGV[1],'EX',86400);redis.call('SET',KEYS[2],ARGV[2],'E
 export function createAiQueue({getRedis,settings=AI_QUEUE}) {
   const current=id=>settings.prefix+'post:'+id,jobKey=id=>settings.prefix+'job:'+id;
   return {
-    async enqueue(row,trigger='manual',retryOf){const job={requestId:randomUUID(),postId:row.bai_dang_id,sourceVersion:row.row_version,inputHash:inputHash(row),trigger,state:'queued',...(retryOf?{retryOf}:{})};
+    async enqueue(row,trigger='manual',retryOf){const job={requestId:randomUUID(),postId:row.bai_dang_id,sourceVersion:row.row_version,inputHash:inputHash(row),trigger,enqueuedAt:Date.now(),state:'queued',...(retryOf?{retryOf}:{})};
       return JSON.parse(await getRedis().eval(enqueueLua,{keys:[current(job.postId),jobKey(job.requestId),settings.stream],arguments:[job.requestId,JSON.stringify(job),settings.prefix+'job:',job.sourceVersion,trigger,retryOf?String(retryOf):'']}));},
     async get(id){const value=await getRedis().get(jobKey(id));return value?JSON.parse(value):null;},
-    async status(postId){const id=await getRedis().get(current(postId));if(!id)return null;const value=await this.get(id);return value?{request_id:value.requestId,state:value.state,trigger:value.trigger,source_version:value.sourceVersion,retry_of:value.retryOf??null,analysis_id:value.analysisId??null,progress:value.progress??null}:null;},
+    async status(postId){const id=await getRedis().get(current(postId));if(!id)return null;const value=await this.get(id);return value?{request_id:value.requestId,state:value.state,trigger:value.trigger,source_version:value.sourceVersion,retry_of:value.retryOf??null,analysis_id:value.analysisId??null,enqueued_at:value.enqueuedAt??null,started_at:value.startedAt??null,progress:value.progress??null}:null;},
     async update(job,patch){const next={...job,...patch};await getRedis().set(jobKey(job.requestId),JSON.stringify(next),{EX:86400});return next;}
   };
 }

@@ -1,5 +1,5 @@
 import StatusBadge from "./StatusBadge.jsx";
-/** Danh mục, bài của tôi, kiểm duyệt tự động và luồng đặt giá/kết quả phiên. */
+/** Danh mục, bài của tôi, kiểm duyệt của Admin và luồng đặt giá/kết quả phiên. */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { OWNER_POST_FILTERS, normalizeOwnerPostStatus } from "../../../shared/ownerPostFilters.js";
 import { STATUS, postStatus } from "../utils/statusPresentation.js";
@@ -59,7 +59,7 @@ function ReviewDecision({ review, postId, canExport }) {
         <StatusBadge state={review.ket_qua === "Phê duyệt" ? "approved" : "rejected"}>
           {review.ket_qua === "Phê duyệt" ? "Đã phê duyệt" : "Bị từ chối"}
         </StatusBadge>
-        <small>{review.phan_tich_id ? "Kiểm duyệt tự động" : "Admin kiểm duyệt"} · {date(review.ngay_kiem_duyet)}</small>
+        <small>{review.admin_id == null && review.phan_tich_id ? "AI tự duyệt (lịch sử)" : "Admin kiểm duyệt"} · {date(review.ngay_kiem_duyet)}</small>
       </div>
       <h3>{review.ket_qua === "Từ chối" ? "Lý do từ chối bài đăng" : "Căn cứ phê duyệt"}</h3>
       {review.ket_qua === "Từ chối" ? (
@@ -81,6 +81,53 @@ function ReviewDecision({ review, postId, canExport }) {
       )}
     </blockquote>
   );
+}
+function AdminReviewForm({ post, onRefresh }) {
+  const [reason, setReason] = useState(post.ai_khuyen_nghi?.reason || "");
+  const [confirmed, setConfirmed] = useState(false);
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const dirty = useRef(false), notify = useSuccessFeedback();
+  const suggestion = post.ai_khuyen_nghi?.reason || "";
+  useEffect(() => { if (!dirty.current && suggestion) setReason(suggestion); }, [suggestion]);
+  async function submit(event) {
+    event.preventDefault();
+    const decision = event.nativeEvent.submitter?.value;
+    if (!["phe_duyet", "tu_choi"].includes(decision) || busy) return;
+    if (decision === "phe_duyet" && !confirmed) {
+      setError("Hãy xác nhận đã đối chiếu thông tin và bằng chứng trước khi phê duyệt.");
+      return;
+    }
+    setBusy(true); setError("");
+    try {
+      await postApi.review(post.bai_dang_id, {quyet_dinh:decision, ly_do:reason,
+        xac_nhan_quy_hiem:confirmed, row_version:post.row_version});
+      notify({message:decision === "phe_duyet" ? "Đã phê duyệt bài đăng." : "Đã từ chối bài đăng."});
+      await onRefresh();
+    } catch (failure) { setError(failure.message); }
+    finally { setBusy(false); }
+  }
+  return <form className="admin-review-form" onSubmit={submit} aria-label="Quyết định kiểm duyệt">
+    <h3>Quyết định của Admin</h3>
+    <p className="field-hint">AI chỉ hỗ trợ tham khảo. Admin quyết định và chịu trách nhiệm về căn cứ kiểm duyệt, kể cả khi AI lỗi hoặc điểm chưa đạt.</p>
+    <fieldset disabled={busy}>
+      <label>Căn cứ và lý do kiểm duyệt
+        <textarea required maxLength={8000} rows={6} value={reason}
+          onChange={event=>{dirty.current=true;setReason(event.target.value);}} />
+      </label>
+      {suggestion && <button type="button" className="text-button"
+        onClick={()=>{dirty.current=true;setReason(suggestion);}}>Dùng gợi ý của AI</button>}
+      <label className="review-confirmation">
+        <input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)} />
+        Tôi đã đối chiếu thông tin và bằng chứng về yếu tố quý hiếm của bản sách.
+      </label>
+      <div className="actions">
+        <button className="secondary" type="submit" value="tu_choi">Từ chối có lý do</button>
+        <button className="primary" type="submit" value="phe_duyet">Phê duyệt bài đăng</button>
+      </div>
+    </fieldset>
+    {busy && <p role="status">Đang lưu quyết định…</p>}
+    {error && <p className="error" role="alert">{error}</p>}
+  </form>;
 }
 function Detail({
   post,
@@ -239,12 +286,13 @@ function Detail({
       {mode !== "catalog" && (
         <section className="panel live-review">
           {admin && ai}
+          {admin && waiting && <AdminReviewForm key={post.row_version} post={post} onRefresh={onRefresh} />}
           <h2>{waiting ? "Tiến độ kiểm duyệt" : "Kết quả kiểm duyệt"}</h2>
           {waiting && !admin && (
             <p className="notice" role="status">
               {post.ai_san_sang
-                ? "Bài đăng đang chờ kiểm duyệt tự động. Quyết định và lý do sẽ xuất hiện tại đây."
-                : "Bài đăng đã được lưu và sẽ tiếp tục chờ dịch vụ AI."}
+                ? "Bài đăng đang chờ Admin kiểm duyệt. Quyết định và lý do sẽ xuất hiện tại đây."
+                : "Bài đăng đã được lưu và đang chờ Admin kiểm duyệt."}
             </p>
           )}
           {decision && (
@@ -406,7 +454,7 @@ export default function PostsPanel({
       ++detailSequence.current;
     };
   }, [selectedId, mode, initialCreate]);
-  const watchDecision = Boolean(!form && post?.kiem_duyet_tu_dong && post.trang_thai_phien === "cho_kiem_duyet");
+  const watchDecision = Boolean(!form && post && post.trang_thai_phien === "cho_kiem_duyet");
   useEffect(() => {
     if (!watchDecision || !selectedId) return;
     let active = true, timer;

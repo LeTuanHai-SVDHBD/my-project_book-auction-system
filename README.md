@@ -101,7 +101,7 @@ còn lại dừng theo `--kill-others`. Muốn chạy kiểm tra/smoke thì mở
 | Khách | Xem/tìm phiên công khai, ảnh/video, giá, lịch sử, kết quả, bình luận và uy tín |
 | Người dùng | Đăng sách, lưu nháp, bổ sung bài bị từ chối, kích hoạt/đăng lại đủ điều kiện; đặt giá sách của người khác |
 | Hai bên giao dịch | Chat riêng, xác nhận hoàn tất phần giao dịch của mình, khiếu nại; người mua đánh giá sau hoàn tất |
-| Admin | Theo dõi kiểm duyệt AI, yêu cầu phân tích lại khi bài còn chờ; xử lý khiếu nại |
+| Admin | Tham khảo AI, phê duyệt/từ chối kèm căn cứ, yêu cầu phân tích lại khi bài còn chờ; xử lý khiếu nại |
 
 Admin dùng sidebar riêng, không có chức năng đăng sách. Khách không thấy avatar tài khoản hoặc hộp thông báo.
 Đăng nhập cùng tài khoản ở nơi mới thu hồi phiên cũ; F5 không khôi phục phiên đã bị thu hồi.
@@ -112,9 +112,9 @@ Khác tài khoản vẫn có thể dùng đồng thời ở các tab. Xem [accou
 1. **Đăng sách:** điền bốn bước, gồm thông tin sách, ảnh/video, thông số đấu giá, kiểm tra và gửi.
    ISBN tùy chọn, tối đa 100 ký tự; thể loại chọn từ danh mục chung, gõ chỉ để lọc.
    Một ô **Tình trạng, yếu tố quý hiếm và bằng chứng** thay cho hai mô tả tình trạng trùng nhau.
-2. **Kiểm duyệt:** Bài được đưa vào hàng đợi AI sau khi lưu; worker đối chiếu hai điểm độc lập với hai ngưỡng.
-   Đạt cả hai thì phê duyệt; điểm thấp hoặc thiếu bằng chứng sau khi phân tích thì từ chối kèm lý do.
-   Sự cố dịch vụ giữ bài chờ. Admin có thể yêu cầu AI phân tích lại, còn quyết định luôn do hệ thống lưu.
+2. **Kiểm duyệt:** Bài được đưa vào hàng đợi AI sau khi lưu; worker đối chiếu hai điểm độc lập với hai ngưỡng
+   để tạo khuyến nghị. **Admin quyết định phê duyệt hoặc từ chối**, bắt buộc căn cứ/lý do;
+   phê duyệt cần xác nhận đã đối chiếu bằng chứng. AI lỗi hoặc thiếu dữ liệu không tự từ chối bài.
    Bật Gemini và xem hai ngưỡng theo [hướng dẫn cấu hình](docs/ai-analysis.md#admin-quyết-định-ai-hỗ-trợ).
 3. **Bổ sung:** chủ bài bị từ chối sửa hồ sơ, đánh dấu gỡ media cũ, thêm media và gửi duyệt lại.
    Lưu hồ sơ theo bài, giữ media/quyết định/PDF của vòng trước. Bài đã duyệt rời danh sách kiểm duyệt.

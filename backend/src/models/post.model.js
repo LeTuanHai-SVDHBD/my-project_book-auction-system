@@ -117,7 +117,11 @@ export function createPostModel({ getPool, sql }) {
     await request(tx).input('id',sql.Int,row.phien_dau_gia_id).input('state',sql.VarChar(30),approve?'da_qua_kiem_duyet':'khong_dat_kiem_duyet').query('UPDATE dbo.PhienDauGia SET trang_thai=@state WHERE phien_dau_gia_id=@id');
     const saved=await request(tx).input('id',sql.Int,postId).input('admin',sql.Int,admin).input('analysis',sql.Int,analysisId).input('result',sql.NVarChar(20),approve?'Phê duyệt':'Từ chối')
       .input('reason',sql.NVarChar(sql.MAX),reason)
-      .query('INSERT dbo.KiemDuyet(bai_dang_id,admin_id,phan_tich_id,ket_qua,phan_hoi_admin) OUTPUT INSERTED.kiem_duyet_id VALUES(@id,@admin,@analysis,@result,@reason)');
+      // OUTPUT cần INTO vì migration 010 bật trigger kiểm tra người quyết định trên KiemDuyet.
+      .query(`DECLARE @savedReview TABLE(kiem_duyet_id INT);
+        INSERT dbo.KiemDuyet(bai_dang_id,admin_id,phan_tich_id,ket_qua,phan_hoi_admin)
+        OUTPUT INSERTED.kiem_duyet_id INTO @savedReview(kiem_duyet_id) VALUES(@id,@admin,@analysis,@result,@reason);
+        SELECT kiem_duyet_id FROM @savedReview;`);
     await saveSnapshot(tx,postId,saved.recordset[0].kiem_duyet_id,await reviewData(tx,postId));
     await history(tx,row.phien_dau_gia_id,admin,`${admin==null?'AI (lịch sử)':'Admin'} ${approve?'phê duyệt':'từ chối'} bài đăng và phiên`);
   }

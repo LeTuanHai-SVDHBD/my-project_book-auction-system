@@ -70,6 +70,12 @@ Chỉ quyết định Admin mới công bố kết quả cho người bán. Hồ
 `KiemDuyet.admin_id` xác định người quyết định; `phan_tich_id` có thể cùng tồn tại để giữ điểm/bằng chứng trong PDF và màn hình người mua.
 Không gán Admin giả cho quyết định AI cũ. Hai điểm không chứng thực ấn bản hay chữ ký.
 
+Khi lưu cả phê duyệt và từ chối, `post.model.js` thu mã kiểm duyệt bằng `OUTPUT INSERTED.kiem_duyet_id INTO`
+một biến bảng rồi `SELECT` lại trong cùng giao dịch. SQL Server không cho trả `OUTPUT` trực tiếp
+trên bảng có trigger INSERT đang bật ([Microsoft: OUTPUT clause](https://learn.microsoft.com/en-us/sql/t-sql/queries/output-clause-transact-sql?view=sql-server-ver16#triggers)); giữ trigger bảo vệ quyết định của migration 010.
+Quyết định, trạng thái bài/phiên, bản kết quả và lịch sử cùng COMMIT; lỗi lưu sẽ rollback.
+Sửa câu truy vấn không yêu cầu migration mới.
+
 ## Thời gian phân tích dành cho Admin
 
 Admin nhận **khoảng thời gian phân tích dự kiến ngay khi mở hồ sơ**, dựa trên độ dài nội dung,

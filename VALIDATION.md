@@ -2,6 +2,17 @@
 
 # Kiểm chứng và nghiệm thu
 
+## Lưu kiểm duyệt khi bảng có trigger — 11/11/2026
+
+- `npm run check` và `npm test` đạt: **238 PASS, 12 SKIP, 250 test**.
+- Fixture SQL mô phỏng lỗi 334 của `OUTPUT` không có `INTO` khi trigger INSERT đang bật.
+  Trước sửa, cả phê duyệt/từ chối đều lỗi; sau sửa, hai quyết định lưu đúng trạng thái, lý do và
+  mã kiểm duyệt trong snapshot. Kiểm thử HTTP, chặn phiên bản cũ và rollback khi snapshot lỗi vẫn đạt.
+- Bổ sung xác nhận trigger migration 010 đang bật trong kịch bản SQL opt-in có cả hai quyết định.
+  **Chưa chạy SQL Server/Redis/Gemini thật** trong lần sửa này; 12 test dịch vụ thật vẫn SKIP.
+- Không có migration mới. Máy đã áp dụng migration 010 chỉ cần cập nhật code và khởi động lại API;
+  giữ nguyên trigger và dữ liệu. Kiểm tra lại một bài từ chối và một bài phê duyệt đang chờ trên máy chạy dịch vụ.
+
 ## Ước tính thời gian ngay từ hồ sơ và checkbox — 11/11/2026
 
 - `npm run check`, `npm run build`, `npm test` đạt: **236 PASS, 12 SKIP, 248 test**.

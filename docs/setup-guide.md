@@ -152,6 +152,7 @@ Các smoke nghiệp vụ và điều kiện chạy được liệt kê tại [RE
 | Port 5173 already in use | Dừng terminal Vite/dev:all cũ; Vite strictPort không tự nhảy cổng |
 | Redis/event worker chưa sẵn sàng | Xem Docker, log WORKER, kết nối Redis/SQL và heartbeat; giữ dev:all chạy |
 | SQL sai số bảng/cột | Kiểm tra `DB_DATABASE`/đúng volume, chạy migration sau khi dịch vụ healthy |
+| Từ chối/phê duyệt lỗi `KiemDuyet` có trigger và `OUTPUT` không có `INTO` | Cập nhật code `feat/Hai`, khởi động lại API. Câu INSERT phải dùng `OUTPUT … INTO` rồi SELECT mã kiểm duyệt; giữ trigger của migration 010. Bản sửa này không có migration mới |
 | Không đăng nhập, lỗi CSRF | Kiểm tra session/Redis/origin; Ctrl+F5, đăng nhập lại; web tự làm mới token và thử lại tối đa một lần với lỗi INVALID_CSRF |
 | Tab cũ bị đăng xuất | Đúng chính sách khi tài khoản vừa đăng nhập nơi khác; F5 không giành lại phiên |
 | Cloudinary có tệp nhưng web báo lỗi | Đối soát theo public ID, chưa có vé thì không gắn vào bài; không upload lặp liên tục |

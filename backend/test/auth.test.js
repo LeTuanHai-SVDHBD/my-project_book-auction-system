@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
+import { createAuthRateLimiter } from '../src/services/authRateLimit.service.js';
 import session from 'express-session';
 import { createApp } from '../src/app.js';
 import { createAuthRouter } from '../src/routes/auth.routes.js';
@@ -137,6 +138,44 @@ test('giới hạn thử trả 429 và Retry-After trước khi đọc mật kh�
   const c = client(); await c.bootstrap(); const r = await c.login();
   assert.equal(r.response.status, 429); assert.equal(r.response.headers.get('retry-after'), '300'); assert.equal(calls, 0);
 });
+test('đăng nhập thành công nhiều lần không tích lũy khóa email; sai vẫn chặn và hết TTL mới mở', async t => {
+  let now=0,ipCount=0,emailCount=0,expires=900;
+  const limiter={
+    async consume(action){
+      if(action!=='login')return 0;
+      if(now>=expires){ipCount=0;emailCount=0;expires=now+900;}
+      ipCount++;emailCount++;return ipCount>50||emailCount>10?expires-now:0;
+    },
+    async resetLogin(email){assert.equal(email,'hai@example.test');emailCount=0;},
+  };
+  const {client}=await serve(t,{limiter});const c=client();await c.bootstrap();await c.register();
+  for(let i=0;i<12;i++)assert.equal((await c.login(' HAI@Example.test ')).response.status,200);
+  assert.equal(emailCount,0);assert.equal(ipCount,12);
+  for(let i=0;i<9;i++)assert.equal((await c.login('hai@example.test','sai')).response.status,401);
+  assert.equal((await c.login()).response.status,200);assert.equal(emailCount,0);
+  for(let i=0;i<10;i++)assert.equal((await c.login('hai@example.test','sai')).response.status,401);
+  const limited=await c.login();assert.equal(limited.response.status,429);
+  assert.equal(limited.response.headers.get('retry-after'),'900');
+  now=901;assert.equal((await c.login()).response.status,200);
+});
+test('xóa bộ đếm chỉ đúng email đã đăng nhập, giữ bộ đếm IP và email khác',async()=>{
+  const counters=new Map();let keys;
+  const redis={eval:async(_script,options)=>{keys=options.keys;for(const key of keys)counters.set(key,8);return 0;},
+    del:async key=>counters.delete(key)};
+  const limiter=createAuthRateLimiter({getRedis:()=>redis,secret:authConfig.secret,prefix:'fixture:limit:'});
+  await limiter.consume('login',{ip:'127.0.0.1',email:'other@example.test'});const other=keys[1];
+  await limiter.consume('login',{ip:'127.0.0.1',email:'hai@example.test'});const [ip,email]=keys;
+  await limiter.resetLogin('hai@example.test');
+  assert.equal(counters.has(email),false);assert.equal(counters.get(ip),8);assert.equal(counters.get(other),8);
+  assert([...counters.keys()].every(key=>!key.includes('@')&&!key.includes('127.0.0.1')));
+});
+test('lượt đăng nhập đúng không xóa giới hạn IP đã chạm trần',async t=>{
+  let reset=0,reads=0;
+  const users=fakeUsers();users.findByEmail=async()=>{reads++;return null;};
+  const limiter={consume:async action=>action==='login'?180:0,resetLogin:async()=>{reset++;}};
+  const {client}=await serve(t,{users,limiter});const c=client();await c.bootstrap();
+  assert.equal((await c.login()).response.status,429);assert.equal(reset,0);assert.equal(reads,0);
+});
 test('Redis chưa sẵn sàng trả 503, không cấp cookie hoặc bỏ qua giới hạn thử', async t => {
   const { client } = await serve(t, { ready: () => false }); const c = client();
   const r = await c.bootstrap(); assert.equal(r.response.status, 503); assert.equal(c.cookie, '');
@@ -150,6 +189,7 @@ test('CORS chỉ cấp credentials cho origin trong danh sách', async t => {
   const { client } = await serve(t); const c = client(); const r = await c.bootstrap();
   assert.equal(r.response.headers.get('access-control-allow-credentials'), 'true');
   assert.equal(r.response.headers.get('access-control-allow-origin'), origin);
+  assert.equal(r.response.headers.get('access-control-expose-headers'),'Retry-After');
   assert.equal((await c.call('/csrf', { requestOrigin: 'https://evil.example' })).response.status, 403);
 });
 test('lỗi đọc RedisStore không tạo phiên đăng nhập và không lộ chi tiết', async t => {

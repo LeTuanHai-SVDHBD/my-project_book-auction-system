@@ -2,7 +2,7 @@
 import { randomBytes } from 'node:crypto';
 import {HttpError} from '../middlewares/errorHandler.js';
 const save = req => new Promise((resolve, reject) => req.session.save(error => error ? reject(error) : resolve()));
-export function createAuthController({ service, authConfig }) {
+export function createAuthController({ service, authConfig, limiter }) {
   return {
     async csrf(req, res) {
       req.session.csrfToken ||= randomBytes(32).toString('hex');
@@ -21,6 +21,7 @@ export function createAuthController({ service, authConfig }) {
       req.session.csrfToken = randomBytes(32).toString('hex');
       await save(req);
       await req.accountControl?.claim(req);
+      await limiter.resetLogin?.(req.authInput.email);
       res.json({ user, csrfToken: req.session.csrfToken });
     },
     async logout(req, res) {

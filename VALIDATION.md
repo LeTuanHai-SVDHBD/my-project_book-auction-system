@@ -2,6 +2,20 @@
 
 # Kiểm chứng và nghiệm thu
 
+## Giới hạn đăng nhập và thông báo chờ — 13/11/2026
+
+- `npm run check`, `npm test`, `npm run build` đạt: **242 PASS, 12 SKIP, 254 test**.
+- Trước sửa, test hồi quy tái hiện đăng nhập hợp lệ lần 11 trả 429. Sau sửa, HTTP với Argon2 thật,
+  tài khoản/session và hạn mức giả xác nhận đăng nhập thành công đặt lại bộ đếm email; sai nhiều lần
+  vẫn nhận 429, hết TTL mới thử tiếp được. Xác nhận chỉ xóa đúng khóa email và giữ giới hạn IP.
+- HTTP xác nhận CORS chỉ expose `Retry-After` cho origin được phép. Client giữ thời gian chờ và không
+  tự gửi lại mật khẩu khi nhận 429. Chromium với API fixture: lỗi 429 ở CSRF hiển thị đếm ngược,
+  nút gửi bị khóa rồi tự mở lại khi hết thời gian. Không nhập mật khẩu/tài khoản thật trong trình duyệt.
+- Mở rộng Redis opt-in để kiểm tra đăng nhập lặp và giữ trần 50 yêu cầu/IP, nhưng **chưa chạy Redis/SQL
+  thật** trong lần sửa này. Chưa xác minh được mật khẩu của tài khoản trên máy người dùng.
+- Không đổi mật khẩu, cơ chế Argon2, quyền Admin, session/CSRF hoặc chính sách một phiên/tài khoản.
+  Không có migration mới; khóa tạm thời đang có sẽ hết theo TTL, không tự xóa khi restart.
+
 ## Lưu kiểm duyệt khi bảng có trigger — 11/11/2026
 
 - `npm run check` và `npm test` đạt: **238 PASS, 12 SKIP, 250 test**.

@@ -154,6 +154,8 @@ Các smoke nghiệp vụ và điều kiện chạy được liệt kê tại [RE
 | SQL sai số bảng/cột | Kiểm tra `DB_DATABASE`/đúng volume, chạy migration sau khi dịch vụ healthy |
 | Từ chối/phê duyệt lỗi `KiemDuyet` có trigger và `OUTPUT` không có `INTO` | Cập nhật code `feat/Hai`, khởi động lại API. Câu INSERT phải dùng `OUTPUT … INTO` rồi SELECT mã kiểm duyệt; giữ trigger của migration 010. Bản sửa này không có migration mới |
 | Không đăng nhập, lỗi CSRF | Kiểm tra session/Redis/origin; Ctrl+F5, đăng nhập lại; web tự làm mới token và thử lại tối đa một lần với lỗi INVALID_CSRF |
+| `429` khi đăng nhập, “Bạn đã thử quá nhiều lần” | Cập nhật code, restart API/web, chờ đếm ngược theo TTL (login tối đa 15 phút). Đăng nhập thành công đặt lại bộ đếm email, giữ trần IP. Restart không tự xóa khóa cũ; không FLUSHDB hoặc xóa volume |
+| `401 INVALID_CREDENTIALS` sau khi hết khóa | Kiểm tra đúng email/tài khoản và database đang kết nối; đây là lỗi riêng với 429. Không gửi mật khẩu/hash vào log hoặc chat |
 | Tab cũ bị đăng xuất | Đúng chính sách khi tài khoản vừa đăng nhập nơi khác; F5 không giành lại phiên |
 | Cloudinary có tệp nhưng web báo lỗi | Đối soát theo public ID, chưa có vé thì không gắn vào bài; không upload lặp liên tục |
 | `1.jpg` bị từ chối | Tên không bị cấm; kiểm tra nội dung thực/codec/tệp hỏng, xem lỗi theo tên tệp |

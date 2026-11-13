@@ -17,7 +17,7 @@ export function createApp({ config, deps, probes, authRouter, postRouter, mediaR
   app.use(cors({ origin(origin, done) {
     if (!origin || config.origins.includes(origin)) done(null, true);
     else done(new HttpError(403, 'ORIGIN_NOT_ALLOWED', 'Origin không được phép.'));
-  }, credentials: true }));
+  }, credentials: true, exposedHeaders: ['Retry-After'] }));
   app.use(express.json({ limit: '64kb' }));
   app.get('/api/health/live', (req, res) => res.json({ ok: true, service: 'book-auction-api', milestone: 8, uptimeSeconds: Math.floor(process.uptime()) }));
   app.get('/api/health/ready', async (req, res) => {

@@ -20,6 +20,8 @@ export async function apiRequest(path, options = {}) {
     if(revision===sessionRevision&&(body?.error==='ACCOUNT_REPLACED'||response.status===401&&authenticated&&body?.error==='UNAUTHENTICATED'))invalidateSession(body?.error==='ACCOUNT_REPLACED');
     if (revision===sessionRevision&&body?.error === 'INVALID_CSRF') csrfToken = undefined;
     const error = new Error(body?.message || 'Chưa thực hiện được yêu cầu.');
+    const retryAfter = Number(response.headers.get('Retry-After'));
+    error.retryAfterSeconds = Number.isSafeInteger(retryAfter) && retryAfter > 0 ? retryAfter : 0;
     error.status = response.status; error.code = body?.error; throw error;
   }
   return body;

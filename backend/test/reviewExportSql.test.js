@@ -8,7 +8,7 @@ import {createPostModel} from '../src/models/post.model.js';
 import {moderationQuery} from '../src/services/moderationList.js';
 import {validatePost,validateReview} from '../src/services/postValidation.js';
 
-test('SQL xuất kết quả: quyết định và snapshot cùng COMMIT, hai vòng không lẫn media',
+test('SQL xuất kết quả: trigger đang bật, hai quyết định và snapshot cùng COMMIT, không lẫn media',
   {skip:process.env.REVIEW_TEST_SQL!=='true',timeout:60000},async t=>{
     assert.match(process.env.DB_DATABASE||'',/^BookAuctionTest_[A-Za-z0-9_]+$/);
     const {getPool,sql,closeDatabase}=await import('../src/config/database.js');
@@ -31,6 +31,8 @@ test('SQL xuất kết quả: quyết định và snapshot cùng COMMIT, hai vò
     }
     legacyBookId=(await pool.request().query("INSERT dbo.Sach(ten_sach,tinh_trang_sach,isbn) OUTPUT INSERTED.sach_id VALUES(N'Legacy ISBN fixture',N'Test only','0306406152')")).recordset[0].sach_id;
     await applyMigrations(pool);await applyMigrations(pool);
+    const trigger=(await pool.request().query("SELECT is_disabled FROM sys.triggers WHERE object_id=OBJECT_ID('dbo.TR_KiemDuyet_admin_insert') AND parent_id=OBJECT_ID('dbo.KiemDuyet')")).recordset[0];
+    assert(trigger,'Migration 010 phải tạo trigger bảo vệ quyết định');assert.equal(trigger.is_disabled,false);
     assert.equal((await pool.request().input('id',sql.Int,legacyBookId).query('SELECT isbn FROM dbo.Sach WHERE sach_id=@id')).recordset[0].isbn,'0306406152');
     const run=randomUUID();
     for(let i=0;i<3;i++)users.push((await pool.request().input('email',sql.VarChar(254),`export-${run}-${i}@example.test`).input('role',sql.VarChar(20),i===2?'admin':'nguoi_dung')

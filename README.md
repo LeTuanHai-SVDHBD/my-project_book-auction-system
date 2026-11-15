@@ -18,10 +18,10 @@ Không coi việc hoàn thành mã nguồn là chứng nhận sẵn sàng vận 
 | Giao diện | React, Vite, JavaScript ES Modules; giao diện BookBid responsive |
 | API | Node.js **24.x**, Express; xác thực HTTP, upload và Socket.IO |
 | Worker | Redis Streams; xử lý giá, hết hạn và kiểm duyệt AI |
-| CSDL | SQL Server 2022 Developer; migration 001–008 |
+| CSDL | SQL Server 2022 Developer; migration 001–010 |
 | Redis | Redis 8; session, hàng đợi, admission, khóa và Pub/Sub |
 | Ảnh/video | Cloudinary; vé upload Redis, metadata và tham chiếu SQL |
-| AI | Gemini Interactions + Files API; Backend tính hai điểm và hỗ trợ tự duyệt theo ngưỡng cấu hình |
+| AI | Gemini Interactions + Files API; Backend tính hai điểm tham khảo; Admin phê duyệt/từ chối |
 | Quản lý gói | npm workspaces, một `package-lock.json` ở thư mục gốc |
 
 Schema hiện tại: **21 bảng, 172 cột, 102 CHECK, 15 UNIQUE constraints**, theo
@@ -81,7 +81,7 @@ npm.cmd run dev:all
 ```
 
 Ctrl+F5 sau khi cập nhật frontend. Các script `setup:*` chỉ thêm khóa thiếu, giữ giá trị đang có;
-`db:migrate` áp dụng 002–008 lên schema nền có sẵn. Không dùng `db:migrate` thay `db:init` trên database trống.
+`db:migrate` áp dụng 002–010 lên schema nền có sẵn. Không dùng `db:migrate` thay `db:init` trên database trống.
 Không xóa database/Redis/volume để chữa readiness. Nếu đổi Docker project hoặc máy có volume cũ,
 đọc [docker-migration.md](docs/docker-migration.md) trước khi khởi động.
 
@@ -101,7 +101,7 @@ còn lại dừng theo `--kill-others`. Muốn chạy kiểm tra/smoke thì mở
 | Khách | Xem/tìm phiên công khai, ảnh/video, giá, lịch sử, kết quả, bình luận và uy tín |
 | Người dùng | Đăng sách, lưu nháp, bổ sung bài bị từ chối, kích hoạt/đăng lại đủ điều kiện; đặt giá sách của người khác |
 | Hai bên giao dịch | Chat riêng, xác nhận hoàn tất phần giao dịch của mình, khiếu nại; người mua đánh giá sau hoàn tất |
-| Admin | Theo dõi kiểm duyệt AI, yêu cầu phân tích lại khi bài còn chờ; xử lý khiếu nại |
+| Admin | Tham khảo AI, phê duyệt/từ chối kèm căn cứ, yêu cầu phân tích lại khi bài còn chờ; xử lý khiếu nại |
 
 Admin dùng sidebar riêng, không có chức năng đăng sách. Khách không thấy avatar tài khoản hoặc hộp thông báo.
 Đăng nhập cùng tài khoản ở nơi mới thu hồi phiên cũ; F5 không khôi phục phiên đã bị thu hồi.
@@ -112,10 +112,10 @@ Khác tài khoản vẫn có thể dùng đồng thời ở các tab. Xem [accou
 1. **Đăng sách:** điền bốn bước, gồm thông tin sách, ảnh/video, thông số đấu giá, kiểm tra và gửi.
    ISBN tùy chọn, tối đa 100 ký tự; thể loại chọn từ danh mục chung, gõ chỉ để lọc.
    Một ô **Tình trạng, yếu tố quý hiếm và bằng chứng** thay cho hai mô tả tình trạng trùng nhau.
-2. **Kiểm duyệt:** Bài được đưa vào hàng đợi AI sau khi lưu; worker đối chiếu hai điểm độc lập với hai ngưỡng.
-   Đạt cả hai thì phê duyệt; điểm thấp hoặc thiếu bằng chứng sau khi phân tích thì từ chối kèm lý do.
-   Sự cố dịch vụ giữ bài chờ. Admin có thể yêu cầu AI phân tích lại, còn quyết định luôn do hệ thống lưu.
-   Bật Gemini và xem hai ngưỡng theo [hướng dẫn cấu hình](docs/ai-analysis.md#kiểm-duyệt-tự-động).
+2. **Kiểm duyệt:** Bài được đưa vào hàng đợi AI sau khi lưu; worker đối chiếu hai điểm độc lập với hai ngưỡng
+   để tạo khuyến nghị. **Admin quyết định phê duyệt hoặc từ chối**, bắt buộc căn cứ/lý do;
+   phê duyệt cần xác nhận đã đối chiếu bằng chứng. AI lỗi hoặc thiếu dữ liệu không tự từ chối bài.
+   Bật Gemini và xem hai ngưỡng theo [hướng dẫn cấu hình](docs/ai-analysis.md#admin-quyết-định-ai-hỗ-trợ).
 3. **Bổ sung:** chủ bài bị từ chối sửa hồ sơ, đánh dấu gỡ media cũ, thêm media và gửi duyệt lại.
    Lưu hồ sơ theo bài, giữ media/quyết định/PDF của vòng trước. Bài đã duyệt rời danh sách kiểm duyệt.
 4. **Kích hoạt:** chủ sách đặt lịch tương lai cho đúng phiên đã duyệt. Phê duyệt chưa tự mở đấu giá.

@@ -79,7 +79,7 @@ Các file `.gitkeep` chỉ giữ cấu trúc, không phải mô-đun chức năn
 | `backend/schema-manifest.json` | Chữ ký đích: 21 bảng, 172 cột, 102 CHECK, 15 UNIQUE |
 | `backend/scripts/` | Init/migrate, danh sách migration dùng chung và CLI tạo Admin |
 
-Các dòng tên migration 002–008 ở bảng trên đều nằm trong `backend/migrations/`.
+Các dòng tên migration 002–010 ở bảng trên đều nằm trong `backend/migrations/`.
 
 ## Frontend
 
@@ -122,3 +122,5 @@ không tráo ảnh minh họa thành bằng chứng của người bán.
 
 Không có script `lint`, `smoke:m3`, `smoke:m7` hoặc `smoke:media` trong package.json hiện tại.
 Các tệp `smokeAfterSales.mjs`, `smokeReadiness.mjs` là mô-đun dùng chung, không có npm script riêng.
+
+Migration 010 chỉnh ràng buộc và trigger trên KiemDuyet: chỉ Admin tạo quyết định mới, giữ lịch sử AI. `ai/timing.js` tính thống kê theo các mẫu thực tương tự, chỉ trả cho Admin.

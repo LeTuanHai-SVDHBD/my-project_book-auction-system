@@ -58,6 +58,28 @@ mở lại các thao tác sau khi server xác thực mật khẩu. Phản hồi 
 
 Client terminal dùng cookie chung vẫn theo chính sách một phiên; smoke dùng tài khoản UUID riêng.
 
+## Giới hạn đăng nhập và khóa tạm thời
+
+- Redis vẫn giới hạn tối đa 50 yêu cầu đăng nhập/IP trong cửa sổ 900 giây và 10 lượt/email.
+  Email được chuẩn hóa trước khi tạo khóa HMAC; không lưu email/IP rõ trong tên khóa.
+- Sau khi mật khẩu hợp lệ, session đã lưu và claim thành công, chỉ xóa bộ đếm đăng nhập của email đó.
+  Nhờ vậy đăng nhập hợp lệ nhiều lần không tích lũy đến mức khóa email. Không xóa trần IP, bộ đếm email
+  khác, đăng ký, CSRF hoặc dữ liệu Redis khác. Sai mật khẩu không được gọi thao tác đặt lại.
+- Khi đã chạm giới hạn, 429 trả trước khi đọc tài khoản/kiểm tra mật khẩu. Vì vậy mật khẩu đúng cũng phải
+  chờ hết khóa; 429 không chứng minh mật khẩu sai. Trả `Retry-After` theo TTL còn lại, không tự thử lại mật khẩu.
+- CORS cho frontend đọc `Retry-After` ở origin đã được cho phép. Biểu mẫu đếm ngược và khóa nút gửi trong
+  thời gian chờ, tự mở lại nút khi hết thời gian, không tự gửi yêu cầu. Cả lỗi 429 khi lấy CSRF và khi gửi
+  đăng nhập/đăng ký đều hiển thị thời gian chờ.
+- Bộ đếm cũ trước cập nhật không tự xóa khi restart; chờ TTL hiện tại hết (tối đa 15 phút cho login).
+  Không dùng FLUSHDB, xóa volume hoặc thay mật khẩu để chữa 429. Không có migration mới.
+
+| Mã lỗi | Ý nghĩa |
+|---|---|
+| `401 INVALID_CREDENTIALS` | Email/mật khẩu không khớp sau kiểm tra; không tạo phiên |
+| `429 RATE_LIMITED` | Đã vượt giới hạn email/IP; chờ thời gian máy chủ trả về |
+| `403 INVALID_CSRF` | Client làm mới token và thử lại tối đa một lần trước khi xử lý đăng nhập |
+| `503 DEPENDENCY_UNAVAILABLE` | Dịch vụ SQL/Redis hoặc session có lỗi; không kết luận mật khẩu sai |
+
 ## Kiểm tra
 
 Cài/nâng cấp và khởi động lại đúng API/worker/web theo [setup-guide.md](setup-guide.md);

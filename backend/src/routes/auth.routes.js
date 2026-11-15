@@ -7,7 +7,7 @@ import { createAuthService, validateCredentials } from '../services/auth.service
 import { createAuthController } from '../controllers/auth.controller.js';
 export function createAuthRouter({ authConfig, store, users, passwords, limiter, sessionMiddleware, ready = () => true }) {
   const router = Router();
-  const controller = createAuthController({ service: createAuthService({ users, passwords }), authConfig });
+  const controller = createAuthController({ service: createAuthService({ users, passwords }), authConfig, limiter });
   router.use((req, res, next) => {
     res.set('Cache-Control', 'no-store');
     if (!ready()) return next(new HttpError(503, 'AUTH_UNAVAILABLE', 'Dịch vụ đăng nhập chưa sẵn sàng.'));

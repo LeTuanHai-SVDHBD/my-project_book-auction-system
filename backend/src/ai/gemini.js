@@ -2,6 +2,7 @@
 import {HttpError} from '../middlewares/errorHandler.js';
 import {setTimeout as delay} from 'node:timers/promises';
 import {createGeminiFiles} from './files.js';
+import {analysisWorkload} from './timing.js';
 import {prepareAiMedia} from './media.js';
 import {boundedBytes} from './transport.js';
 import {AI_MAX_RETRY_WAIT_MS,aiRequestTimeout} from '../config/ai.js';
@@ -55,7 +56,7 @@ export function createGemini({config,fetchImpl=fetch,onHttpError,wait=delay}) {
       execution.model=model;
       for(let attempt=1;attempt<=attempts;attempt++) {
         signal.throwIfAborted();execution.attempts=attempt;
-        await progress({phase:'provider',attempt,max_attempts:attempts,media_completed:manifest.length,media_total:manifest.length,provider_timeout_ms:execution.provider_timeout_ms});
+        await progress({phase:'provider',workload:analysisWorkload(row,manifest),attempt,max_attempts:attempts,media_completed:manifest.length,media_total:manifest.length,provider_timeout_ms:execution.provider_timeout_ms});
         const requestSignal=AbortSignal.any([signal,AbortSignal.timeout(execution.provider_timeout_ms)]),requestStarted=Date.now();
         let retryAfter=null;
         try {

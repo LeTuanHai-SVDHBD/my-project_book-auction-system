@@ -65,7 +65,7 @@ async function counts(id) {
 }
 try {
   assert.equal(config.mode,'development','Chỉ chạy smoke trong development.');
-  assert.equal(parseAiConfig(process.env).autoModeration,null,'Chạy smoke này với API/worker test riêng: AI_TEST_MANUAL_REVIEW=true và DB_DATABASE=BookAuctionTest_*.');
+  assert.equal(parseAiConfig(process.env).autoAnalysis,false,'Chạy smoke này với API/worker test riêng: AI_TEST_MANUAL_REVIEW=true và DB_DATABASE=BookAuctionTest_*.');
   const seller=new Client(),a=new Client(),b=new Client(),admin=new Client();
   await checkSmokeReadiness({base});
   stage='kết nối SQL của script';pool=await getPool();

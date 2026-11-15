@@ -2,7 +2,7 @@
 import {META_CRITERION} from '../ai/criteria.js';
 import {encodeRowVersion,withRowVersion} from '../utils/rowVersion.js';
 const changed=()=>Object.assign(new Error('AI_INPUT_CHANGED'),{code:'AI_INPUT_CHANGED'});
-export function createAiModel({getPool,sql,commitReview}) {
+export function createAiModel({getPool,sql}) {
   const request=target=>target.request?target.request():new sql.Request(target);
   async function find(job,target) {
     const rows=await request(target||await getPool()).input('post',sql.Int,job.postId).input('request',sql.VarChar(36),job.requestId).input('meta',sql.NVarChar(200),META_CRITERION)
@@ -33,7 +33,7 @@ export function createAiModel({getPool,sql,commitReview}) {
       if(row)row.chi_tiet=(await request(pool).input('id',sql.Int,analysisId).query('SELECT tieu_chi,diem,bang_chung,do_tin_cay,canh_bao,nhom_tieu_chi,trang_thai_danh_gia,trong_so,nguon_doi_chieu FROM dbo.ChiTietPhanTichAI WHERE phan_tich_id=@id ORDER BY chi_tiet_id')).recordset;
       return row||null;
     },
-    async save(job,result,metadata,beforeCommit=async()=>{},verdict=null) {
+    async save(job,result,metadata,beforeCommit=async()=>{}) {
       const tx=new sql.Transaction(await getPool());let started=false,committing=false;
       try{
         await tx.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);started=true;
@@ -52,7 +52,6 @@ export function createAiModel({getPool,sql,commitReview}) {
           await query.query(`INSERT dbo.ChiTietPhanTichAI(phan_tich_id,tieu_chi,diem,bang_chung,do_tin_cay,canh_bao,nhom_tieu_chi,trang_thai_danh_gia,trong_so,nguon_doi_chieu)
             VALUES(@analysis,@tieu_chi,@diem,@bang_chung,@do_tin_cay,@canh_bao,@group,@state,@trong_so,@nguon_doi_chieu)`);
         }
-        if(verdict)await commitReview(tx,{job,analysisId:saved.phan_tich_id,verdict});
         await beforeCommit();committing=true;await tx.commit();return {...saved,trang_thai:result.trang_thai};
       }catch(error){if(started&&!committing)try{await tx.rollback();}catch{}throw error;}
     }

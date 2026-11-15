@@ -104,8 +104,8 @@ không là snapshot cố định; tải lại trang để xem hiện tại. Bài
 | POST | `/ai/:id` | Admin + CSRF yêu cầu phân tích lại, body `{row_version}`; bài đang chờ và có lần phân tích cùng phiên bản; trả 202 |
 
 API xếp hàng sau khi lưu bài; worker quét bài chờ từ SQL để phục hồi. GET chỉ đọc. Worker chuẩn bị ảnh/video,
-gọi Gemini, kiểm tra JSON, tính hai điểm và lưu quyết định cùng SQL. Thiếu bằng chứng giữ NULL;
-lỗi provider giữ bài chờ. Admin có thể dùng **Phân tích lại bằng AI** khi có lượt phân tích cùng phiên bản nhưng chưa quyết định.
+gọi Gemini, kiểm tra JSON, tính hai điểm và lưu phân tích SQL, giữ hồ sơ chờ Admin. Thiếu bằng chứng giữ NULL;
+lỗi provider không tạo quyết định. Admin có thể dùng **Phân tích lại bằng AI** khi có lượt phân tích cùng phiên bản nhưng chưa quyết định.
 Chi tiết Files API/video dài, deadline, replay và quyền công bố: [ai-analysis.md](ai-analysis.md).
 
 ## 4. Đặt giá và kết thúc
@@ -159,3 +159,5 @@ Không phải trigger, outbox hoặc Socket push riêng. Xem [ui-integration.md]
 409: xung đột trạng thái/version/nội dung; 410: yêu cầu giá không thể tiếp tục, cần đối soát;
 413/415: dung lượng/định dạng; 429: giới hạn thử; 503: dịch vụ chưa sẵn sàng. Lỗi provider có mã riêng,
 không phản chiếu khóa, stack hoặc body thô. Các nghĩa cụ thể phụ thuộc endpoint, không suy kết quả nghiệp vụ từ HTTP 202.
+
+Admin quyết định qua POST /posts/:id/review, bắt buộc căn cứ, được dùng/chỉnh gợi ý AI. Quyết định gắn Admin và phân tích cùng phiên bản nếu có; worker trễ không thay đổi quyết định.

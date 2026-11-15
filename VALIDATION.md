@@ -2,6 +2,55 @@
 
 # Kiểm chứng và nghiệm thu
 
+## Giới hạn đăng nhập và thông báo chờ — 13/11/2026
+
+- `npm run check`, `npm test`, `npm run build` đạt: **242 PASS, 12 SKIP, 254 test**.
+- Trước sửa, test hồi quy tái hiện đăng nhập hợp lệ lần 11 trả 429. Sau sửa, HTTP với Argon2 thật,
+  tài khoản/session và hạn mức giả xác nhận đăng nhập thành công đặt lại bộ đếm email; sai nhiều lần
+  vẫn nhận 429, hết TTL mới thử tiếp được. Xác nhận chỉ xóa đúng khóa email và giữ giới hạn IP.
+- HTTP xác nhận CORS chỉ expose `Retry-After` cho origin được phép. Client giữ thời gian chờ và không
+  tự gửi lại mật khẩu khi nhận 429. Chromium với API fixture: lỗi 429 ở CSRF hiển thị đếm ngược,
+  nút gửi bị khóa rồi tự mở lại khi hết thời gian. Không nhập mật khẩu/tài khoản thật trong trình duyệt.
+- Mở rộng Redis opt-in để kiểm tra đăng nhập lặp và giữ trần 50 yêu cầu/IP, nhưng **chưa chạy Redis/SQL
+  thật** trong lần sửa này. Chưa xác minh được mật khẩu của tài khoản trên máy người dùng.
+- Không đổi mật khẩu, cơ chế Argon2, quyền Admin, session/CSRF hoặc chính sách một phiên/tài khoản.
+  Không có migration mới; khóa tạm thời đang có sẽ hết theo TTL, không tự xóa khi restart.
+
+## Lưu kiểm duyệt khi bảng có trigger — 11/11/2026
+
+- `npm run check` và `npm test` đạt: **238 PASS, 12 SKIP, 250 test**.
+- Fixture SQL mô phỏng lỗi 334 của `OUTPUT` không có `INTO` khi trigger INSERT đang bật.
+  Trước sửa, cả phê duyệt/từ chối đều lỗi; sau sửa, hai quyết định lưu đúng trạng thái, lý do và
+  mã kiểm duyệt trong snapshot. Kiểm thử HTTP, chặn phiên bản cũ và rollback khi snapshot lỗi vẫn đạt.
+- Bổ sung xác nhận trigger migration 010 đang bật trong kịch bản SQL opt-in có cả hai quyết định.
+  **Chưa chạy SQL Server/Redis/Gemini thật** trong lần sửa này; 12 test dịch vụ thật vẫn SKIP.
+- Không có migration mới. Máy đã áp dụng migration 010 chỉ cần cập nhật code và khởi động lại API;
+  giữ nguyên trigger và dữ liệu. Kiểm tra lại một bài từ chối và một bài phê duyệt đang chờ trên máy chạy dịch vụ.
+
+## Ước tính thời gian ngay từ hồ sơ và checkbox — 11/11/2026
+
+- `npm run check`, `npm run build`, `npm test` đạt: **236 PASS, 12 SKIP, 248 test**.
+- Hồ sơ mới có khoảng thời gian dự kiến ngay, không đợi 5 mẫu hoặc truy vấn thống kê SQL.
+  Kiểm thử thay đổi độ dài thông tin, số ảnh/video, dung lượng và thời lượng đã biết; metadata
+  thiếu một phần giữ thời lượng/dung lượng chưa xác định. Người bán không nhận phần ước tính nội bộ.
+- Chromium với API mẫu: ước tính xuất hiện trước lần phân tích đầu; checkbox cùng hàng với chữ
+  ở khung 320/390/768/1440 px, màn hình hẹp chỉ xuống dòng nội dung và không tràn ngang toàn trang.
+- Đây là kiểm chứng công thức, API và bố cục với dữ liệu mẫu, **chưa đo độ chính xác của khoảng dự kiến
+  qua Gemini thật**. Hệ số được công khai là giả định kỹ thuật, không phải thời gian trung bình đã đo.
+  Chưa chạy SQL/Redis/Gemini thật; không có migration mới cho lần sửa này.
+
+## Admin quyết định và thời gian AI — 11/11/2026
+
+- `npm run check`, `npm run build`, `npm test` đạt: **235 PASS, 12 SKIP, 247 test**.
+- Test fixture xác nhận điểm cao/thấp/NULL và lỗi không tự tạo quyết định; xếp hàng sau COMMIT,
+  replay, quota và phiên bản cũ vẫn được kiểm tra. Thống kê dùng thời gian đo, không dùng timeout;
+  cơ chế 5 mẫu khi đó đã được thay bằng ước tính tải hồ sơ ở mục trên. Phần AI nội bộ vẫn không trả cho người bán.
+- Chromium với API mẫu: sửa gợi ý, giữ nội dung Admin đang gõ qua polling, yêu cầu xác nhận trước
+  phê duyệt, từ chối khi AI lỗi, nhãn Admin và ẩn AI của người bán đang chờ. Khung 320/390/768/1440 px không tràn ngang trong các trang được kiểm tra.
+- Migration 010 và kịch bản SQL opt-in đã được bổ sung nhưng **chưa chạy SQL/Redis/Gemini thật**
+  trong lần sửa này. Sau khi cập nhật, dừng cả API/worker, chạy `npm.cmd run db:migrate` rồi khởi động lại.
+  Giữ dữ liệu cũ; không đổi quyết định AI lịch sử thành quyết định Admin.
+
 ## Bố cục responsive và khung xem ảnh
 
 - Chromium với API dữ liệu mẫu: đo tràn ngang cho 21 tổ hợp trang/vai trò, mỗi tổ hợp ở

@@ -11,26 +11,42 @@ export default function AccountPanel({ user, onUserChange: setUser }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sessionNotice, setSessionNotice] = useState('');
+  const [retryUntil, setRetryUntil] = useState(0);
+  const [now, setNow] = useState(Date.now);
+  const retrySeconds = Math.max(0, Math.ceil((retryUntil - now) / 1000));
+  const coolingDown = retrySeconds > 0;
+  useEffect(() => {
+    if (!coolingDown) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [coolingDown]);
   const notify = useSuccessFeedback();
   const [reload, setReload] = useState(0);
+  function showFailure(failure, fallback) {
+    if (failure.status === 429 && failure.retryAfterSeconds > 0) {
+      const time = Date.now(); setNow(time); setRetryUntil(time + failure.retryAfterSeconds * 1000); setError('');
+    } else setError(failure.message || fallback);
+  }
   useEffect(() => {
     let canceled = false;
     setLoading(true); setError('');
     authApi.current().then(value => { if (!canceled) setUser(value); })
-      .catch(() => { if (!canceled) setError('Chưa tải được tài khoản. Kiểm tra API và Redis rồi thử lại.'); })
+      .catch(failure => { if (!canceled) showFailure(failure, 'Chưa tải được tài khoản. Kiểm tra API và Redis rồi thử lại.'); })
       .finally(() => { if (!canceled) setLoading(false); });
     return () => { canceled = true; };
   }, [reload, setUser]);
   useEffect(()=>{const signedOut=event=>{setUser(null);setMode('login');setPassword('');setError('');setBusy(false);setLoading(false);setSessionNotice(event.detail?.message||'Bạn đã được đăng xuất.');};window.addEventListener('account:signed-out',signedOut);return()=>window.removeEventListener('account:signed-out',signedOut);},[setUser]);
   async function submit(event) {
-    event.preventDefault(); setBusy(true); setError(''); setSessionNotice('');
+    event.preventDefault();
+    if (busy || coolingDown) return;
+    setBusy(true); setError(''); setSessionNotice(''); setRetryUntil(0);
     try {
       if (mode === 'register') {
         await authApi.register({ ho_ten: name, email, mat_khau: password });
         setMode('login'); notify({ message: 'Đăng ký thành công. Hãy đăng nhập bằng tài khoản vừa tạo.' });
       } else setUser(await authApi.login({ email, mat_khau: password }));
       setPassword('');
-    } catch (failure) { setError(failure.message || 'Không kết nối được máy chủ. Vui lòng thử lại.'); }
+    } catch (failure) { showFailure(failure, 'Không kết nối được máy chủ. Vui lòng thử lại.'); }
     finally { setBusy(false); }
   }
   async function logout() {
@@ -69,10 +85,15 @@ export default function AccountPanel({ user, onUserChange: setUser }) {
           <label>Mật khẩu<input type="password" value={password} onChange={event => setPassword(event.target.value)} minLength={mode === 'register' ? 12 : 1} maxLength={128}
             autoComplete={mode === 'register' ? 'new-password' : 'current-password'} required disabled={busy}/></label>
           {mode === 'register' && <p className="field-hint">Sử dụng từ 12 đến 128 ký tự. Bạn có thể dùng một cụm từ dễ nhớ.</p>}
-          <button className="primary" disabled={busy}>{busy ? 'Đang xử lý…' : mode === 'register' ? 'Tạo tài khoản' : 'Đăng nhập'}</button>
+          <button className="primary" disabled={busy || coolingDown}>{busy ? 'Đang xử lý…' : coolingDown ? 'Vui lòng chờ…' : mode === 'register' ? 'Tạo tài khoản' : 'Đăng nhập'}</button>
         </form>
         <button className="text-button" onClick={() => setReload(value => value + 1)} disabled={busy}>Kiểm tra lại kết nối</button>
       </>}
+      {retryUntil > 0 && <p className="notice" role="status">
+        {coolingDown
+          ? `Bạn đã thử quá nhiều lần. Có thể thử lại sau ${Math.floor(retrySeconds / 60)} phút ${retrySeconds % 60} giây.`
+          : 'Đã hết thời gian chờ. Bạn có thể thử đăng nhập lại.'}
+      </p>}
       {error && <p className="error" role="alert">{error}</p>}
       {sessionNotice && <p className="notice" role="status">{sessionNotice}</p>}
     </section>

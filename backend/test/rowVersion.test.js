@@ -43,6 +43,9 @@ function databaseFixture(){
         bump();return {recordset:[{phien_dau_gia_id:state.row.phien_dau_gia_id}]};
       }
       if(text.startsWith('INSERT dbo.KiemDuyet')){
+        // SQL Server 334: migration 010 bật AFTER INSERT trigger, OUTPUT trực tiếp không hợp lệ.
+        if(/\bOUTPUT\b/i.test(text)&&!/\bOUTPUT\b[^;]*\bINTO\b/i.test(text))
+          throw Object.assign(Error('OUTPUT without INTO conflicts with enabled trigger'),{code:'EREQUEST',number:334});
         const row={kiem_duyet_id:state.reviews.length+1,ket_qua:this.values.result,phan_hoi_admin:this.values.reason,ngay_kiem_duyet:new Date()};
         state.reviews.push(row);return {recordset:[{kiem_duyet_id:row.kiem_duyet_id}]};
       }
@@ -62,6 +65,22 @@ function databaseFixture(){
   const pool={request:()=>new Request()};
   return {state,model:createPostModel({getPool:async()=>pool,sql:{...sql,Transaction}})};
 }
+for(const [decision,result,postState,auctionState] of [
+  ['tu_choi','Từ chối','tu_choi','khong_dat_kiem_duyet'],
+  ['phe_duyet','Phê duyệt','da_duyet','da_qua_kiem_duyet'],
+])test(`model ${decision} lưu quyết định và snapshot khi trigger KiemDuyet đang bật`,async()=>{
+  const {model,state}=databaseFixture(),reason='Admin đã đối chiếu hồ sơ và bằng chứng';
+  const saved=await model.review({admin:2,postId:7,input:validateReview({
+    quyet_dinh:decision,ly_do:reason,xac_nhan_quy_hiem:true,row_version:expected,
+  })});
+  assert.deepEqual(saved,{id:7});
+  assert.equal(state.commits,1);assert.equal(state.rollbacks,0);assert.equal(state.reviews.length,1);
+  assert.equal(state.row.trang_thai_bai,postState);assert.equal(state.row.trang_thai_phien,auctionState);
+  const review=state.reviews[0],snapshot=JSON.parse(review.ket_qua_snapshot);
+  assert.equal(review.ket_qua,result);assert.equal(review.phan_hoi_admin,reason);
+  assert.equal(snapshot.review.kiem_duyet_id,review.kiem_duyet_id);
+  assert.equal(snapshot.review.ket_qua,result);assert.equal(snapshot.review.phan_hoi_admin,reason);
+});
 test('model list/detail chuyển Buffer SQL thành cùng token JSON, activation pending trả 409 thay vì input 400',async()=>{
   const {model}=databaseFixture();const list=await model.list({owner:1});const detail=await model.detail(7,{owner:1});
   assert.equal(list[0].row_version,expected);assert.equal(detail.row_version,expected);

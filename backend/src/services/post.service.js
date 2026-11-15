@@ -1,6 +1,5 @@
 /** Điều phối upload/SQL: chỉ nhận vé của chủ sách, không gọi Cloudinary trong transaction. */
-import {HttpError} from '../middlewares/errorHandler.js';
-export function createPostService({ model, ledger, limits, autoModeration=false, enqueueReview=async()=>{}, notify=async()=>{}, log=()=>{} }) {
+export function createPostService({ model, ledger, limits, autoAnalysis=false, enqueueReview=async()=>{}, notify=async()=>{}, log=()=>{} }) {
   async function attach(owner,input,operation) {
     const claim=await ledger.claim(owner,input.media);
     try {
@@ -15,7 +14,7 @@ export function createPostService({ model, ledger, limits, autoModeration=false,
   }
   function scheduleReview(result){
     // SQL has committed. If Redis is down, the worker's SQL scan will recover the job.
-    if(autoModeration&&!result.replayed)void Promise.resolve().then(()=>enqueueReview(result.id))
+    if(autoAnalysis&&!result.replayed)void Promise.resolve().then(()=>enqueueReview(result.id))
       .catch(error=>log(error,{component:'auto-moderation-enqueue',postId:result.id}));
     return result;
   }
@@ -30,7 +29,6 @@ export function createPostService({ model, ledger, limits, autoModeration=false,
       return scheduleReview(await attach(owner,input,items=>model.resubmit({owner,postId,input,items,limits})));
     },
     async review(admin,postId,input) {
-      if(autoModeration)throw new HttpError(409,'AUTO_MODERATION_ENABLED','Bài đăng được kiểm duyệt tự động.');
       return model.review({admin,postId,input});
     },
     async activate(owner,postId,input) {

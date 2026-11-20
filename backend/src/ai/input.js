@@ -3,10 +3,12 @@ import {createHash} from 'node:crypto';
 import {aggregate} from './scoring.js';
 import {META_CRITERION,RULE_VERSION} from './criteria.js';
 export function analysisInput(row) {
+  // Keep raw source fields in the provenance hash; Gemini merges their display text separately.
   const names=['ten_sach','tac_gia','the_loai','nha_xuat_ban','nam_xuat_ban','isbn','tinh_trang_sach','mo_ta','tieu_de','mo_ta_tinh_trang'];
   return {book:Object.fromEntries(names.map(key=>[key,row[key]??null])),media:(row.media||[]).map((x,index)=>({id:`M${index+1}`,kind:x.kind,url:x.url,title:x.title||''}))};
 }
 export const inputHash=row=>createHash('sha256').update(JSON.stringify(analysisInput(row))).digest('hex');
+export const currentAnalysisId=row=>row.ai?.thong_tin?.source_version===row.row_version?row.ai?.phan_tich_id??null:null;
 export function analysisView(raw,row) {
   if(!raw)return null;
   const details=raw.chi_tiet||[],metadata=details.find(x=>x.tieu_chi===META_CRITERION);

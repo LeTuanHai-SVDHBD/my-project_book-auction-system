@@ -1,8 +1,9 @@
 /** Socket chỉ nhận tín hiệu công khai; luôn lấy lại SQL qua HTTP sau join/reconnect và định kỳ để bù thông báo mất. */
+import {browserApiBase} from './apiBase.js';
 import {useEffect,useRef,useState} from 'react';
 import {io} from 'socket.io-client';
 import {isAccountReplaced} from './controlIdentity.js';
-const base=import.meta.env.VITE_API_URL||'http://127.0.0.1:5000';
+const base=browserApiBase();
 export function useAuctionRealtime({auctionId=null,onChange,enabled=true}) {
   const latest=useRef(onChange);latest.current=onChange;
   const [state,setState]=useState('connecting');

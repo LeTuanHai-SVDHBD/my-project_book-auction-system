@@ -10,9 +10,9 @@ export function createMediaController({config,provider,ledger}) {
       req.uploadProcessing=true;
       try {
         if(res.destroyed||!Buffer.isBuffer(req.body)||!req.body.length)throw new HttpError(400,'EMPTY_MEDIA','Tệp trống hoặc kết nối đã đóng.');
-        verifyMedia(req.body,req.get('content-type'),kind);
+        const actual=verifyMedia(req.body,undefined,kind);
         const ticket=await ledger.begin(req.user.nguoi_dung_id,kind);
-        const result=await provider.upload({kind,publicId:ticket.publicId,bytes:req.body,mime:req.get('content-type')});
+        const result=await provider.upload({kind,publicId:ticket.publicId,bytes:req.body,mime:actual.mime});
         res.status(201).json(await ledger.ready(ticket,result.url));
       } finally {req.releaseUpload?.();}
     },

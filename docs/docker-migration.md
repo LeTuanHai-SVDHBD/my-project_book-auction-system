@@ -13,6 +13,8 @@
 
 Đổi project không tự di chuyển dữ liệu sang volume mới. Tên volume chứa dữ liệu cũ có thể được giữ; container và network mang tên project mới.
 
+Hướng dẫn cài mới/nâng schema hiện tại: [setup-guide.md](setup-guide.md). Tài liệu này chỉ dành cho việc chuyển tên project/giữ volume, không yêu cầu chạy lại sau mỗi pull.
+
 Máy đang chạy healthy và truy cập đúng dữ liệu không cần thực hiện lại việc chuyển đổi.
 Giữ nguyên `.env` và các volume đang gắn. Chỉ làm các bước bên dưới khi thực sự chuyển project.
 

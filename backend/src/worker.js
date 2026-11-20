@@ -21,11 +21,11 @@ import {parseAiConfig} from './config/ai.js';
 import {createAiModel} from './models/ai.model.js';
 import {createPostModel} from './models/post.model.js';
 import {createAiQueue} from './ai/queue.js';
+import {createAiQuotaGate} from './ai/quota.js';
 import {createGemini} from './ai/gemini.js';
 import {createAiProcessor} from './ai/processor.js';
+import {runAutoModeration} from './ai/scheduler.js';
 import {ensureAiGroup,consumeAi} from './ai/consumer.js';
-import {createAiService} from './services/ai.service.js';
-import {reconcileAi} from './ai/reconcile.js';
 const consumer = `${hostname()}-${process.pid}`;
 const reader = makeRedisClient('redis-blocking-reader');
 const auctionReader=makeRedisClient('redis-auction-reader');
@@ -33,9 +33,9 @@ const auctionModel=createAuctionModel({getPool,sql});
 const publisher=createAuctionPublisher({getRedis:()=>redis});
 const processAuction=createAuctionProcessor({model:auctionModel,locks:createAuctionLock({getRedis:()=>redis,leaseMs:AUCTION.leaseMs}),notify:createAuctionNotifier({getRedis:()=>redis}),log:logError});
 const controller = new AbortController();
-const aiReader=makeRedisClient('redis-ai-reader'),aiConfig=parseAiConfig(process.env),aiModel=createAiModel({getPool,sql}),posts=createPostModel({getPool,sql}),aiQueue=createAiQueue({getRedis:()=>redis});
-const aiService=createAiService({posts,model:aiModel,queue:aiQueue,config:aiConfig});
-const processAi=createAiProcessor({posts,model:aiModel,queue:aiQueue,provider:createGemini({config:aiConfig}),locks:createAuctionLock({getRedis:()=>redis,keyPrefix:'bookauction:ai:lock:',leaseMs:180000}),config:aiConfig,signal:controller.signal});
+const aiReader=makeRedisClient('redis-ai-reader'),aiConfig=parseAiConfig(process.env),posts=createPostModel({getPool,sql}),aiModel=createAiModel({getPool,sql}),aiQueue=createAiQueue({getRedis:()=>redis});
+const quota=createAiQuotaGate({getRedis:()=>redis,apiKey:aiConfig.key});
+const processAi=createAiProcessor({posts,model:aiModel,queue:aiQueue,quota,provider:createGemini({config:aiConfig}),locks:createAuctionLock({getRedis:()=>redis,keyPrefix:'bookauction:ai:lock:',leaseMs:60000}),config:aiConfig,signal:controller.signal});
 let heartbeatTimer; let heartbeatTask; let loops=[]; let stopping = false;
 async function pulse() {
   try {
@@ -52,8 +52,8 @@ async function start() {
     handle: event => processProbe({ event, client: redis, getPool, consumer }) }),
     consumeAuctions({client:redis,reader:auctionReader,consumer,signal:controller.signal,handle:processAuction,log:logError}),
     runAuctionExpiry({model:auctionModel,publisher,signal:controller.signal,log:logError}),
-    consumeAi({client:redis,reader:aiReader,consumer,signal:controller.signal,handle:processAi,log:logError}),
-    reconcileAi({model:aiModel,service:aiService,config:aiConfig,signal:controller.signal,log:logError})];
+    consumeAi({client:redis,reader:aiReader,consumer,signal:controller.signal,handle:processAi,quota,log:logError})];
+  if(aiConfig.configured&&aiConfig.autoAnalysis)loops.push(runAutoModeration({posts,model:aiModel,queue:aiQueue,quota,signal:controller.signal,log:logError}));
   await Promise.all(loops);
 }
 async function shutdown(code = 0) {

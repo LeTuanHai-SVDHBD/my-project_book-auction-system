@@ -2,6 +2,11 @@
 
 # Quyết định kỹ thuật
 
+Rà soát theo source ngày 03/11/2026. Các ADR ghi lý do và giới hạn đã chọn, không tự chứng nhận mọi
+kiểm thử dịch vụ thật. Các số schema gắn migration cũ là mốc nâng cấp; schema đích hiện tại 21/172/102/15.
+Chính sách mới về phiên đăng nhập, AI manual, Files API và nháp bên dưới thay thế các mô tả cũ tương ứng.
+Hướng dẫn chạy hiện tại tại [setup-guide.md](setup-guide.md), bằng chứng tại [VALIDATION](../VALIDATION.md).
+
 ## ADR-001 — Repository và tiến trình
 
 **Trạng thái:** áp dụng.
@@ -145,7 +150,7 @@ Claim chưa rõ và không có reference được giữ/cảnh báo để đối
 Mất Redis có thể để lại orphan; không có distributed transaction SQL–Cloudinary.
 Chưa có chức năng xóa bài; xóa SQL thủ công không tự xóa tệp. File dùng chung giữa các lần đăng cần được bảo vệ theo reference.
 
-Giới hạn mặc định: 12 ảnh/3 video mỗi bài, 10 MB/ảnh, 50 MB/video, hai upload đồng thời/API process,
+Cập nhật 30/10/2026: bỏ giới hạn số ảnh mỗi bài theo yêu cầu. Giữ mặc định 3 video/bài (tính cả media giữ lại), 10 MB/ảnh, 50 MB/video, hai upload đồng thời/API process,
 60 lần thử/tài khoản/giờ. Đây là giới hạn kỹ thuật, không thay bộ tiêu chí thẩm định sách.
 Tham khảo: [Cloudinary Upload API](https://cloudinary.com/documentation/image_upload_api_reference).
 
@@ -182,10 +187,10 @@ Tham khảo: [Microsoft rowversion](https://learn.microsoft.com/en-us/sql/t-sql/
 
 **Trạng thái:** áp dụng.
 
-Ba ô giá khởi điểm/ngưỡng kết thúc sớm/bước giá nhập số thuần; dòng Giá trị bên dưới hiển thị nhóm nghìn.
-Không đổi định dạng trong ô khi gõ/focus/blur để tránh can thiệp IME hoặc làm lặp chữ số.
+Ô đặt giá và ba ô giá khi đăng sách hiển thị dấu phân cách hàng nghìn ngay khi gõ.
+Giữ nguyên văn bản đang tổ hợp bằng IME; định dạng khi IME chốt. Con trỏ được quy đổi theo số chữ số đã nhập.
 Input hiển thị tách khỏi hidden input mang chuỗi nguyên gửi API. Không chuyển tiền sang Number,
-không làm tròn và không âm thầm cắt bớt khi vượt 18 chữ số. Chỉnh sửa/xóa chuỗi số dùng hành vi bàn phím thông thường; chỉ hiệu chỉnh khi lọc ký tự không phải số.
+không làm tròn và không âm thầm cắt bớt khi vượt 18 chữ số. Xóa cạnh dấu phân cách tác động lên chữ số liền kề.
 Giá hiện tại thuộc nghiệp vụ đặt giá, không cho chủ sách tự nhập.
 Backend tiếp tục kiểm tra chuỗi nguyên dương, ngưỡng không nhỏ hơn giá khởi điểm và các ràng buộc SQL.
 
@@ -218,7 +223,7 @@ Chi tiết: [Xử lý đấu giá](auction-processing.md).
 
 ## ADR-017 — AI quan sát, Backend tính điểm, Admin quyết định
 
-**Trạng thái:** áp dụng; Hải xác nhận smoke:ai PASS; đối chiếu ảnh/video thật còn chờ dữ liệu.
+**Trạng thái:** lịch sử chế độ thủ công; xem ADR-030 cho chế độ tự duyệt. Nhóm đã báo smoke:ai PASS ở lần trước. Đối chiếu chất lượng ảnh/video và Files API thật là nghiệm thu riêng.
 
 Theo báo cáo tuần 7 và yêu cầu hiện tại, độ hiếm gồm bốn nhóm 25%; tình trạng gồm 20/25/30/15/10%.
 Giữ hai tổng độc lập; thiếu tiêu chí áp dụng giữ NULL, không áp dụng có căn cứ mới loại trọng số.
@@ -226,7 +231,7 @@ Gemini chỉ trả quan sát có cấu trúc; Backend giữ bảng quy đổi/tr
 Ảnh không thấy không chứng minh bộ phận bị mất; chữ ký quan sát được không có nghĩa chữ ký thật.
 Không dùng điểm cao hoặc sự cố AI để tự duyệt/từ chối bài.
 
-Hàng đợi AI và kết nối BLOCK riêng không chặn vòng đặt giá/chốt hạn. Đối soát SQL bù enqueue bị mất;
+Hàng đợi AI và kết nối BLOCK riêng không chặn vòng đặt giá/chốt hạn. Chỉ yêu cầu chủ động từ Admin được xếp lịch;
 lưu kết quả và chi tiết trong transaction kiểm tra lại version/pending. Receipt request trong metadata
 chống ghi trùng, cache kết quả đã kiểm tra hạn chế gọi lại Gemini khi SQL lỗi. Không cam kết gọi provider đúng một lần:
 crash trước cache có thể tốn thêm lượt gọi. Không thêm bảng/cột hoặc dependency.
@@ -235,7 +240,7 @@ Xem [Phân tích AI](ai-analysis.md) để tra công thức, hợp đồng, cấ
 
 ## ADR-018 — Giao dịch hai xác nhận và quyền chat theo hồ sơ
 
-**Trạng thái:** áp dụng; chờ SQL Server/Cloudinary thật và smoke:m8.
+**Trạng thái:** đã triển khai, nhóm đã xác nhận hoàn thành Mốc 8; kiểm tra lại SQL/Cloudinary trên revision hiện tại theo VALIDATION.
 
 Dùng các bảng sẵn có, không thêm schema/dependency. Kết quả có người thắng tạo GiaoDich và CuocTroChuyen
 cùng transaction; hai bên được suy từ kết quả/chủ bài, số tiền giữ nguyên chuỗi DECIMAL(18,0).
@@ -263,10 +268,124 @@ chỉ kiểm tra, không được khôi phục quyền từ cookie cũ. Namespac
 trở về đăng nhập. Không còn lớp phủ yêu cầu F5 để tiếp tục. Khác tài khoản vẫn độc lập.
 Hợp đồng và giới hạn tại [account-control.md](account-control.md).
 
-Ô tiền luôn nhập số thuần, kể cả khi focus hoặc rời ô; định dạng có dấu chấm chỉ hiện ở dòng Giá trị riêng.
-Không ghi DOM value hoặc đổi mask trong khi gõ. Trong composition giữ draft, chốt và kiểm tra số sau compositionend;
-giữ chuỗi nguyên/18 chữ số, không chuyển Number hoặc tự cắt phần vượt giới hạn.
+Ở lần sửa này, ô tiền dùng số thuần và chỉ hiện dấu chấm ở dòng Giá trị. Cách hiển thị hiện tại đã cập nhật
+tại ADR-015; hợp đồng chuỗi nguyên tối đa 18 chữ số giữ nguyên.
 
 Thể loại là một lựa chọn từ danh mục dùng chung ở shared/bookGenres.js, căn cứ tài liệu thể loại người dùng gửi,
 bổ sung nhóm sách cổ/tư liệu. Gõ có/không dấu chỉ lọc danh sách; API sách mới chặn tên ngoài danh mục.
 Giữ tùy chọn để trống và dữ liệu sách cũ, không migration hoặc tự ánh xạ lại lịch sử.
+
+## ADR-020 — Bản kết quả kiểm duyệt cho người bán
+
+Người bán xuất PDF của lần đã được Admin phê duyệt/từ chối. Migration 005 thêm một cột `ket_qua_snapshot` vào bảng KiemDuyet hiện có, không thêm bảng hoặc dependency. Ghi bản kết quả trong cùng transaction với quyết định để không lẫn thông tin/media/AI khi gửi duyệt lại. Với dữ liệu cũ, chỉ dựng và lưu lại quyết định hiện tại còn phù hợp; vòng cũ không có snapshot không được tái tạo bằng dữ liệu mới. PDF dùng bản in A4 riêng và chức năng lưu PDF của trình duyệt, các media giữ dạng link Cloudinary.
+
+## ADR-021 — Ô ISBN nhận chuỗi do người bán cung cấp
+
+Theo yêu cầu ngày 31/10/2026, bỏ ràng buộc chính xác 10/13 ký tự ở frontend, Backend và SQL. Dùng chung ISBN_MAX_LENGTH=100; giữ nội dung và dấu phân cách, không ép uppercase hoặc chuyển Number. Migration 006 mở rộng cột hiện có thành NVARCHAR(100), bỏ check định dạng cũ, giữ check không rỗng và chỉ mục. Không tự xác nhận mã người đăng nhập là ISBN chuẩn; Admin tiếp tục đối chiếu. Không sửa dữ liệu hay hash nguồn của phân tích AI cũ.
+
+
+## ADR-022 — AI nhiều media, timeout thích ứng và lease
+
+Theo lỗi lặp lại ngày 31/10/2026, thay bước tải tuần tự bằng tối đa bốn tải song song theo lô,
+giữ thứ tự/mã bằng chứng và ngân sách ảnh inline 12 MiB (video dùng Files API theo quyết định mới bên dưới). Bước chuẩn bị có deadline riêng; tệp bỏ qua vẫn nằm trong manifest.
+Thời gian từng lượt Gemini = cơ sở + 4 giây/media thực gửi, có trần 300 giây mặc định; tối đa hai lượt
+chỉ với lỗi tạm thời, dùng lại payload. Đọc body cũng nằm trong deadline. Dùng thinking_level=low,
+giữ output 8192 để tránh cắt JSON; Admin vẫn quyết định và hai điểm giữ NULL khi không đủ dữ liệu.
+
+Lease AI 60 giây được gia hạn mỗi 15 giây suốt tác vụ; mất lease/worker dừng thì hủy và để pending,
+không lưu kết quả giả. Replay SQL dùng cache/receipt cũ. Có thể gọi provider lại sau crash trước cache;
+không cam kết đúng một lượt hay hết mọi sự cố Gemini/mạng. Admin thấy tiến độ và thống kê an toàn;
+kết quả cũ được đánh dấu khi phân tích lại. Không đổi schema/dependency/hash nguồn, nhà cung cấp hoặc cấu hình riêng.
+
+
+## ADR-023 — Danh sách kiểm duyệt giữ bài đã từ chối
+
+Theo xác nhận ngày 31/10/2026, trang Admin hiển thị chờ duyệt và từ chối mặc định, ưu tiên nhóm chờ.
+Phê duyệt loại khỏi danh sách theo trạng thái hiện tại, không xóa lịch sử hoặc tự kích hoạt phiên.
+Từ chối chỉ đọc lại quyết định; chỉ sau khi người bán gửi lại mới có thể duyệt lượt mới.
+Dùng bộ lọc/cursor nhóm + ID phía server để bài chờ không bị chìm sau nhiều bài từ chối khi phân trang.
+Giữ route /posts/pending và quyền Admin; chỉ endpoint này dùng nextBefore dạng nhóm:ID.
+Không thêm bảng/cột/dependency hoặc đổi hợp đồng danh mục/người bán. Xem flows.md để tra bộ lọc/cursor.
+
+
+## ADR-024 — Hồ sơ theo bài và media lịch sử
+
+Theo chốt của người dùng, gửi duyệt lại cho sửa đủ thông tin sách và gỡ media cũ khỏi hồ sơ mới.
+Không UPDATE Sach dùng chung: mỗi BaiDang lưu ho_so_sach; dữ liệu cũ NULL fallback về Sach.
+Đăng lại copy hồ sơ nguồn và giữ sach_id. HinhAnh/Video dùng cờ active, không DELETE/destroy file lịch sử.
+Trước resubmit chụp quyết định legacy hiện tại nếu thiếu snapshot; lịch sử/PDF không dùng đầu vào vòng mới.
+Dùng transaction/version/owner/state guard, AI chỉ xếp lịch khi Admin chủ động nhấn nút. Không thêm bảng/dependency;
+migration 007 thêm ba cột, schema 21/165 và 99 check. Client cũ không gửi sách/gỡ media vẫn giữ dữ liệu.
+
+## ADR-025 — Đối soát phản hồi Cloudinary
+
+Tách timeout video 300 giây khỏi ảnh 120 giây và cho client chờ đủ cả body/provider/lookup. Sau lỗi tạm thời, tra đọc đúng public ID đã cấp tối đa ba lần; không upload lại bytes hay đoán URL. Chỉ trả ready sau xác minh identity/kind/URL và Redis; trạng thái chưa rõ vẫn thất bại. Lookup cần quyền/hạn mức Admin API, không cam kết đúng một upload qua crash hoặc mọi lần chọn lại. Media error trả thông báo tĩnh và log HTTP/transport an toàn, không quy mọi lỗi thành Docker hoặc lộ body provider. Không đổi nghiệp vụ/quyền/SQL/dependency; staging cleanup và SQL reference guard giữ nguyên.
+
+
+## ADR-026 — AI chỉ theo yêu cầu Admin
+
+Bài mới, đăng lại, gửi duyệt lại và thao tác đọc trạng thái không tự tạo phân tích.
+Bỏ callback enqueue sau lưu và vòng quét pending của worker. Admin dùng endpoint có CSRF/version
+để bắt đầu; admission vẫn gộp yêu cầu manual đang chạy cùng phiên bản. Job auto cũ bị bỏ qua,
+không gộp vào yêu cầu manual mới; lịch sử SQL đã lưu được giữ nguyên.
+Phân biệt chưa chạy, đang chạy, thất bại và phân tích thiếu dữ liệu. Chỉ hiện ô điểm khi có kết quả
+không thất bại; chưa chạy dùng “Phân tích bằng AI”, đã chạy dùng “Phân tích lại bằng AI”.
+Không đổi tiêu chí, trọng số, NULL, quyền xem của người bán hoặc quyền quyết định thủ công.
+
+
+## ADR-027 — Video AI dài dùng Files API
+
+Giữ video Cloudinary làm bằng chứng gốc; không thêm luồng đăng YouTube. Ảnh vẫn inline trong
+12 MiB, video dùng Files API riêng: upload một lần/tệp, chờ ACTIVE, tham chiếu URI qua Interactions.
+Không đặt clip offset hoặc cắt ở phút thứ 5, không thay cả video bằng vài frame; mặc định Gemini lấy mẫu.
+Tải/chuẩn bị tuần tự và có dung lượng/deadline riêng; manifest giữ đúng M1… và link gốc, không lưu URI tạm.
+Thử xóa file Google khi kết thúc, chấp nhận TTL của Files API nếu crash/lost-response/cleanup lỗi.
+Không đổi API key, model, hai điểm/NULL, quyền Admin, SQL schema, giới hạn upload gốc hoặc dependency.
+
+
+## ADR-028 — Nháp cục bộ và upload qua điều hướng
+
+Nháp theo tài khoản/chế độ/bài ở trình duyệt; không thêm bảng hoặc đồng bộ thiết bị.
+Upload sống ngoài component để đổi route SPA không mất kết quả; reload có thể ngắt lượt chưa hoàn tất,
+không tự POST lặp. Vé staging vẫn một giờ. Chỉ discard tệp mới sau xác nhận bỏ nháp, không xóa file lịch sử;
+gửi thành công mới xóa nháp, UUID retry được giữ. Source version đổi thì không áp dụng nháp cũ.
+
+## ADR-029 — Tìm kiếm SQL và hộp thông báo bền vững
+
+Tìm kiếm dùng LIKE tham số hóa/collation và allowlist sort/filter, không thêm bảng tìm kiếm.
+ThongBao (migration 004) là hộp riêng, đồng bộ khi đọc từ nguồn nghiệp vụ đã COMMIT,
+UNIQUE người nhận/nguồn chống trùng; frontend polling 10 giây/focus/online. Không dùng trigger,
+không coi Socket/PubSub công khai là thông báo riêng, chưa có push/email/outbox.
+Không copy chat/bằng chứng/giá ẩn vào thông báo. Xem [ui-integration.md](ui-integration.md).
+
+
+## ADR-030 — Kiểm duyệt tự động theo hai điểm độc lập
+
+**Đã được thay thế bởi ADR-031; phần dưới giữ làm lịch sử.**
+
+Theo yêu cầu ngày 06/11/2026, có thể bật tự duyệt với hai ngưỡng cấu hình bắt buộc. Backend dùng điểm đã tính và bằng chứng, không lấy quyết định từ văn bản Gemini. Cả hai điểm đạt thì phê duyệt; không đủ điểm hoặc thiếu bằng chứng thì ghi lý do để bổ sung. Lỗi kỹ thuật giữ chờ và thử lại có giãn cách.
+
+SQL lưu phân tích, quyết định, snapshot và cập nhật trạng thái nguyên tử; quyết định tự duyệt có `phan_tich_id`, không gán Admin giả. Worker phục hồi bài chờ từ SQL, kiểm tra lại phiên bản và dùng receipt chống ghi lặp. Admin chỉ theo dõi khi bật tự duyệt; chế độ thủ công vẫn dùng được cho môi trường thử. Phê duyệt không kích hoạt phiên. Xem [cấu hình](ai-analysis.md#admin-quyết-định-ai-hỗ-trợ).
+
+### Cập nhật: tự duyệt trong luồng sử dụng bình thường
+
+API xếp hàng sau khi lưu bài; worker quét SQL làm đường phục hồi. Cờ `AI_AUTO_MODERATION` cũ không còn
+quyết định luồng này. Hai ngưỡng mặc định 70/100, vẫn cho phép cấu hình riêng. Admin chỉ yêu cầu phân tích
+lại bài đang chờ đã có một lần phân tích cùng phiên bản. Lỗi HTTP 503 được thử lại có giãn cách và có thể
+dùng model Gemini dự phòng đã cấu hình; lỗi dịch vụ không sinh quyết định từ chối.
+
+## ADR-031 — Admin quyết định, AI tự phân tích và gợi ý
+
+Theo phạm vi chốt ngày 11/11/2026: chỉ thay quyền quyết định, phân tích AI, vai trò hai điểm và lý do.
+AI tự chạy sau gửi hồ sơ, không tạo KiemDuyet hoặc đổi trạng thái bài/phiên. Admin vẫn quyết định khi AI lỗi/NULL/điểm thấp, với căn cứ bắt buộc.
+Migration 010 cho phép Admin tham khảo một phân tích; giữ nguyên quyết định AI lịch sử. Lưu quyết định nguyên tử và chống phiên bản cũ.
+Thời gian AI chỉ Admin thấy. Yêu cầu sau đó được chỉnh thành ước tính sơ bộ ngay từ tải hồ sơ, không cần mẫu lịch sử; xem ADR-032.
+Giữ nguyên cơ chế giá kết thúc sớm, kích hoạt, tranh chấp và giao dịch. Phạm vi là đồ án sàn sách giữa người dùng;
+thay đổi này không phải xác nhận hệ thống đã đáp ứng toàn bộ pháp luật kinh doanh/đấu giá.
+
+## ADR-032 — Ước tính thời gian ngay từ hồ sơ
+
+Theo chỉnh lại yêu cầu: bỏ điều kiện 5 mẫu và truy vấn thống kê mỗi lần polling.
+Hiển thị khoảng dự kiến theo độ dài thông tin, số ảnh/video; cập nhật theo dung lượng và thời lượng khi biết.
+Các hệ số là giả định kỹ thuật được ghi rõ trong ai-analysis.md, không gọi là thời gian trung bình thực nghiệm.
+Không đổi điểm AI, quyết định Admin, timeout, quota hoặc công bố dữ liệu cho người bán.

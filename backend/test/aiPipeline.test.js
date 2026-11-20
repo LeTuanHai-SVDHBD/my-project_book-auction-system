@@ -6,7 +6,8 @@ import {createAiProcessor} from '../src/ai/processor.js';
 import {createAiService} from '../src/services/ai.service.js';
 import {analysisView} from '../src/ai/input.js';
 import {META_CRITERION} from '../src/ai/criteria.js';
-const job=()=>({postId:1,requestId:randomUUID(),sourceVersion:'0000000000000001',inputHash:'a'.repeat(64),state:'queued'});
+import {setTimeout as delay} from 'node:timers/promises';
+const job=()=>({postId:1,requestId:randomUUID(),sourceVersion:'0000000000000001',inputHash:'a'.repeat(64),trigger:'manual',state:'queued'});
 function fixture(){
   let cached=null,receipt=null,output=null,calls=0,writes=0;const row={row_version:'0000000000000001',trang_thai_phien:'cho_kiem_duyet'};
   const queue={get:async()=>cached,update:async(j,patch)=>(cached={...j,...patch})};
@@ -32,11 +33,25 @@ test('lỗi Gemini lưu thất bại với hai điểm NULL; dữ liệu đã th
 });
 test('tắt AI không enqueue hoặc sinh phân tích giả; Redis lỗi không chặn đọc SQL đã có',async()=>{
   const service=createAiService({posts:{detail:async()=>({row_version:'0000000000000001',ai:null})},model:{history:async()=>[]},queue:{enqueue:()=>assert.fail(),status:async()=>{throw Error('Redis down');}},config:{configured:false}});
-  assert.equal(await service.enqueue(1),null);await assert.rejects(service.request(1,{vai_tro:'admin'},'0000000000000001'),{status:503});
+  await assert.rejects(service.request(1,{vai_tro:'admin'},'0000000000000001'),{status:503});
   assert.equal((await service.status(1,{vai_tro:'admin'})).analysis,null);
 });
-test('job tự động trùng phiên bản dùng kết quả đã lưu, Admin yêu cầu mới vẫn được phân tích lại',async()=>{
-  const f=fixture();f.model.forVersion=async()=>({phan_tich_id:9});const handle=createAiProcessor(f.options);
-  await handle({...job(),trigger:'auto'});assert.equal(f.calls(),0);assert.equal(f.writes(),0);
+test('bỏ qua job tự động tồn từ bản cũ; chỉ yêu cầu manual của Admin được gọi provider',async()=>{
+  const f=fixture();const handle=createAiProcessor(f.options);
+  await handle({...job(),trigger:'auto'});assert.equal(f.calls(),0);assert.equal(f.writes(),0);assert.equal(f.cached().state,'skipped');
   await handle({...job(),trigger:'manual'});assert.equal(f.calls(),1);assert.equal(f.writes(),1);
+});
+test('gia hạn khóa trong khi provider chậm, mất quyền thì ngắt và không lưu thất bại giả',async()=>{
+  const f=fixture();let renewed=0,released=0;
+  f.options.config.leaseRenewMs=5;f.options.locks.acquire=async()=>({renew:async()=>{renewed++;return true;},release:async()=>{released++;}});
+  const analyze=f.provider.analyze;f.provider.analyze=async(...args)=>{await delay(40);return analyze(...args);};
+  await createAiProcessor(f.options)(job());assert(renewed>=2);assert.equal(released,1);assert.equal(f.writes(),1);
+  const lost=fixture();lost.options.config.leaseRenewMs=5;lost.options.locks.acquire=async()=>({renew:async()=>false,release:async()=>{}});
+  lost.provider.analyze=async(row,signal)=>{await delay(200,undefined,{signal});return analyze();};
+  await assert.rejects(createAiProcessor(lost.options)(job()),/AI_LEASE_LOST/);assert.equal(lost.writes(),0);assert(!lost.cached().result);
+});
+test('timeout lưu hai điểm NULL, giữ chẩn đoán media/timing an toàn cho Admin và cache lỗi cuối',async()=>{
+  const f=fixture();f.row.media=[{kind:'image',url:'https://res.cloudinary.com/demo/image/upload/a.png'}];
+  f.provider.analyze=async()=>{throw Object.assign(Error('private'),{code:'AI_TIMEOUT',aiContext:{media:[{...f.row.media[0],id:'M1',sent:true}],execution:{attempts:2,media_total:1,media_sent:1,secret:'private'}}});};
+  await createAiProcessor(f.options)(job());assert.equal(f.output().result.diem_do_hiem,null);assert.equal(f.output().result.diem_tinh_trang,null);assert.equal(f.output().metadata.media.length,1);assert.equal(f.output().metadata.execution.attempts,2);assert(!JSON.stringify(f.output()).includes('private'));
 });

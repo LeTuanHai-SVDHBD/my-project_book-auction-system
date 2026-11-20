@@ -62,6 +62,14 @@ test('Redis thật: TTL 2 giờ, gia hạn, hết hạn, thu hồi session và g
     for (const sessionKey of keys) await redis.pExpire(sessionKey, 1);
     await new Promise(resolve => setTimeout(resolve, 15));
     assert.equal((await call('/me')).response.status, 401);
+    // Đăng nhập lặp hợp lệ không khóa email ở lượt 11; trần IP không bị xóa bởi thành công.
+    for(let i=0;i<12;i++)assert.equal((await call('/login',{email:user.email,mat_khau:'test-password-long-enough'})).response.status,200);
+    const input={ip:'test-preserved-ip',email:'reset@example.test'};
+    for(let i=0;i<50;i++){
+      assert.equal(await limiter.consume('login',input),0);
+      await limiter.resetLogin(input.email);
+    }
+    assert((await limiter.consume('login',input))>0,'Thành công không được xóa trần IP');
     const attempts = await Promise.all(Array.from({ length: 20 }, () => limiter.consume('login', { ip: 'test-concurrency-ip', email: 'concurrent@example.test' })));
     assert.equal(attempts.filter(value => value === 0).length, 10);
     assert.equal(attempts.filter(value => value > 0).length, 10);

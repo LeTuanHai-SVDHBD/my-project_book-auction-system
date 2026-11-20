@@ -7,10 +7,12 @@
 Áp dụng cho repository `my-project_book-auction-system` — hệ thống đấu giá sách trực tuyến của Nhóm 15.
 
 Tài liệu kỹ thuật nằm trong `docs/`; báo cáo, slide và mã UML nằm trong `academic/`.
+Bắt đầu tại README, hướng dẫn vận hành `docs/setup-guide.md` và bằng chứng hiện tại trong VALIDATION.md;
+`docs/archive/` là lịch sử, không thay hợp đồng triển khai hiện tại.
 
 Công nghệ:
-- Frontend: React và Vite.
-- Backend: Node.js và Express, sử dụng JavaScript ES Modules.
+- Frontend: React và Vite, JavaScript ES Modules.
+- Backend: Node.js 24.x và Express, sử dụng JavaScript ES Modules.
 - Cơ sở dữ liệu: SQL Server.
 - Hàng đợi sự kiện và phối hợp xử lý: Redis Streams, Redis.
 - Cập nhật thời gian thực: Socket.IO.

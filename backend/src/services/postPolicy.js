@@ -12,3 +12,17 @@ export function canRelist({sourceId,latestId,state,outcome}) {
 export function assertRelistable(input) {
   if(!canRelist(input))throw new HttpError(409,'POST_CONFLICT','Chỉ đăng lại phiên mới nhất của sách đã kết thúc và có kết quả không có người thắng.');
 }
+
+/** Image count has no per-listing business cap; video count includes reused media. */
+export function assertVideoLimit(items,maxVideos) {
+  if(items.filter(item=>item.kind==='video').length>maxVideos)throw new HttpError(400,'MEDIA_COUNT',`Tối đa ${maxVideos} video cho mỗi bài đăng.`);
+}
+
+export function resolveCoverImage(choice,existing,uploads) {
+  if(!choice)return null;
+  const image=choice.uploadId
+    ? uploads.find(item=>item.kind==='image'&&item.uploadId===choice.uploadId)
+    : existing.find(item=>item.kind==='image'&&item.id===choice.id);
+  if(!image)throw new HttpError(400,'INVALID_POST_INPUT','Ảnh chính phải là một ảnh còn giữ hoặc vừa tải lên cho bài này.');
+  return image;
+}

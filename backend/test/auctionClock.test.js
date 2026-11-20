@@ -1,7 +1,7 @@
 /** Biên đồng hồ UI và chờ kết quả SQL; đồng hồ máy người dùng không quyết định phiên kết thúc. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {observeAuctionClock,auctionTime} from '../../frontend/src/utils/auctionClock.js';
+import {observeAuctionClock,auctionTime,duration} from '../../frontend/src/utils/auctionClock.js';
 const row={server_time:'2026-10-24T01:00:00Z',thoi_gian_bat_dau:'2026-10-24T01:00:10Z',thoi_gian_ket_thuc:'2026-10-24T01:01:10Z'};
 test('đếm theo mốc SQL, qua giờ bắt đầu và hết giờ chỉ chờ xác nhận',()=>{
   const clock=observeAuctionClock(row,100);
@@ -12,4 +12,9 @@ test('đếm theo mốc SQL, qua giờ bắt đầu và hết giờ chỉ chờ 
   assert.deepEqual(auctionTime(clock,'da_ket_thuc',11000),{phase:'closed',seconds:0});
   assert.equal(auctionTime(null,'da_kich_hoat',100).phase,'unknown');
   assert.throws(()=>observeAuctionClock({...row,server_time:'invalid'},100));
+});
+test('đổi giờ dài thành ngày và giờ lẻ; phiên ngắn không hiện 0 ngày',()=>{
+  assert.equal(duration(526*3600+58*60+36),'21 ngày 22 giờ 58 phút 36 giây');
+  assert.equal(duration(86400),'1 ngày 0 giờ 0 phút 0 giây');
+  assert.equal(duration(3599),'0 giờ 59 phút 59 giây');
 });

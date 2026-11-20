@@ -13,6 +13,10 @@ return retry`;
 export function createAuthRateLimiter({ getRedis, secret, prefix = 'bookauction:auth:limit:' }) {
   const digest = value => createHmac('sha256', secret).update(value).digest('hex');
   return {
+    // Chỉ đặt lại giới hạn theo email sau khi đăng nhập thành công; IP vẫn giữ trần chống lạm dụng.
+    async resetLogin(email) {
+      await getRedis().del(`${prefix}login:${digest(`email:${email}`)}`);
+    },
     async consume(action, { ip, email = '' }) {
       const policies = {
         login: { seconds: 900, entries: [[`ip:${ip}`, 50], [`email:${email}`, 10]] },

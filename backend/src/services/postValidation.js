@@ -1,6 +1,8 @@
 /** Hợp đồng bài đăng: tên trường theo schema, tiền VND nguyên dưới dạng chuỗi, lịch có múi giờ. */
 import { HttpError } from '../middlewares/errorHandler.js';
 import {BOOK_GENRES} from '../../../shared/bookGenres.js';
+import {conditionPreview} from '../../../shared/bookCondition.js';
+import {ISBN_MAX_LENGTH} from '../../../shared/bookIdentifiers.js';
 const bad = message => { throw new HttpError(400, 'INVALID_POST_INPUT', message); };
 export function object(value, allowed, name) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) bad(`${name} không hợp lệ.`);
@@ -28,37 +30,59 @@ function money(value, name) {
   if (typeof value !== 'string' || !/^[1-9]\d{0,17}$/.test(value)) bad(`${name} phải là chuỗi số nguyên VND dương, tối đa 18 chữ số.`);
   return value;
 }
-export function validatePost(body, { mode = 'create', maxImages = 12, maxVideos = 3 } = {}) {
-  object(body, ['ma_yeu_cau', 'sach', 'bai_dang', 'phien', 'media', 'reuse_media', 'row_version'], 'Bài đăng');
+export function validatePost(body, { mode = 'create' } = {}) {
+  object(body, ['ma_yeu_cau', 'sach', 'bai_dang', 'phien', 'media', 'reuse_media', 'row_version', 'remove_media', 'cover_image'], 'Bài đăng');
   if (body.reuse_media !== undefined && typeof body.reuse_media !== 'boolean') bad('reuse_media không hợp lệ.');
-  const book = mode === 'create' ? object(body.sach, ['ten_sach','tac_gia','the_loai','nha_xuat_ban','nam_xuat_ban','isbn','tinh_trang_sach','mo_ta'], 'Sách') : null;
-  if (mode !== 'create' && body.sach !== undefined) bad('Đăng lại/gửi duyệt lại không sửa bản ghi Sách dùng trong lịch sử.');
+  const book = mode !== 'relist' && body.sach !== undefined ? object(body.sach, ['ten_sach','tac_gia','the_loai','nha_xuat_ban','nam_xuat_ban','isbn','tinh_trang_sach','mo_ta'], 'Sách') : null;
+  if (mode === 'create' && !book) bad('Thiếu thông tin Sách.');
+  if (mode === 'relist' && body.sach !== undefined) bad('Đăng lại giữ hồ sơ Sách từ bài nguồn.');
+  if (mode !== 'resubmit' && body.remove_media !== undefined) bad('Chỉ gỡ media khi gửi duyệt lại.');
+  const removed = body.remove_media === undefined ? [] : body.remove_media;
+  if (!Array.isArray(removed)) bad('Danh sách media gỡ không hợp lệ.');
+  const removeMedia = removed.map(item=>{object(item,['kind','id'],'Media gỡ');if(!['image','video'].includes(item.kind))bad('Loại media gỡ không hợp lệ.');return {kind:item.kind,id:id(item.id)};});
+  if(new Set(removeMedia.map(item=>`${item.kind}:${item.id}`)).size!==removeMedia.length)bad('Không lặp media gỡ.');
   const post = object(body.bai_dang, ['tieu_de','mo_ta_tinh_trang'], 'Nội dung bài đăng');
+  const normalizedPost = { tieu_de: text(post.tieu_de, 300, 'Tiêu đề bài đăng', true),
+    mo_ta_tinh_trang: text(post.mo_ta_tinh_trang, 12000, 'Tình trạng, yếu tố quý hiếm và bằng chứng', true) };
   const auction = object(body.phien, ['gia_khoi_diem','gia_toi_thieu','buoc_gia','thoi_gian_cho_dat_lai'], 'Thông số giá');
   const prices = { gia_khoi_diem: money(auction.gia_khoi_diem, 'Giá khởi điểm'),
     gia_toi_thieu: money(auction.gia_toi_thieu, 'Giá kết thúc sớm'), buoc_gia: money(auction.buoc_gia, 'Bước giá'),
     thoi_gian_cho_dat_lai: auction.thoi_gian_cho_dat_lai ?? 20 };
   if (BigInt(prices.gia_toi_thieu) < BigInt(prices.gia_khoi_diem)) bad('Giá kết thúc sớm phải lớn hơn hoặc bằng giá khởi điểm.');
   if (!Number.isInteger(prices.thoi_gian_cho_dat_lai) || prices.thoi_gian_cho_dat_lai < 10 || prices.thoi_gian_cho_dat_lai > 30) bad('Thời gian chờ đặt lại phải từ 10 đến 30 giây.');
-  if (!Array.isArray(body.media) || body.media.length > maxImages + maxVideos) bad('Danh sách media không hợp lệ.');
+  if (!Array.isArray(body.media)) bad('Danh sách media không hợp lệ.');
   const media = body.media.map(item => {
     object(item, ['upload_id','tieu_de'], 'Media');
     return { upload_id: uuid(item.upload_id), tieu_de: text(item.tieu_de, 500, 'Tiêu đề media') };
   });
   if (new Set(media.map(item => item.upload_id)).size !== media.length) bad('Không lặp mã upload trong cùng bài đăng.');
+  let coverImage=null;
+  if(body.cover_image!==undefined){
+    const choice=object(body.cover_image,['id','upload_id'],'Ảnh chính');
+    if(Object.keys(choice).length!==1)bad('Chọn đúng một ảnh chính.');
+    if(Object.hasOwn(choice,'upload_id')){
+      const uploadId=uuid(choice.upload_id);
+      if(!media.some(item=>item.upload_id===uploadId))bad('Ảnh chính phải nằm trong danh sách tệp gửi lên.');
+      coverImage={uploadId};
+    }else{
+      if(mode==='create'||mode==='relist'&&body.reuse_media!==true)bad('Ảnh chính phải thuộc media được giữ lại.');
+      const imageId=id(choice.id);
+      if(removeMedia.some(item=>item.kind==='image'&&item.id===imageId))bad('Không thể chọn ảnh đã gỡ làm ảnh chính.');
+      coverImage={id:imageId};
+    }
+  }
   let normalizedBook;
   if (book) {
-    if(book.the_loai!==undefined&&book.the_loai!==null&&book.the_loai!==''&&!BOOK_GENRES.includes(book.the_loai))bad('Hãy chọn thể loại trong danh mục.');
+    if(mode==='create'&&book.the_loai!==undefined&&book.the_loai!==null&&book.the_loai!==''&&!BOOK_GENRES.includes(book.the_loai))bad('Hãy chọn thể loại trong danh mục.');
     normalizedBook = { ten_sach: text(book.ten_sach, 300, 'Tên sách', true), tac_gia: text(book.tac_gia, 200, 'Tác giả'),
       the_loai: text(book.the_loai, 100, 'Thể loại'), nha_xuat_ban: text(book.nha_xuat_ban, 200, 'Nhà xuất bản'),
-      tinh_trang_sach: text(book.tinh_trang_sach, 1000, 'Tình trạng sách', true), mo_ta: text(book.mo_ta, 12000, 'Mô tả sách'),
-      nam_xuat_ban: book.nam_xuat_ban ?? null, isbn: text(book.isbn, 13, 'ISBN') };
+      tinh_trang_sach: text(book.tinh_trang_sach, 1000, 'Tình trạng sách') ?? conditionPreview(normalizedPost.mo_ta_tinh_trang), mo_ta: text(book.mo_ta, 12000, 'Mô tả sách'),
+      nam_xuat_ban: book.nam_xuat_ban ?? null, isbn: text(book.isbn, ISBN_MAX_LENGTH, 'ISBN') };
     if (normalizedBook.nam_xuat_ban !== null && (!Number.isInteger(normalizedBook.nam_xuat_ban) || normalizedBook.nam_xuat_ban < 1 || normalizedBook.nam_xuat_ban > 9999)) bad('Năm xuất bản phải từ 1 đến 9999.');
-    if (normalizedBook.isbn && !/^(?:\d{13}|\d{9}[\dX])$/.test(normalizedBook.isbn)) bad('ISBN cần 13 chữ số hoặc ISBN-10 hợp lệ về định dạng.');
   }
   return { requestId: mode === 'resubmit' ? null : uuid(body.ma_yeu_cau), book: normalizedBook,
-    post: { tieu_de: text(post.tieu_de, 300, 'Tiêu đề bài đăng', true), mo_ta_tinh_trang: text(post.mo_ta_tinh_trang, 12000, 'Mô tả tình trạng bản sách', true) },
-    prices, media, reuseMedia: mode !== 'create' && body.reuse_media === true,
+    post: normalizedPost,
+    prices, media, coverImage, removeMedia, reuseMedia: mode !== 'create' && body.reuse_media === true,
     rowVersion: mode === 'resubmit' ? version(body.row_version) : null };
 }
 export function validateReview(body) {

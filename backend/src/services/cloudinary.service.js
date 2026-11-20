@@ -1,43 +1,103 @@
 /** Cloudinary REST phía server; không nhận URL tùy ý, không đưa bí mật vào phản hồi/lỗi. */
+import {detectMedia} from '../../../shared/mediaFormats.js';
+import {randomUUID} from 'node:crypto';
 import { HttpError } from '../middlewares/errorHandler.js';
-export function createCloudinary({ config, fetchImpl = fetch }) {
-  const endpoint = kind => `https://api.cloudinary.com/v1_1/${config.cloudName}/${kind}`;
+import {setTimeout as delay} from 'node:timers/promises';
+import {providerJson} from '../utils/providerJson.js';
+import {mediaFailure,recoverableMediaError} from './mediaErrors.js';
+import {mediaRecoveryDelays} from '../config/media.js';
+const VIDEO_CHUNK_BYTES=6*1024*1024;
+export function createCloudinary({ config, fetchImpl = fetch, wait=delay }) {
+  const root=`https://api.cloudinary.com/v1_1/${config.cloudName}`;
+  const endpoint = kind => `${root}/${kind}`;
   const headers = { Authorization: `Basic ${Buffer.from(`${config.apiKey}:${config.apiSecret}`).toString('base64')}` };
-  async function call(url, body) {
-    if (!config.configured) throw new HttpError(503, 'MEDIA_NOT_CONFIGURED', 'Chưa cấu hình Cloudinary trên API.');
+  async function call(url,body,{operation,timeout,method='POST',signal=AbortSignal.timeout(timeout),extraHeaders,upload}) {
+    if (!config.configured) throw mediaFailure('MEDIA_NOT_CONFIGURED');
+    let stage='awaiting_headers';
+    const diagnostics=()=>upload?{kind:upload.kind,file_bytes:upload.bytes,part:upload.part,parts:upload.parts,timeout_ms:upload.timeout,
+      elapsed_ms:Math.round(performance.now()-upload.started),stage,deadline_reached:signal.aborted}:{};
     try {
-      const response = await fetchImpl(url, { method: 'POST', headers, body, signal: AbortSignal.timeout(config.uploadTimeoutMs) });
-      if (!response.ok) throw new Error('Provider rejected request');
-      return await response.json();
-    } catch { throw new HttpError(502, 'MEDIA_PROVIDER_ERROR', 'Cloudinary chưa xử lý được tệp. Vui lòng thử lại.'); }
+      signal.throwIfAborted();
+      const response=await fetchImpl(url,{method,headers:{...headers,...extraHeaders},body,signal,redirect:'error'});
+      if(!response.ok){
+        stage='http_response';
+        void response.body?.cancel().catch(()=>{});
+        if(operation==='recover'&&response.status===404)return null;
+        const code=[408,504].includes(response.status)?'MEDIA_PROVIDER_TIMEOUT':[401,403].includes(response.status)?'MEDIA_PROVIDER_AUTH':[413,420,429].includes(response.status)?'MEDIA_PROVIDER_LIMIT':response.status>=400&&response.status<500?'MEDIA_PROVIDER_REJECTED':'MEDIA_PROVIDER_ERROR';
+        throw mediaFailure(code,{operation,http_status:response.status,...diagnostics()});
+      }
+      // Plain json() stubs remain supported in existing unit fixtures; real fetch Responses use bounded streams.
+      stage='response_body';
+      return response.body===undefined?await response.json():await providerJson(response,signal);
+    } catch(error) {
+      if(error instanceof HttpError)throw error;
+      const code=signal.aborted||['TimeoutError','AbortError'].includes(error.name)?'MEDIA_PROVIDER_TIMEOUT':error instanceof TypeError?'MEDIA_PROVIDER_NETWORK':'MEDIA_PROVIDER_ERROR';
+      throw mediaFailure(code,{operation,transport_code:error.cause?.code,...diagnostics()});
+    }
+  }
+  function verified(result,kind,publicId) {
+    let url;try{url=new URL(result?.secure_url);}catch{}
+    if(result?.public_id!==publicId||result.resource_type!==kind||result.placeholder||result.type&&result.type!=='upload'||!url||url.protocol!=='https:'||url.hostname!=='res.cloudinary.com'||url.username||url.password||url.port||!url.pathname.startsWith(`/${config.cloudName}/${kind}/upload/`)||result.secure_url.length>2048)throw mediaFailure('INVALID_MEDIA_RESPONSE');
+    return {url:result.secure_url,publicId,kind};
+  }
+  async function sendUpload({kind,publicId,bytes,mime}) {
+    const url=`${endpoint(kind)}/upload`;
+    const timeout=kind==='video'?(config.videoUploadTimeoutMs||300000):config.uploadTimeoutMs;
+    const started=performance.now(),signal=AbortSignal.timeout(timeout);
+    const parts=kind==='video'?Math.ceil(bytes.length/VIDEO_CHUNK_BYTES):1;
+    const upload={kind,bytes:bytes.length,parts,timeout,started};
+    const formFor=part=>{
+      const form=new FormData();
+      form.set('file',new Blob([part],{type:mime}),'upload');
+      form.set('public_id',publicId);form.set('overwrite','false');
+      return form;
+    };
+    if(parts<=1)return call(url,formFor(bytes),{operation:'upload',signal,upload:{...upload,part:1}});
+    const uploadId=randomUUID();
+    for(let start=0;start<bytes.length;start+=VIDEO_CHUNK_BYTES){
+      const end=Math.min(start+VIDEO_CHUNK_BYTES,bytes.length);
+      const response=await call(url,formFor(bytes.subarray(start,end)),{operation:'upload',signal,upload:{...upload,part:start/VIDEO_CHUNK_BYTES+1},extraHeaders:{
+        'X-Unique-Upload-Id':uploadId,'Content-Range':`bytes ${start}-${end-1}/${bytes.length}`
+      }});
+      if(response?.existing)return response;
+      const last=end===bytes.length;
+      if(response?.done!==last)throw mediaFailure('MEDIA_PROVIDER_ERROR',{operation:'upload'});
+      if(last)return response;
+    }
   }
   return {
-    async upload({ kind, publicId, bytes, mime }) {
-      const form = new FormData();
-      form.set('file', new Blob([bytes], { type: mime }), 'upload');
-      form.set('public_id', publicId); form.set('overwrite', 'false');
-      const result = await call(`${endpoint(kind)}/upload`, form);
-      let url; try { url = new URL(result.secure_url); } catch { /* handled below */ }
-      if (result.public_id !== publicId || result.resource_type !== kind || !url || url.protocol !== 'https:' || url.hostname !== 'res.cloudinary.com' || !url.pathname.startsWith(`/${config.cloudName}/`) || result.secure_url.length > 2048) {
-        throw new HttpError(502, 'INVALID_MEDIA_RESPONSE', 'Cloudinary trả về dữ liệu không hợp lệ.');
+    async upload({kind,publicId,bytes,mime}) {
+      let original;
+      try {
+        const result=await sendUpload({kind,publicId,bytes,mime});
+        if(!result||result.done===false)throw mediaFailure('MEDIA_PROVIDER_ERROR',{operation:'upload'});
+        if(!result.existing)return verified(result,kind,publicId);
+        if(result.public_id&&result.public_id!==publicId)throw mediaFailure('INVALID_MEDIA_RESPONSE');
+        original=mediaFailure('MEDIA_PROVIDER_ERROR',{operation:'upload'});
+      }catch(error){if(!recoverableMediaError(error))throw error;original=error;}
+      // Read-only recovery of this server-issued UUID; never repeat the upload or guess a delivery URL.
+      for(const pause of mediaRecoveryDelays(kind)){
+        if(pause)await wait(pause);
+        try{
+          const result=await call(`${root}/resources/${kind}/upload/${encodeURIComponent(publicId)}`,undefined,{operation:'recover',method:'GET',timeout:config.recoveryTimeoutMs||15000});
+          if(result)return verified(result,kind,publicId);
+          original.recoveryDiagnostics={operation:'recover',http_status:404};
+        }catch(error){
+          if(error.code==='INVALID_MEDIA_RESPONSE')throw error;
+          original.recoveryDiagnostics=error.mediaDiagnostics;
+          if(!recoverableMediaError(error))break;
+        }
       }
-      return { url: result.secure_url, publicId, kind };
+      throw original;
     },
-    async destroy({ kind, publicId }) {
-      const result = await call(`${endpoint(kind)}/destroy`, new URLSearchParams({ public_id: publicId, invalidate: 'true' }));
-      if (!['ok', 'not found'].includes(result.result)) throw new HttpError(502, 'MEDIA_DELETE_FAILED', 'Chưa xóa được media.');
+    async destroy({kind,publicId}) {
+      const result=await call(`${endpoint(kind)}/destroy`,new URLSearchParams({public_id:publicId,invalidate:'true'}),{operation:'destroy',timeout:config.uploadTimeoutMs});
+      if(!['ok','not found'].includes(result?.result))throw mediaFailure('MEDIA_DELETE_FAILED');
     },
   };
 }
 export function verifyMedia(bytes, mime, kind) {
-  const prefix = value => bytes.subarray(0, value.length).equals(Buffer.from(value));
-  const valid = kind === 'image' ? (
-    mime === 'image/jpeg' && prefix([255,216,255]) ||
-    mime === 'image/png' && prefix([137,80,78,71,13,10,26,10]) ||
-    mime === 'image/webp' && bytes.toString('ascii',0,4) === 'RIFF' && bytes.toString('ascii',8,12) === 'WEBP'
-  ) : (
-    mime === 'video/mp4' && bytes.toString('ascii',4,8) === 'ftyp' ||
-    mime === 'video/webm' && prefix([26,69,223,163])
-  );
-  if (!valid) throw new HttpError(415, 'INVALID_MEDIA_TYPE', 'Nội dung tệp không khớp định dạng được hỗ trợ.');
+  const actual=detectMedia(bytes);
+  if (!actual || actual.kind!==kind || (mime&&actual.mime!==mime)) throw new HttpError(415, 'INVALID_MEDIA_TYPE', 'Nội dung tệp không phải ảnh/video được hỗ trợ hoặc tệp đã hỏng.');
+  return actual;
 }

@@ -1,7 +1,9 @@
 /** Upload nhị phân từng tệp qua API sau xác thực/CSRF; không dùng multipart parser hay dependency mới. */
+import {mediaFormats} from '../../../shared/mediaFormats.js';
 import express from 'express';
 import { requireUser, requireCsrf, requireRole } from '../middlewares/auth.js';
 import { HttpError } from '../middlewares/errorHandler.js';
+import {mediaFailure} from '../services/mediaErrors.js';
 import { createMediaController } from '../controllers/media.controller.js';
 export function createMediaRouter({ sessionMiddleware, users, config, provider, ledger }) {
   const router=express.Router(); let active=0;
@@ -10,9 +12,9 @@ export function createMediaRouter({ sessionMiddleware, users, config, provider, 
   router.use(sessionMiddleware,requireUser(users),requireRole('nguoi_dung'),requireCsrf);
   for (const kind of ['image','video']) {
     const limit=kind==='image'?config.imageMaxBytes:config.videoMaxBytes;
-    const types=kind==='image'?['image/jpeg','image/png','image/webp']:['video/mp4','video/webm'];
+    const types=mediaFormats.filter(x=>x.kind===kind).map(x=>x.mime);
     router.post(`/${kind}`,(req,res,next)=>{
-      if (!config.configured) return next(new HttpError(503,'MEDIA_NOT_CONFIGURED','Chưa cấu hình Cloudinary trên API.'));
+      if (!config.configured) return next(mediaFailure('MEDIA_NOT_CONFIGURED'));
       if (!types.includes(req.get('content-type'))) return next(new HttpError(415,'UNSUPPORTED_MEDIA','Định dạng tệp không được hỗ trợ.'));
       if (active>=2) return next(new HttpError(429,'UPLOAD_BUSY','API đang tải tệp. Hãy thử lại sau.'));
       active++; let released=false;

@@ -35,13 +35,16 @@ export function scoreObservations(input,{mediaIds=[],sourceUrls=[]}={}) {
       }else if(findings.every(x=>Object.hasOwn(CONDITION_POINTS,x)))point=Math.min(...findings.map(x=>CONDITION_POINTS[x]));
       else flags.push('Kết quả tình trạng không thuộc bảng quy đổi.');
     }
-    if(state==='not_applicable'&&(!evidence||!refs.length))flags.push('Không áp dụng cần có bằng chứng, không dùng thay cho ảnh bị thiếu.');
+    if(state==='not_applicable'){
+      if(criterion.id==='provenance')flags.push('Lai lịch và dấu ấn riêng không dùng trạng thái Không áp dụng.');
+      else if(!evidence||!refs.length)flags.push('Không áp dụng cần có bằng chứng, không dùng thay cho ảnh bị thiếu.');
+    }
     if(flags.length){state='verify';point=null;}
     if(state!=='assessed')point=null;
     const confidence=Number.isFinite(raw.confidence)&&raw.confidence>=0&&raw.confidence<=100?Math.round(raw.confidence*100)/100:null;
     return {tieu_chi:criterion.name,nhom_tieu_chi:criterion.group,trong_so:criterion.weight,diem:point,
       trang_thai_danh_gia:STATUSES[state],bang_chung:evidence,do_tin_cay:confidence,
-      canh_bao:[warning,...flags,...(sources.length?['Nguồn đối chiếu do đầu vào cung cấp; Admin cần kiểm tra nội dung và tính xác thực.']:[])].filter(Boolean).join(' ')||null,
+      canh_bao:[warning,...flags,...(sources.length&&validSources?['Nguồn do người đăng cung cấp; hệ thống chưa đối chiếu độc lập.']:[])].filter(Boolean).join(' ')||null,
       nguon_doi_chieu:JSON.stringify({media:validRefs?refs:[],urls:validSources?sources:[]})};
   });
   const rarity=aggregate(rows,'do_hiem'),condition=aggregate(rows,'tinh_trang');

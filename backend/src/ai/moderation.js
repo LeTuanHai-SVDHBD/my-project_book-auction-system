@@ -1,0 +1,51 @@
+/** Khuyến nghị tham khảo từ hai điểm Backend; không ghi quyết định kiểm duyệt. */
+import {CRITERIA,STATUSES} from './criteria.js';
+const groups=[
+  {key:'rarity',group:'do_hiem',field:'diem_do_hiem',label:'Hỗ trợ đánh giá độ hiếm'},
+  {key:'condition',group:'tinh_trang',field:'diem_tinh_trang',label:'Tình trạng vật lý'},
+];
+const format=value=>Number(value).toLocaleString('vi-VN',{maximumFractionDigits:2});
+const clean=value=>typeof value==='string'?value.replace(/\s+/g,' ').trim().slice(0,460):'';
+const evidenceHints={
+  limited_edition:'Bổ sung ảnh rõ trang ghi giới hạn phát hành, số bản hoặc dấu hiệu nhận diện đúng ấn bản.',
+  special_edition:'Bổ sung ảnh trang nhan đề, bản quyền hoặc chi tiết phân biệt ấn bản này với các lần in khác.',
+  historical_context:'Bổ sung ảnh trang có năm xuất bản, nhà in hoặc nhà xuất bản; nêu căn cứ cho bối cảnh lịch sử đã khai.',
+  provenance:'Bổ sung ảnh rõ các vị trí liên quan, như giấy lót, trang nhan đề hoặc trang giới hạn. Nếu có khai chữ ký, dấu sở hữu hoặc lai lịch đặc biệt, kèm ảnh chi tiết và tài liệu có mã lưu trữ, số hiệu hoặc dấu hiệu nhận diện khớp đúng bản sách.',
+  cover:'Bổ sung ảnh bìa trước, bìa sau và cận cảnh vị trí có dấu hiệu hư hỏng.',
+  spine:'Bổ sung ảnh gáy, bản lề và chỗ liên kết giữa bìa với khối trang.',
+  pages:'Bổ sung ảnh các trang ruột đại diện và cận cảnh chỗ ố, rách hoặc nghi thiếu trang.',
+  edges:'Bổ sung ảnh riêng mép trên, mép dưới và mép ngoài của khối giấy khi đóng sách.',
+  dust_jacket:'Bổ sung ảnh bìa áo nếu có, hoặc bằng chứng cho thấy đúng ấn bản này vốn không có bìa áo.',
+};
+const evidenceHintByName=new Map(CRITERIA.map(({id,name})=>[name,evidenceHints[id]]));
+export function moderationDecision(result, metadata, thresholds) {
+  if (!thresholds || !['thanh_cong','chua_day_du'].includes(result.trang_thai)) return null;
+  // Missing evidence from the submission is different from media that could not be downloaded.
+  if (metadata.media?.some(item=>!item.sent&&['prepare_timeout','download_timeout','unavailable','video_timeout','video_failed','video_access'].includes(item.reason))) return null;
+  const issues=[], summaries=[];
+  for (const {key,group,field,label} of groups) {
+    const minimum=thresholds[key], score=result[field];
+    const criteria=result.chi_tiet.filter(item=>item.nhom_tieu_chi===group);
+    if(score==null){
+      issues.push(`${label}: chưa đủ bằng chứng để tính điểm.`);
+      for(const item of criteria.filter(x=>[STATUSES.missing,STATUSES.verify].includes(x.trang_thai_danh_gia))){
+        const observation=clean(item.bang_chung);
+        const hint=evidenceHintByName.get(item.tieu_chi)||'Bổ sung bằng chứng rõ hơn cho tiêu chí này.';
+        issues.push(`• ${item.tieu_chi} — ${item.trang_thai_danh_gia}.${observation?` Quan sát: ${observation}`:''}\n  ${hint}`);
+      }
+      continue;
+    }
+    if(!Number.isFinite(score)||score<0||score>100)return null;
+    summaries.push(`${label}: ${format(score)}/100 (mức đạt ${format(minimum)}/100).`);
+    if(score>=minimum)continue;
+    issues.push(`${label}: ${format(score)}/100, dưới mức đạt ${format(minimum)}/100.`);
+    for(const item of criteria.filter(x=>x.trang_thai_danh_gia===STATUSES.assessed&&x.diem<minimum)){
+      const hint=evidenceHintByName.get(item.tieu_chi);
+      issues.push(`• ${item.tieu_chi}: ${format(item.diem)}/100. ${clean(item.bang_chung)||'Tiêu chí chưa đạt theo bằng chứng đã phân tích.'}${hint?` Nếu bằng chứng chưa thể hiện đúng bản sách: ${hint}`:''}`);
+    }
+  }
+  const reason=issues.length
+    ? ['AI khuyến nghị bổ sung hoặc từ chối dựa trên bằng chứng hiện có.',...issues,'Vui lòng bổ sung bằng chứng hoặc chỉnh thông tin, sau đó gửi duyệt lại.'].join('\n')
+    : ['Hai nhóm tiêu chí đạt mức yêu cầu.',...summaries,'Admin cần đối chiếu bằng chứng trước khi quyết định.'].join('\n');
+  return {approve:issues.length===0,reason:reason.slice(0,8000),thresholds};
+}

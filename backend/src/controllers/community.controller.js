@@ -1,6 +1,7 @@
 /** Hợp đồng HTTP sau phiên; người thực hiện từ session, không nhận người bán/mua, trạng thái hoặc URL tự chèn. */
+import {HttpError} from '../middlewares/errorHandler.js';
 import {id,object} from '../services/postValidation.js';
-import {validateText,validateRating,validateComplaint,text} from '../services/communityPolicy.js';
+import {validateText,validateRating,validateComplaint,validateComplaintDecision} from '../services/communityPolicy.js';
 export function createCommunityController({model,service}){
   const before=req=>req.query.before===undefined?2147483647:id(req.query.before),key=req=>id(req.params.id),user=req=>req.user;
   return {
@@ -13,10 +14,16 @@ export function createCommunityController({model,service}){
     confirm:async(req,res)=>{object(req.body,[],'Xác nhận');res.json(await model.confirm(key(req),user(req)));},
     rate:async(req,res)=>res.json(await model.rate(key(req),user(req),validateRating(req.body))),
     complain:async(req,res)=>res.status(201).json(await service.complain(key(req),user(req),validateComplaint(req.body))),
-    complaints:async(req,res)=>res.json(await model.listComplaints(user(req),before(req))),
+    complaints:async(req,res)=>{
+      object(req.query,['before','scope'],'Danh sách khiếu nại');
+      const scope=req.query.scope??'all';
+      if(!['all','mine','reply'].includes(scope))throw new HttpError(400,'INVALID_COMPLAINT_SCOPE','Bộ lọc khiếu nại không hợp lệ.');
+      res.json(await model.listComplaints(user(req),before(req),scope));
+    },
+    respond:async(req,res)=>res.status(201).json(await service.respond(key(req),user(req),validateComplaint(req.body,true))),
     complaint:async(req,res)=>res.json(await model.complaintDetail(key(req),user(req))),
     claim:async(req,res)=>{object(req.body,[],'Tiếp nhận');res.json(await model.claim(key(req),user(req)));},
-    resolve:async(req,res)=>{object(req.body,['phan_hoi_admin'],'Kết quả xử lý');res.json(await model.resolve(key(req),user(req),text(req.body.phan_hoi_admin,8000)));},
+    resolve:async(req,res)=>res.json(await model.resolve(key(req),user(req),validateComplaintDecision(req.body))),
     complaintMessages:async(req,res)=>res.json(await model.complaintMessages(key(req),user(req),before(req))),
     comments:async(req,res)=>res.json(await model.comments(key(req),before(req))),
     comment:async(req,res)=>res.status(201).json(await model.comment(key(req),user(req),validateText(req.body,2000))),

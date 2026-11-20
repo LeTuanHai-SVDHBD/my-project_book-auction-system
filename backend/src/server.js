@@ -3,6 +3,8 @@
  * Mở kết nối dịch vụ và xử lý đóng ứng dụng.
  * Không đặt logic nghiệp vụ đấu giá trong file này.
  */
+import {createNotificationModel} from './models/notification.model.js';
+import {createNotificationRouter} from './routes/notification.routes.js';
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { config } from './config/env.js';
@@ -41,6 +43,7 @@ import {createCommunityRouter} from './routes/community.routes.js';
 import {parseAiConfig} from './config/ai.js';
 import {createAiModel} from './models/ai.model.js';
 import {createAiQueue} from './ai/queue.js';
+import {createAiQuotaGate} from './ai/quota.js';
 import {createAiService} from './services/ai.service.js';
 import {createAiRouter} from './routes/ai.routes.js';
 const authConfig = parseAuthConfig(process.env);
@@ -49,14 +52,15 @@ const accountControl=createAccountControl({getRedis:requireRedis,idleSeconds:aut
 const sessionMiddleware = createSessionMiddleware(authConfig, new RedisStore({ client: redis, prefix: 'bookauction:auth:session:' }),{control:accountControl});
 const mediaConfig = parseMediaConfig(process.env);
 const model = createPostModel({getPool,sql});
-const aiService=createAiService({posts:model,model:createAiModel({getPool,sql}),queue:createAiQueue({getRedis:requireRedis}),config:parseAiConfig(process.env)});
+const aiConfig=parseAiConfig(process.env);
+const aiService=createAiService({posts:model,model:createAiModel({getPool,sql}),queue:createAiQueue({getRedis:requireRedis}),config:aiConfig,quota:createAiQuotaGate({getRedis:requireRedis,apiKey:aiConfig.key})});
 const aiRouter=createAiRouter({sessionMiddleware,users,service:aiService});
 const provider = createCloudinary({config:mediaConfig});
 const ledger = createMediaLedger({getRedis:requireRedis,provider,isReferenced:id=>model.isMediaReferenced(id),config:mediaConfig});
 const communityModel=createCommunityModel({getPool,sql});
 const communityRouter=createCommunityRouter({sessionMiddleware,users,model:communityModel,service:createCommunityService({model:communityModel,ledger,log:logError})});
-const service = createPostService({model,ledger,limits:mediaConfig,notify:createAuctionNotifier({getRedis:requireRedis}),enqueueAi:aiService.enqueue,log:logError});
-const postRouter = createPostRouter({sessionMiddleware,users,model,service,limits:mediaConfig});
+const service = createPostService({model,ledger,limits:mediaConfig,autoAnalysis:aiConfig.autoAnalysis,enqueueReview:aiService.enqueueSubmission,notify:createAuctionNotifier({getRedis:requireRedis}),log:logError});
+const postRouter = createPostRouter({sessionMiddleware,users,model,service,limits:mediaConfig,aiConfig});
 const mediaRouter = createMediaRouter({sessionMiddleware,users,config:mediaConfig,provider,ledger});
 const auctionModel=createAuctionModel({getPool,sql});
 const auctionService=createAuctionService({model:auctionModel,publisher:createAuctionPublisher({getRedis:requireRedis})});
@@ -64,7 +68,8 @@ const auctionRouter=createAuctionRouter({sessionMiddleware,users,model:auctionMo
 const authRouter = createAuthRouter({ authConfig, sessionMiddleware, users, passwords,
   limiter: createAuthRateLimiter({ getRedis: requireRedis, secret: authConfig.secret }),
   ready: () => redis.isReady });
-const app = createApp({ config, authRouter, postRouter, mediaRouter, auctionRouter, aiRouter, communityRouter, deps: { sqlserver: databaseStatus, redis: redisStatus, worker: workerStatus },
+const notificationRouter=createNotificationRouter({sessionMiddleware,users,model:createNotificationModel({getPool,sql})});
+const app = createApp({ config, notificationRouter, authRouter, postRouter, mediaRouter, auctionRouter, aiRouter, communityRouter, deps: { sqlserver: databaseStatus, redis: redisStatus, worker: workerStatus },
   probes: { enqueue: () => enqueueProbe(requireRedis()), get: async id => {
     const raw = await requireRedis().get(INFRA.resultPrefix + id); return raw ? JSON.parse(raw) : null;
   } }, log: logError });

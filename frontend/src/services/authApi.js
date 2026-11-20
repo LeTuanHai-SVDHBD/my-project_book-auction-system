@@ -1,10 +1,12 @@
 /** HTTP tài khoản: gửi cookie bằng credentials; CSRF chỉ giữ trong bộ nhớ. */
+import {browserApiBase} from './apiBase.js';
 import {getTabId} from './tabIdentity.js';
 import {getControlId,isAccountReplaced,markAccountReplaced,markAccountExpired,resetAccountControl,replacedError} from './controlIdentity.js';
-const base = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
+const base=browserApiBase();
 let csrfToken;
 let bootstrap;
 let authenticated=false,sessionRevision=0;
+export const getSessionRevision=()=>sessionRevision;
 export function invalidateSession(replaced=true){csrfToken=undefined;authenticated=false;++sessionRevision;if(replaced)markAccountReplaced();else markAccountExpired();}
 export async function apiRequest(path, options = {}) {
   if(isAccountReplaced()&&!['/auth/csrf','/auth/login','/auth/register','/auth/me'].includes(path))throw replacedError();
@@ -16,8 +18,10 @@ export async function apiRequest(path, options = {}) {
   const body = response.status === 204 ? null : await response.json();
   if (!response.ok) {
     if(revision===sessionRevision&&(body?.error==='ACCOUNT_REPLACED'||response.status===401&&authenticated&&body?.error==='UNAUTHENTICATED'))invalidateSession(body?.error==='ACCOUNT_REPLACED');
-    if (body?.error === 'INVALID_CSRF') csrfToken = undefined;
+    if (revision===sessionRevision&&body?.error === 'INVALID_CSRF') csrfToken = undefined;
     const error = new Error(body?.message || 'Chưa thực hiện được yêu cầu.');
+    const retryAfter = Number(response.headers.get('Retry-After'));
+    error.retryAfterSeconds = Number.isSafeInteger(retryAfter) && retryAfter > 0 ? retryAfter : 0;
     error.status = response.status; error.code = body?.error; throw error;
   }
   return body;
@@ -29,9 +33,18 @@ export async function ensureCsrf() {
   return bootstrap;
 }
 export async function apiPost(path, body = {}) {
-  const token = await ensureCsrf();
-  return apiRequest(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': token }, body: JSON.stringify(body) });
+  const revision=sessionRevision;
+  const send=async()=>apiRequest(path,{method:'POST',headers:{'Content-Type':'application/json','x-csrf-token':await ensureCsrf()},body:JSON.stringify(body)});
+  try{return await send();}
+  catch(error){
+    // INVALID_CSRF is returned before the route mutates data. Retry exactly once;
+    // never retry a lost response, business error or request from an older session.
+    if(error.status!==403||error.code!=='INVALID_CSRF'||revision!==sessionRevision)throw error;
+    csrfToken=undefined;
+    return send();
+  }
 }
+
 export const authApi = {
   async current() {
     csrfToken = undefined;

@@ -4,6 +4,7 @@ import {randomUUID,randomBytes} from 'node:crypto';
 import {setTimeout as delay} from 'node:timers/promises';
 import {createClient} from 'redis';
 import {config} from '../backend/src/config/env.js';
+import {parseAiConfig} from '../backend/src/config/ai.js';
 import {getPool,closeDatabase,sql} from '../backend/src/config/database.js';
 import {createUserModel} from '../backend/src/models/user.model.js';
 import {passwords} from '../backend/src/services/password.service.js';
@@ -64,6 +65,7 @@ async function counts(id) {
 }
 try {
   assert.equal(config.mode,'development','Chỉ chạy smoke trong development.');
+  assert.equal(parseAiConfig(process.env).autoAnalysis,false,'Chạy smoke này với API/worker test riêng: AI_TEST_MANUAL_REVIEW=true và DB_DATABASE=BookAuctionTest_*.');
   const seller=new Client(),a=new Client(),b=new Client(),admin=new Client();
   await checkSmokeReadiness({base});
   stage='kết nối SQL của script';pool=await getPool();
@@ -173,6 +175,9 @@ try {
       INSERT @p SELECT bai_dang_id FROM dbo.BaiDang WITH (UPDLOCK,HOLDLOCK) WHERE nguoi_dung_id IN (${ids});
       INSERT @a SELECT phien_dau_gia_id FROM dbo.PhienDauGia WHERE bai_dang_id IN(SELECT id FROM @p);
       INSERT @b SELECT sach_id FROM dbo.BaiDang WHERE bai_dang_id IN(SELECT id FROM @p);
+      DELETE dbo.ThongBao WHERE (loai IN('pending','mine','catalog') AND doi_tuong_id IN(SELECT id FROM @p))
+        OR (loai='trades' AND doi_tuong_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a))))
+        OR (loai='complaints' AND doi_tuong_id IN(SELECT khieu_nai_id FROM dbo.KhieuNai WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a)))));
       DELETE dbo.BangChungKhieuNai WHERE khieu_nai_id IN(SELECT khieu_nai_id FROM dbo.KhieuNai WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a))));
       DELETE dbo.KhieuNai WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a)));
       DELETE dbo.TinNhan WHERE cuoc_tro_chuyen_id IN(SELECT cuoc_tro_chuyen_id FROM dbo.CuocTroChuyen WHERE giao_dich_id IN(SELECT giao_dich_id FROM dbo.GiaoDich WHERE ket_qua_id IN(SELECT ket_qua_id FROM dbo.KetQuaDauGia WHERE phien_dau_gia_id IN(SELECT id FROM @a))));
